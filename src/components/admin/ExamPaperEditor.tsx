@@ -6,6 +6,7 @@ import {
   buttonSecondaryClass,
   cardClass,
 } from "./admin-ui";
+import { parsePastedMcqs } from "@/lib/paste-mcq-parser";
 
 type ExamBrief = {
   id: string;
@@ -50,202 +51,6 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// ── MCQ bulk parser ────────────────────────────────────────────────────
-
-function cleanOptionText(raw: string): string {
-  let s = raw.trim();
-  // Remove leading * / ► markers
-  s = s.replace(/^\*\s*/, "").trim();
-  s = s.replace(/^[\*\-•]+\s*/, "").trim();
-  // Remove trailing ✓ / * / (correct)
-  s = s.replace(/\s*✓\s*$/, "").trim();
-  s = s.replace(/\s*\(correct\)\s*$/i, "").trim();
-  s = s.replace(/\s*\*\s*$/, "").trim();
-  return s;
-}
-
-function parseMCQs(input: string): Array<{ question: string; options: string[]; correctIndex: number }> {
-  const text = input.replace(/\r\n/g, "\n").trim();
-  if (!text) return [];
-
-  // Split into blocks at each question start (numbered or Qnn)
-  const blocks = text.split(/(?=\n\s*(?:\d{1,3}\s*[\.\)]\s+|Q\s*0*\d+\s*[\.\)\:\-]?\s+))/);
-  // Single block case: if no newline delimiter but contains multiple " 2. " inline, fallback to regex match positions
-  let effectiveBlocks = blocks;
-  if (blocks.length === 1 && text.length > 200) {
-    // Try to find all question starts globally
-    const re = /(?:^|\n)\s*(?:Q\s*0*\d+\s*[\.\)\:\-]?\s+|\d{1,3}\s*[\.\)]\s+)/g;
-    const indices: number[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const at = m.index + (m[0].startsWith("\n") ? 1 : 0) + m[0].length - m[0].trimStart().length - (m[0].match(/^\s*(?:Q\s*0*\d+|\d{1,3})/)?.[0].length ?? 0);
-      // Use m.index as block start (keep delimiter)
-      indices.push(m.index);
-    }
-    // dedup sort
-    const uniq = [...new Set(indices)].sort((a, b) => a - b);
-    if (uniq.length > 1) {
-      effectiveBlocks = [];
-      for (let i = 0; i < uniq.length; i++) {
-        const start = uniq[i];
-        const end = uniq[i + 1] ?? text.length;
-        effectiveBlocks.push(text.slice(start, end));
-      }
-    }
-  }
-
-  const results: Array<{ question: string; options: string[]; correctIndex: number }> = [];
-
-  for (const rawBlock of effectiveBlocks) {
-    const block = rawBlock.trim();
-    if (!block) continue;
-
-    // Strip leading question number
-    const stripped = block.replace(/^\s*(?:Q\s*0*\d+\s*[\.\)\:\-]?\s*|\d{1,3}\s*[\.\)]\s*)/i, "").trim();
-    if (!stripped) continue;
-
-    const lines = stripped.split("\n").map((l) => l.trimEnd());
-
-    // Find first option line
-    const optionRe = /^\s*([A-D])\s*[\.\)\:\-\)]\s*(.+)$/i;
-    const answerRe = /^\s*(?:Ans(?:wer)?|Correct(?:\s*Ans(?:wer)?)?)\s*[\:\-\=]?\s*([A-D])\b/i;
-
-    let firstOptionIdx = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (optionRe.test(lines[i])) {
-        firstOptionIdx = i;
-        break;
-      }
-    }
-
-    let questionText = "";
-    let options: string[] = ["", "", "", ""];
-    let correctIndex = 0;
-    let answerFound = false;
-
-    if (firstOptionIdx === -1) {
-      // Try global inline options parse (e.g. "A. foo B. bar C. baz D. qux")
-      const globalOptRe = /\b([A-D])\s*[\.\)\:\-]\s*([^A-D]+?)(?=\s+[A-D]\s*[\.\)\:\-]|\s*(?:Ans|Answer|Correct)\s*[\:\-\=]|\s*$)/gi;
-      const opts: string[] = ["", "", "", ""];
-      let gm: RegExpExecArray | null;
-      let found = false;
-      const inlineText = stripped;
-      while ((gm = globalOptRe.exec(inlineText)) !== null) {
-        const letter = gm[1].toUpperCase();
-        const idx = letter.charCodeAt(0) - 65;
-        if (idx >= 0 && idx < 4) {
-          let raw = gm[2].trim();
-          // Check for * marker before this option (look ahead/behind)
-          const before = inlineText.slice(Math.max(0, gm.index - 2), gm.index);
-          if (before.includes("*")) answerFound = true;
-          raw = cleanOptionText(raw);
-          // Detect trailing * before next option
-          if (raw.endsWith("*")) {
-            raw = cleanOptionText(raw.slice(0, -1));
-            correctIndex = idx;
-            answerFound = true;
-          }
-          // Detect leading * in original match
-          if (gm[0].trim().startsWith("*")) {
-            correctIndex = idx;
-            answerFound = true;
-          }
-          opts[idx] = raw;
-          found = true;
-        }
-      }
-      if (found) {
-        const beforeOpts = inlineText.split(/\bA\s*[\.\)\:\-]/i)[0];
-        questionText = beforeOpts.replace(/^\s*(?:Q\s*0*\d+.*?\n|\d+\s*[\.\)]\s*)/, "").trim();
-        // Answer line at end
-        const ansMatch = inlineText.match(answerRe);
-        if (ansMatch) {
-          correctIndex = ansMatch[1].toUpperCase().charCodeAt(0) - 65;
-          answerFound = true;
-        }
-        options = opts;
-        // Clean up questionText if it still contains options fragment
-        questionText = questionText.split(/\bA\s*[\.\)\:\-]/i)[0].trim();
-      } else {
-        continue;
-      }
-    } else {
-      // Question is lines before first option (joined)
-      const qLines = lines.slice(0, firstOptionIdx).filter((l) => l.trim().length > 0);
-      questionText = qLines.join(" ").trim();
-
-      // Parse options from firstOptionIdx onward until answer or non-option text block
-      for (let i = firstOptionIdx; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        const ansM = trimmed.match(answerRe);
-        if (ansM) {
-          const idx = ansM[1].toUpperCase().charCodeAt(0) - 65;
-          if (idx >= 0 && idx < 4) {
-            correctIndex = idx;
-            answerFound = true;
-          }
-          continue;
-        }
-        const optM = trimmed.match(optionRe);
-        if (optM) {
-          const letter = optM[1].toUpperCase();
-          const idx = letter.charCodeAt(0) - 65;
-          if (idx >= 0 && idx < 4) {
-            let raw = optM[2].trim();
-            // Detect * marker at start of original line
-            const startsWithStar = /^\s*\*/.test(line) || raw.startsWith("*");
-            if (startsWithStar) {
-              correctIndex = idx;
-              answerFound = true;
-              raw = raw.replace(/^\*\s*/, "");
-            }
-            // Detect (correct) or ✓ at end
-            if (/\b(correct)\b/i.test(raw) || raw.endsWith("✓") || raw.endsWith("*")) {
-              correctIndex = idx;
-              answerFound = true;
-            }
-            options[idx] = cleanOptionText(raw);
-          }
-        } else {
-          // Continuation of previous option or stray line — if we already have options, append to last non-empty option
-          if (trimmed.length > 0 && options.some((o) => o)) {
-            // Find last filled option index
-            let last = -1;
-            for (let k = 3; k >= 0; k--) if (options[k]) { last = k; break; }
-            if (last >= 0 && !answerRe.test(trimmed) && !optionRe.test(trimmed)) {
-              // Treat as continuation only if not answer line
-              // Avoid appending answer-explanation lines
-              if (trimmed.length < 120) options[last] = `${options[last]} ${cleanOptionText(trimmed)}`.trim();
-            }
-          }
-        }
-      }
-    }
-
-    questionText = questionText.replace(/\s+/g, " ").trim();
-    options = options.map((o) => o.replace(/\s+/g, " ").trim());
-
-    const filled = options.filter((o) => o.length > 0);
-    if (questionText.length < 2) continue;
-    if (filled.length < 2) continue;
-
-    // If answer not found, keep 0 (will be editable)
-    if (!answerFound) correctIndex = 0;
-    if (correctIndex < 0 || correctIndex > 3) correctIndex = 0;
-    // Ensure correct option not empty — if it is, fallback to first non-empty
-    if (!options[correctIndex]) {
-      const firstNonEmpty = options.findIndex((o) => o);
-      if (firstNonEmpty >= 0) correctIndex = firstNonEmpty;
-    }
-
-    results.push({ question: questionText, options, correctIndex });
-  }
-
-  return results;
-}
-
 export default function ExamPaperEditor({
   exam,
   authHeaders,
@@ -267,6 +72,7 @@ export default function ExamPaperEditor({
   const [notice, setNotice] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState<number | null>(null);
   const [imageUploadingSlot, setImageUploadingSlot] = useState<number | null>(null);
+  const [detectWarnings, setDetectWarnings] = useState<Record<number, string[]>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bearer = useMemo(() => authHeaders["Authorization"] || authHeaders["authorization"] || "", [authHeaders]);
 
@@ -433,12 +239,17 @@ export default function ExamPaperEditor({
   async function handleDetect() {
     setError(null);
     setNotice(null);
+    setDetectWarnings({});
     if (!bulkText.trim()) {
       setError("Paste your questions first.");
       return;
     }
-    const parsed = parseMCQs(bulkText);
-    if (parsed.length === 0) {
+    const parsed = parsePastedMcqs(bulkText);
+    // Filter out totally invalid blocks (no question and <2 options) but keep those with warnings (partial)
+    const validParsed = parsed.filter((p) => p.question.trim().length >= 2 && p.options.filter((o) => o.trim()).length >= 2);
+    const hasAnyValid = validParsed.length > 0 ? validParsed : parsed;
+    const useParsed = hasAnyValid.length > 0 ? hasAnyValid : parsed;
+    if (useParsed.length === 0 || useParsed.every((p) => p.options.filter((o) => o.trim()).length < 2 && p.question.trim().length < 3)) {
       setError("No questions detected. Check the format (numbered questions with A–D options).");
       return;
     }
@@ -448,32 +259,63 @@ export default function ExamPaperEditor({
     }
     setDetectBusy(true);
     try {
-      const count = Math.min(parsed.length, totalSlots);
-      // Update drafts locally first for instant fill
+      const count = Math.min(useParsed.length, totalSlots);
+      const extra = useParsed.length - totalSlots;
+      // Build warnings per slot (for those with issues)
+      const warnings: Record<number, string[]> = {};
+      for (let i = 0; i < count; i++) {
+        const p = useParsed[i];
+        if (p.issues.length > 0) warnings[i] = p.issues;
+        // special: if correctIndex null, issue already includes verification warning
+      }
+      setDetectWarnings(warnings);
+
+      // Update drafts locally first for instant fill — preserve original order Q01..QNN
       setDrafts((prev) => {
         const next = { ...prev };
         for (let i = 0; i < count; i++) {
+          const p = useParsed[i];
+          // Map null correctIndex to 0 for storage but keep warning so admin verifies; UI will show warning
+          // If we want blank, store -1 and handle in persist (will fallback to 0 on save but UI shows none selected)
+          const ci = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : -1;
+          // Keep blank as -1 to show "none selected" until admin picks
           next[i] = {
-            question: parsed[i].question,
-            options: parsed[i].options.slice(0, 4),
-            correctIndex: parsed[i].correctIndex,
+            question: p.question,
+            options: p.options.slice(0, 4) as string[],
+            correctIndex: ci >= 0 ? ci : -1,
           };
         }
         return next;
       });
 
       // Persist sequentially to preserve order
+      let persisted = 0;
+      let skippedDueToMissingAnswer = 0;
       for (let i = 0; i < count; i++) {
-        const draft = { question: parsed[i].question, options: parsed[i].options.slice(0, 4), correctIndex: parsed[i].correctIndex };
+        const p = useParsed[i];
+        // If correctIndex is null, we persist with fallback 0 but keep warning; admin must verify
+        // To avoid backend rejection, map -1 to 0 on persist but retain warning state
+        const ciPersist = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : 0;
+        const hasMissingAnswer = p.correctIndex === null;
+        if (hasMissingAnswer) skippedDueToMissingAnswer += 1;
+        const draft = { question: p.question, options: p.options.slice(0, 4) as string[], correctIndex: ciPersist };
+        // Validate before persist: need at least question and 2 options
+        const qTrim = draft.question.trim();
+        const filledOpts = draft.options.filter((o) => o.trim()).length;
+        if (qTrim.length < 3 || filledOpts < 2) continue;
         // eslint-disable-next-line no-await-in-loop
         await persistSlotWithData(i, draft);
+        persisted += 1;
       }
       await load();
       onChanged?.();
-      setNotice(`Detected ${count} question${count === 1 ? "" : "s"} and filled Q01–Q${pad(count)}.`);
-      setTimeout(() => setNotice(null), 3000);
-      // Clear bulk area after success
-      // Keep text for reference but not required
+      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)}.`;
+      if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not saved).`;
+      if (skippedDueToMissingAnswer > 0) msg += ` ${skippedDueToMissingAnswer} question${skippedDueToMissingAnswer === 1 ? "" : "s"} have no confident answer — please verify.`;
+      const reviewCount = Object.keys(warnings).length;
+      if (reviewCount > 0) msg += ` ${reviewCount} need review.`;
+      setNotice(msg);
+      setTimeout(() => setNotice(null), 5000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed.");
     } finally {
@@ -513,6 +355,11 @@ export default function ExamPaperEditor({
 
   async function handleCorrectChange(slotIndex: number, newIdx: number) {
     setDrafts((prev) => ({ ...prev, [slotIndex]: { ...prev[slotIndex], correctIndex: newIdx } }));
+    setDetectWarnings((prev) => {
+      const next = { ...prev };
+      delete next[slotIndex];
+      return next;
+    });
     // Persist immediately
     const draft = drafts[slotIndex];
     if (!draft) return;
@@ -665,13 +512,19 @@ export default function ExamPaperEditor({
               const opts = [...draft.options];
               while (opts.length < 4) opts.push("");
               const isSaving = savingSlot === index;
+              const warnings = detectWarnings[index];
 
               return (
                 <li
                   key={q?.id ?? `slot-${index}`}
-                  className="rounded-2xl border border-[#dbeafe] bg-white p-4 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] sm:p-5"
+                  className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${warnings && warnings.length > 0 ? "border-amber-300 admin-dark:border-amber-700" : "border-[#dbeafe] admin-dark:border-[#1e3a65]"} admin-dark:bg-[#112544]`}
                 >
-                  <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">Q{pad(slotNumber)}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">Q{pad(slotNumber)}</p>
+                    {warnings && warnings.length > 0 && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
+                    )}
+                  </div>
 
                   {/* Question text — click to edit */}
                   <div className="mt-2">
@@ -725,6 +578,16 @@ export default function ExamPaperEditor({
                       );
                     })}
                   </div>
+
+                  {warnings && warnings.length > 0 && (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20">
+                      {warnings.map((w, wi) => (
+                        <p key={wi} className="text-[11px] font-bold leading-tight text-amber-700 admin-dark:text-amber-300">
+                          ⚠ {w}
+                        </p>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Image upload — small, per question */}
                   <div className="mt-3 flex items-center gap-2">

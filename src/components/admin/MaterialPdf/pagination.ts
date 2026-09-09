@@ -36,14 +36,26 @@ function estimateImageHeight(q: PdfMaterialQuestion): number {
 
 export function estimateQuestionHeight(q: PdfMaterialQuestion, spacing: LineSpacing = "normal"): number {
   const factor = lineSpacingFactor(spacing);
-  // Standalone image block: only image height
   if (q.isStandaloneImage) {
     return estimateImageHeight(q) + 8;
   }
-  // In two-column layout, width is half (~325px), so chars per line is ~38-42
   const charsPerLineQ = 42;
   const charsPerLineOpt = 38;
-  const linesQ = Math.max(1, Math.ceil((q.question || "").length / charsPerLineQ));
+  // Support statement-type MCQs: question contains statements separated by \n (main Q + 1. 2. 3.)
+  // Each explicit line should count as at least one typographic line, plus wrapping for long lines
+  const qText = q.question || "";
+  const qSegments = qText.split("\n");
+  let linesQ = 0;
+  for (const seg of qSegments) {
+    const segTrim = seg.trim();
+    // Even empty segment after \n is a line break; count as 1
+    if (segTrim.length === 0) {
+      linesQ += 1;
+      continue;
+    }
+    linesQ += Math.max(1, Math.ceil(segTrim.length / charsPerLineQ));
+  }
+  if (linesQ === 0) linesQ = 1;
   const qHeight = linesQ * (18 * factor) + 10;
   let optsHeight = 0;
   for (const opt of q.options) {

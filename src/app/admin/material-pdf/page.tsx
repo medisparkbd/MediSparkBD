@@ -698,11 +698,11 @@ D. 150 দিন
                             contentEditable
                             suppressContentEditableWarning
                             onBlur={(e) => {
-                              const txt = (e.currentTarget.textContent || "").trim();
+                              const txt = (e.currentTarget.innerText || "").trim();
                               if (txt !== q.question) handleUpdate(q.id, { question: txt });
                             }}
-                            title="Click to edit question (bold in PDF)"
-                            style={{ lineHeight: `${lineHeightStyle * 1.1}` }}
+                            title="Click to edit question (bold in PDF) — statements (1. 2. 3.) remain with question as one block"
+                            style={{ lineHeight: `${lineHeightStyle * 1.1}`, whiteSpace: "pre-line" } as React.CSSProperties}
                           >
                             {q.question || <span className="text-red-400 font-normal">[Empty — click to edit]</span>}
                           </span>
