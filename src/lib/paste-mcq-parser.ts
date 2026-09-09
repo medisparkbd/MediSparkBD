@@ -1,7 +1,8 @@
-// Paste MCQ Parser — intelligent bulk MCQ detection
-// Requirements: detect boundaries even when numbering inconsistent/missing, blank lines,
-// options A/B/C/D or a/b/c/d, different spacing. Extract Q text, A-D, Correct Answer.
-// Ignore original numbering; mapping to Q01..QNN is done by caller.
+// Paste MCQ Parser — robust flexible MCQ detection
+// Supports: varied question numbering (EN/BN digits, Q/Q., Question, প্রশ্ন, Roman I/II/III etc.),
+// varied option labels (A-D, a-d, (A), ক/খ/গ/ঘ, 1-4/১-৪, i-iv/I-IV ),
+// statement MCQ preservation, flexible spacing/line breaks, mixed formatting,
+// automatic answer detection (letter, Bangla label, full text, numeric text etc.)
 
 export type ParsedPasteMcq = {
   question: string;
@@ -14,245 +15,618 @@ export type ParsedPasteMcq = {
   originalNumber?: string | null;
 };
 
-function stripNumbering(text: string): string {
-  // Remove leading numbering like "5.", "5)", "Q5.", "Q 5:", "Question 5.", "01.", etc.
-  return text
-    .replace(/^\s*(?:Q\s*|Question\s*)?\d{1,3}\s*[.)\-:]\s*/i, "")
+// ── helpers ─────────────────────────────────────────────────────────────────
+const BN_DIGIT_MAP: Record<string, string> = { "০": "0", "১": "1", "২": "2", "৩": "3", "৪": "4", "৫": "5", "৬": "6", "৭": "7", "৮": "8", "৯": "9" };
+const BN_OPT_MAP: Record<string, number> = { "ক": 0, "খ": 1, "গ": 2, "ঘ": 3 };
+const BN_DIGIT_CHARS = "০-৯";
+
+function bnDigitsToAscii(s: string): string {
+  return s.replace(/[০-৯]/g, (ch) => BN_DIGIT_MAP[ch] ?? ch);
+}
+
+function normalizeForCompare(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[।॥]/g, "")
+    .replace(/[.,;:—\-–\(\)\[\]"'!?\u09F7\u09C3]+$/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-function parseOptionLine(line: string, allowNumeric = false): { index: number; text: string; isCorrectMarker: boolean } | null {
+function cleanOptionText(raw: string): string {
+  let s = raw.trim();
+  s = s.replace(/^\*\s*/, "").trim();
+  s = s.replace(/^[\*\-•]+\s*/, "").trim();
+  s = s.replace(/\s*✓\s*$/g, "").trim();
+  s = s.replace(/\s*✔\s*$/g, "").trim();
+  s = s.replace(/\s*\(correct\)\s*$/i, "").trim();
+  s = s.replace(/\s*\*\s*$/g, "").trim();
+  // remove trailing punctuation that is likely answer marker remnants
+  s = s.replace(/\s+$/, "").trim();
+  return s;
+}
+
+function romanToIndex(tok: string): number | null {
+  const t = tok.trim().toLowerCase();
+  if (t === "i") return 0;
+  if (t === "ii") return 1;
+  if (t === "iii") return 2;
+  if (t === "iv") return 3;
+  return null;
+}
+
+// ── question header detection ──────────────────────────────────────────────
+function stripQuestionHeader(line: string): { stripped: string; header: string } | null {
+  const raw = line;
+  // Try patterns in order: most specific first
+  // 1) প্রশ্ন variants: প্রশ্ন, প্রশ্ন নং, প্রশ্ন No.
+  let m = raw.match(/^\s*(প্রশ্ন\s*(?:নং\.?|No\.?)?\s*(?:\d+|[০-৯]+)\s*[\.\)\:\-।\)]?)\s*(.*)$/);
+  if (m) {
+    const header = m[1].trim();
+    const rest = (m[2] ?? "").trim();
+    // Even if rest empty (header alone next line is question), treat as header
+    return { stripped: rest, header };
+  }
+  // 2) Question variants
+  m = raw.match(/^\s*(Question\s*(?:No\.?)?\s*(?:\d+|[০-৯]+)\s*[\.\)\:\-]?)\s*(.*)$/i);
+  if (m) {
+    const header = m[1].trim();
+    const rest = (m[2] ?? "").trim();
+    return { stripped: rest, header };
+  }
+  // 3) Q variants: Q1, Q.1, Q-1, Q01, Q 1, Q. 1, Q- 1, Q1., Q1), Q1:
+  // allow Q optionally with dot/dash then digits
+  // Must ensure not matching "Qi" etc.
+  m = raw.match(/^\s*(Q\s*[\.\-]?\s*0*\d+\s*[\.\)\:\-]?(?:\s+)?)\s*(.*)$/i);
+  if (m) {
+    // Validate that captured header looks like Q + number, not just "Q."
+    const hdr = m[1].trim();
+    if (/^Q/i.test(hdr) && /\d/.test(hdr)) {
+      // Need to ensure rest or header is question start: if remainder empty and next char is not option, still header
+      // For "Q1" alone, rest may be empty; treat as header
+      const rest = (m[2] ?? "").trim();
+      // Guard: Q header should be at line start, not inside "Question" already handled
+      return { stripped: rest, header: hdr };
+    }
+  }
+  // Also handle "Q.1" where dot between Q and number: Q\. ? \d+
+  m = raw.match(/^\s*(Q\s*[\.\)\:\-]\s*0*\d+\s*[\.\)\:\-]?)\s*(.*)$/i);
+  if (m && /\d/.test(m[1])) {
+    return { stripped: (m[2] ?? "").trim(), header: m[1].trim() };
+  }
+
+  // 4) Numeric: 1. 2. 10. 1) 2) ১০. ১১) ১। 1.- etc.
+  m = raw.match(/^\s*((?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)\-]\-?)\s+(.*)$/);
+  if (m) {
+    return { stripped: (m[2] ?? "").trim(), header: m[1].trim() };
+  }
+  // Also allow numeric with no space but at least one non-digit char after? For statements we need space; but for header "1.মূত্র" without space? Still support without space? Better require at least one space but we handle no-space as well if text present
+  // 5) Roman numerals: I. II. III. IV. i. ii. iii. etc. (1-30) — support I.- II.- etc.
+  m = raw.match(/^\s*((?:[IVXLCDM]{1,5}|[ivxlcdm]{1,5})\s*[\.\)\-]\-?)\s+(.*)$/);
+  if (m) {
+    const hdr = m[1].trim();
+    const tok = hdr.replace(/[\.\)\-]/g, "").trim();
+    if (/^(?:[IVXLCDM]+|[ivxlcdm]+)$/.test(tok)) {
+      if (/^[A-Da-d]$/.test(tok)) return null;
+      if (/^[cCdD]$/.test(tok)) return null;
+      return { stripped: (m[2] ?? "").trim(), header: hdr };
+    }
+  }
+  return null;
+}
+
+function isQuestionHeaderLine(line: string): boolean {
+  return stripQuestionHeader(line) !== null;
+}
+
+// ── option parsing ─────────────────────────────────────────────────────────
+function parseOptionLine(line: string, allowNumeric = true): { index: number; text: string; isCorrectMarker: boolean } | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
-  // Pattern: letter A-D with various wrappers and separators, possibly with correct marker at end
-  // Supports: A. text, A) text, A: text, A - text, (A) text, [A] text, A . text
-  let m = trimmed.match(/^\s*(?:[\(\[]\s*)?([A-Da-d])(?:\s*[\)\]])?\s*[.)\-:]\s*(.+)$/);
-  if (m) {
-    const letter = m[1].toUpperCase();
-    const idx = letter.charCodeAt(0) - 65;
-    let content = m[2].trim();
+
+  const checkCorrect = (content: string): { text: string; isCorrect: boolean } => {
+    let c = content.trim();
     let isCorrect = false;
-    if (/\*\s*$/.test(content) || /\(correct\)\s*$/i.test(content) || /✓\s*$/.test(content) || /✔\s*$/.test(content)) {
+    if (/\*\s*$/.test(c) || /\(correct\)\s*$/i.test(c) || /✓\s*$/.test(c) || /✔\s*$/.test(c)) {
       isCorrect = true;
-      content = content.replace(/\s*\*\s*$/, "").replace(/\s*\(correct\)\s*$/i, "").replace(/\s*✓\s*$/, "").replace(/\s*✔\s*$/, "").trim();
+      c = c.replace(/\s*\*\s*$/, "").replace(/\s*\(correct\)\s*$/i, "").replace(/\s*✓\s*$/, "").replace(/\s*✔\s*$/, "").trim();
     }
-    // Also handle "(correct)" without marker removal edge: check again
-    return { index: idx, text: content, isCorrectMarker: isCorrect };
-  }
-  // Numeric options 1-4 → map to A-D — only when explicitly allowed (inside option section)
-  if (!allowNumeric) return null;
-  m = trimmed.match(/^\s*([1-4])\s*[.)\-:]\s*(.+)$/);
+    return { text: c, isCorrect };
+  };
+
+  // 1) English A-D with various wrappers
+  // (A) text, [A] text, A. text, A) text, A: text, A - text, A। etc.
+  let m = trimmed.match(/^\s*\(\s*([A-Da-d])\s*\)\s*[\.\)\:\-\—।]?\s*(.+)$/);
   if (m) {
-    const idx = parseInt(m[1], 10) - 1;
-    let content = m[2].trim();
-    let isCorrect = false;
-    if (/\*\s*$/.test(content) || /\(correct\)\s*$/i.test(content)) {
-      isCorrect = true;
-      content = content.replace(/\s*\*\s*$/, "").replace(/\s*\(correct\)\s*$/i, "").trim();
-    }
-    // Heuristic: numeric options inside question numbered block would be ambiguous;
-    // but we treat them as options only when we are inside option section. Caller decides.
-    return { index: idx, text: content, isCorrectMarker: isCorrect };
+    const idx = m[1].toUpperCase().charCodeAt(0) - 65;
+    const ck = checkCorrect(m[2]);
+    return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
   }
+  m = trimmed.match(/^\s*\[\s*([A-Da-d])\s*\]\s*[\.\)\:\-\—]?\s*(.+)$/);
+  if (m) {
+    const idx = m[1].toUpperCase().charCodeAt(0) - 65;
+    const ck = checkCorrect(m[2]);
+    return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+  }
+  m = trimmed.match(/^\s*([A-Da-d])\s*[\.\)\:\-\—\)]\s*(.+)$/);
+  if (m) {
+    const idx = m[1].toUpperCase().charCodeAt(0) - 65;
+    const ck = checkCorrect(m[2]);
+    return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+  }
+
+  // 2) Bangla ক খ গ ঘ
+  m = trimmed.match(/^\s*\(\s*([কখগঘ])\s*\)\s*[\.\)\:\-\—।]?\s*(.+)$/);
+  if (m) {
+    const idx = BN_OPT_MAP[m[1]];
+    if (idx !== undefined) {
+      const ck = checkCorrect(m[2]);
+      return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+    }
+  }
+  m = trimmed.match(/^\s*\[\s*([কখগঘ])\s*\]\s*[\.\)\:\-\—।]?\s*(.+)$/);
+  if (m) {
+    const idx = BN_OPT_MAP[m[1]];
+    if (idx !== undefined) {
+      const ck = checkCorrect(m[2]);
+      return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+    }
+  }
+  m = trimmed.match(/^\s*([কখগঘ])\s*[\.\)\:\-\—।\)]?\s+(.+)$/);
+  if (m) {
+    const idx = BN_OPT_MAP[m[1]];
+    if (idx !== undefined) {
+      const ck = checkCorrect(m[2]);
+      return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+    }
+  }
+  // also handle ক) without space? e.g., "ক)Option"
+  m = trimmed.match(/^\s*([কখগঘ])\s*[\)\.\:\-।]\s*(.+)$/);
+  if (m) {
+    const idx = BN_OPT_MAP[m[1]];
+    if (idx !== undefined) {
+      const ck = checkCorrect(m[2]);
+      return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+    }
+  }
+
+  // 3) Roman i-iv / I-IV (option style)
+  m = trimmed.match(/^\s*\(\s*(i{1,3}|iv|I{1,3}|IV)\s*\)\s*[\.\)\:\-\—]?\s*(.+)$/);
+  if (m) {
+    const idx = romanToIndex(m[1]);
+    if (idx !== null) {
+      const ck = checkCorrect(m[2]);
+      return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+    }
+  }
+  m = trimmed.match(/^\s*(i{1,3}|iv|I{1,3}|IV)\s*[\.\)\:\-\—]\s*(.+)$/);
+  if (m) {
+    const idx = romanToIndex(m[1]);
+    if (idx !== null) {
+      // Ensure it's really roman option, not question header roman? For option, text after should be option content, not very short question?
+      // We'll treat as option if text length reasonable
+      if (m[2].trim().length > 0) {
+        const ck = checkCorrect(m[2]);
+        return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+      }
+    }
+  }
+
+  // 4) Numeric 1-4 / ১-৪
+  if (allowNumeric) {
+    m = trimmed.match(/^\s*\(\s*([1-4]|[১-৪])\s*\)\s*[\.\)\:\-\—।]?\s*(.+)$/);
+    if (m) {
+      const ascii = bnDigitsToAscii(m[1]);
+      const idx = parseInt(ascii, 10) - 1;
+      if (idx >= 0 && idx < 4) {
+        const ck = checkCorrect(m[2]);
+        return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+      }
+    }
+    m = trimmed.match(/^\s*([1-4]|[১-৪])\s*[\.\)\:\-\—\)]\s*(.+)$/);
+    if (m) {
+      const ascii = bnDigitsToAscii(m[1]);
+      const idx = parseInt(ascii, 10) - 1;
+      if (idx >= 0 && idx < 4) {
+        const ck = checkCorrect(m[2]);
+        return { index: idx, text: cleanOptionText(ck.text), isCorrectMarker: ck.isCorrect };
+      }
+    }
+  }
+
   return null;
 }
 
-function parseAnswerLine(line: string): { index: number } | null {
-  const trimmed = line.trim();
-  // Bangla answer patterns: উত্তর: খ , উত্তর - ক , উত্তরঃ গ , সঠিক উত্তর: ঘ , Ans: ক etc.
-  // Must map ক->0, খ->1, গ->2, ঘ->3
-  const bnMap: Record<string, number> = { ক: 0, খ: 1, গ: 2, ঘ: 3 };
-  // Try Bangla first — avoid \b after Bangla chars (word boundary fails for Unicode)
-  let mBn = trimmed.match(
-    /^\s*(?:উত্তর(?:মালা)?|সঠিক\s*উত্তর|Ans(?:wer)?\.?|Correct\s*Answer|Correct|Key|Solution|Answer\s*Key)\s*(?:is)?\s*[:\-ঃ.]?\s*[\(]?\s*([A-Da-dকখগঘ1-4])\s*[\)]?(?:\s|$)/i,
-  );
-  // Broader Bangla: "উত্তর: খ" anywhere at line start, also handle "উঃ খ" variant
-  if (!mBn) {
-    mBn = trimmed.match(/^\s*উ(?:ত্তর)?\s*[:\-ঃ.]?\s*[\(]?\s*([কখগঘ])\s*[\)]?(?:\s|$)/);
+// ── answer detection ───────────────────────────────────────────────────────
+function extractAnswerPayload(line: string): string | null {
+  const t = line.trim();
+  if (!t) return null;
+  // Prefixes: Answer, Ans, Ans., Correct Answer, Correct, Correct option, উত্তর, উত্তরঃ, সঠিক উত্তর, সঠিক উত্তরঃ
+  // Allow suffix punctuation : :ঃ - = — . and optional "is"
+  // We capture everything after prefix as payload
+  const patterns: RegExp[] = [
+    // Bangla সঠিক উত্তর
+    /^\s*সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    // Bangla উত্তর (with optional ঃ) - must handle visarga char
+    /^\s*উত্তর\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    // English: Correct Answer / Correct option / Answer / Ans
+    /^\s*(?:Correct\s+Answer|Correct\s+option|Correct|Ans(?:wer)?\.?)\s*(?:is)?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    // Generic fallback: "Answer: B" with optional Key/Solution
+    /^\s*(?:Answer\s*Key|Key|Solution)\s*[:\-=—.]?\s*(.+?)\s*$/i,
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m) {
+      let payload = (m[1] ?? "").trim();
+      // payload may include trailing punctuation like "." or "."
+      payload = payload.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]]\s*$/, "").trim();
+      payload = payload.replace(/[\.\)\:\-]+$/g, "").trim();
+      if (payload) return payload;
+    }
   }
-  if (mBn) {
-    const raw = mBn[1];
-    if (bnMap[raw] !== undefined) return { index: bnMap[raw] };
-    const up = raw.toUpperCase();
-    if (/[A-D]/.test(up)) return { index: up.charCodeAt(0) - 65 };
-    if (/[1-4]/.test(raw)) return { index: parseInt(raw, 10) - 1 };
-  }
-  // English patterns (fallback, more permissive with . and () )
-  let m = trimmed.match(
-    /^\s*(?:Ans(?:wer)?\.?|Correct\s*Answer|Correct|Key|Solution|Answer\s*Key)\s*(?:is)?\s*[:\-.]?\s*[\(]?\s*([A-Da-dকখগঘ1-4])\s*[\)]?(?:\s|$)/i,
-  );
-  if (m) {
-    const raw = m[1];
-    if (bnMap[raw] !== undefined) return { index: bnMap[raw] };
-    const up = raw.toUpperCase();
-    if (/[1-4]/.test(up)) return { index: parseInt(up, 10) - 1 };
-    if (/[A-D]/.test(up)) return { index: up.charCodeAt(0) - 65 };
-  }
+  // Also handle case where answer prefix and payload are separated by Bangla colon "："?
+  // Already covered.
   return null;
 }
 
-function isNumberedQuestionStart(line: string): boolean {
-  // Detect lines that start with numbering that likely indicates a new question
-  // e.g., "1. ", "1) ", "5. Question", "Q1. ", "Question 1:", "01. "
-  return /^\s*(?:Q\s*|Question\s*)?\d{1,3}\s*[.)\-:]\s+.+/.test(line);
+function mapAnswerPayloadToIndex(payload: string, options: [string, string, string, string]): number | null {
+  const raw = payload.trim();
+  if (!raw) return null;
+  // Remove surrounding brackets/parens and trailing dot
+  let clean = raw.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
+
+  // 1) Single label check
+  // English A-D
+  if (/^[A-Da-d]$/.test(clean)) {
+    return clean.toUpperCase().charCodeAt(0) - 65;
+  }
+  // Bangla
+  if (/^[কখগঘ]$/.test(clean)) {
+    return BN_OPT_MAP[clean];
+  }
+  // Numeric 1-4 / Bangla ১-৪
+  if (/^[1-4]$/.test(clean) || /^[১-৪]$/.test(clean)) {
+    const ascii = bnDigitsToAscii(clean);
+    const idx = parseInt(ascii, 10) - 1;
+    if (idx >= 0 && idx < 4) return idx;
+  }
+  // Roman i-iv
+  const romanIdx = romanToIndex(clean);
+  if (romanIdx !== null) return romanIdx;
+
+  // Handle payload like "B." or "(B)" already stripped, but also "Option B" etc. Not needed.
+
+  // 2) Full text match: compare normalized payload with each option text
+  const normPayload = normalizeForCompare(clean);
+  // Try exact normalized equality
+  for (let i = 0; i < 4; i++) {
+    const opt = options[i] ?? "";
+    if (!opt.trim()) continue;
+    const normOpt = normalizeForCompare(opt);
+    if (normOpt === normPayload) return i;
+  }
+  // Try payload contains option or vice versa (for minor punctuation differences)
+  // Also handle case where payload is like "Urochrome" and option is "Urochrome" with same
+  // Also handle numeric text like "৩টি" vs "৩টি"
+  // For combination options like "1, 2" payload may be "1,2" etc.
+  for (let i = 0; i < 4; i++) {
+    const opt = options[i] ?? "";
+    if (!opt.trim()) continue;
+    const normOpt = normalizeForCompare(opt);
+    // remove commas/spaces for comparison of combination
+    const compactPayload = normPayload.replace(/[\s,]+/g, "");
+    const compactOpt = normOpt.replace(/[\s,]+/g, "");
+    if (compactPayload === compactOpt) return i;
+    // Also check includes
+    if (normPayload.length > 2 && normOpt.length > 2) {
+      if (normOpt.includes(normPayload) || normPayload.includes(normOpt)) {
+        // Prefer longer exact includes; return first match
+        // To avoid false positives for short payload "B" already handled, this is for longer text
+        return i;
+      }
+    }
+  }
+  // Try case where payload is like "B - Urochrome" includes letter and text? Extract letter inside
+  const letterInPayload = clean.match(/(?:^|[^A-Za-z])([A-Da-d])(?:[^A-Za-z]|$)/);
+  if (letterInPayload) {
+    // Only if options matching fails and payload contains single letter surrounded, map to that letter
+    // But ensure not over-matching inside word like "Urochrome" contains "o" not relevant
+    // We'll only use if payload length short (<10) and contains letter.
+    if (clean.length <= 5) {
+      return letterInPayload[1].toUpperCase().charCodeAt(0) - 65;
+    }
+  }
+  // Bangla letter inside payload like "খ" ?
+  const bnInPayload = clean.match(/[কখগঘ]/);
+  if (bnInPayload && clean.length <= 5) {
+    return BN_OPT_MAP[bnInPayload[0]];
+  }
+
+  return null;
 }
 
-// Split text into raw blocks using numbered markers when available
-function splitByNumbering(text: string): string[] | null {
-  const normalized = text.replace(/\r\n/g, "\n");
-  // Find all numbered starts: need to capture position
-  // Use regex with global and capture start index
-  const regex = /(?:^|\n)\s*((?:Q\s*|Question\s*)?\d{1,3}\s*[.)\-:]\s+)/gi;
-  const matches: { index: number; length: number }[] = [];
-  let m: RegExpExecArray | null;
-  // We use a separate pass to find markers that are likely questions, not options (options are A-D, not numeric only)
-  // So numeric markers here are question numbers
-  while ((m = regex.exec(normalized)) !== null) {
-    // m[0] includes leading \n if any; m[1] is the marker itself
-    // Calculate start index of the line (where the number starts)
-    const full = m[0];
-    const marker = m[1];
-    const markerStart = m.index + full.length - marker.length;
-    // Heuristic: if the line after marker contains option-like pattern very short (<3 chars), it might be false
-    // But question text should be at least a few words, so we accept
-    // Also ignore if marker is like "1. " but next content is a single letter? Not needed.
-    matches.push({ index: markerStart, length: full.length });
+// ── statement detection ────────────────────────────────────────────────────
+function isStatementLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  // Only English A-D and Bangla option styles are true options that should not be considered statements.
+  // Numeric 1-4 and roman i-iv may be either statements or options; treat as statements when before options.
+  const first = t.charAt(0);
+  if (/[A-Da-dকখগঘ]/.test(first)) {
+    if (parseOptionLine(t, false) !== null) return false;
+  } else if (t.startsWith("(") || t.startsWith("[")) {
+    // e.g., (A) or [ক)
+    if (parseOptionLine(t, false) !== null) return false;
   }
-  if (matches.length < 2) return null; // not enough markers to reliably split; fallback to line parser
-  // Sort by index (regex exec already ordered)
-  const blocks: string[] = [];
-  for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].index;
-    const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-    const block = normalized.slice(start, end).trim();
-    if (block) blocks.push(block);
-  }
-  // Validate: at least some blocks contain option-like lines, otherwise fallback
-  const withOptions = blocks.filter((b) => {
-    const lines = b.split("\n");
-    return lines.some((l) => parseOptionLine(l) !== null);
-  }).length;
-  if (withOptions < Math.max(1, Math.floor(blocks.length * 0.5))) {
-    // Less than half look like MCQs, probably false split
-    return null;
-  }
-  return blocks;
+  if (extractAnswerPayload(t) !== null) return false;
+  // Arabic numerals 1-9 with dot/paren
+  if (/^\s*[1-9]\s*[.)\-:]\s+.+/.test(t)) return true;
+  if (/^\s*[১-৯০]\s*[.)\-:।]\s*.+/.test(t)) return true;
+  if (/^\s*(?:i{1,3}|iv|v|vi{1,3}|ix|x)\s*[.)\-:]\s+.+/i.test(t)) return true;
+  if (/^\s*(?:I{1,3}|IV|VI{1,3}|IX|X)\s*[.)\-:]\s+.+/.test(t)) return true;
+  return false;
 }
 
+// ── inline helpers ─────────────────────────────────────────────────────────
+function injectNewlinesForInline(text: string): string {
+  // Insert newline before option markers that appear inline after at least one space, if not already at line start
+  // This helps split "Q? A. opt B. opt" into separate lines
+  // We do replacements for each option style
+  let s = text;
+  // We need to handle option markers inline: detect patterns preceded by whitespace and not at start of line
+  // Use a function to insert \n before each match that is not at line start
+  const optionInlineRe = /[ \t]{1,}(?=((?:\(?\s*[A-Da-d]\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*[কখগঘ]\s*\)?\s*[\.\)\:\-।]?\s+)|(?:\(?\s*[1-4]\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*[১-৪]\s*\)?\s*[\.\)\:\-।]?\s+)|(?:\(?\s*(?:i{1,3}|iv)\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*(?:I{1,3}|IV)\s*\)?\s*[\.\)\:\-]\s+)))/g;
+  // Instead of complex lookahead, we scan and insert
+  // Simpler: replace occurrences of "  A. " or " A. " with "\nA. " when not at line start via regex with capture
+  s = s.replace(/([^\n])\s{2,}(?=[A-Da-d]\s*[\.\)\:\-])/g, "$1\n");
+  s = s.replace(/([^\n])\s+(?=\([A-Da-d]\)\s*[\.\)\:\-]?)/g, "$1\n");
+  s = s.replace(/([^\n])\s{2,}(?=[কখগঘ]\s*[\.\)\:\-।])/g, "$1\n");
+  s = s.replace(/([^\n])\s+(?=\([কখগঘ]\))/g, "$1\n");
+  s = s.replace(/([^\n])\s{2,}(?=[1-4]\s*[\.\)\:\-])/g, "$1\n");
+  s = s.replace(/([^\n])\s{2,}(?=[১-৪]\s*[\.\)\:\-।])/g, "$1\n");
+  // Roman inline
+  s = s.replace(/([^\n])\s{2,}(?=(?:i{1,3}|iv)\s*[\.\)\:\-])/gi, "$1\n");
+  s = s.replace(/([^\n])\s{2,}(?=(?:I{1,3}|IV)\s*[\.\)\:\-])/g, "$1\n");
+  // Answer inline: handle multi-word prefixes first, then single-word with lookbehind to avoid splitting "Correct Answer" inside
+  s = s.replace(/([^\n])\s+(?=(?:Correct\s+Answer|Correct\s+option|সঠিক\s+উত্তর)\s*[:\-=—ঃ])/gi, "$1\n");
+  s = s.replace(/([^\n])\s+(?<!Correct\s)(?<!সঠিক\s)(?=(?:Ans(?:wer)?\.?|Correct|উত্তর\s*ঃ?)\s*[:\-=—ঃ])/gi, "$1\n");
+  // Question header inline: handle " Q1. " or " 2. " after options — require header punctuation to avoid splitting inside question text like "Q1?"
+  s = s.replace(/([^\n])\s+(?=(?:Q\s*0*\d+\s*[\.\)\:\-]|Question\s*(?:No\.?)?\s*\d+\s*[\.\)\:\-]|প্রশ্ন\s*(?:নং\.?)?\s*(?:\d+|[০-৯]+)\s*[\.\)\:\-।]|(?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)]\s+[^\n]{3,}))/g, (m, p1) => p1 + "\n");
+  // Roman question inline: " I. " or " II. "
+  s = s.replace(/([^\n])\s+(?=(?:[IVXLCDM]{1,5})\s*[\.\)]\s+[A-Za-z\u0980-\u09FF])/g, "$1\n");
+
+  return s;
+}
+
+// ── block parsing ──────────────────────────────────────────────────────────
 function parseSingleBlock(blockText: string): ParsedPasteMcq {
   const rawBlock = blockText;
-  const lines = blockText.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  // We'll go line by line inside block
+  // Preprocess inline newlines for this block
+  const withInlines = injectNewlinesForInline(blockText);
+  const linesRaw = withInlines.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  // We'll parse lines
   let questionLines: string[] = [];
   const options: [string, string, string, string] = ["", "", "", ""];
   let correctIndex: number | null = null;
+  let answerPayloadRaw: string | null = null;
   let originalNumber: string | null = null;
   let seenOptions = false;
   let optionMarkerCorrectIdx: number | null = null;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const ans = parseAnswerLine(line);
-
-    // Check for answer line first (before option, to avoid misclassifying "Ans: A" as option if regex overlaps)
-    if (ans) {
-      correctIndex = ans.index;
+  // First pass: collect answer payloads and options, separate question
+  const nonAnswerLines: string[] = [];
+  for (let i = 0; i < linesRaw.length; i++) {
+    const line = linesRaw[i];
+    const payload = extractAnswerPayload(line);
+    if (payload !== null) {
+      // This line is answer
+      answerPayloadRaw = payload; // keep last
+      // Don't add to nonAnswerLines
       continue;
     }
+    nonAnswerLines.push(line);
+  }
 
-    // If this looks like a numbered question start and we haven't seen options yet, treat as question, not option
-    // This prevents "1. Question text" being mis-identified as numeric option "1."
-    if (!seenOptions && isNumberedQuestionStart(line)) {
-      // Will be handled as question below
+  // Now process nonAnswerLines for options vs question
+  // We need to find option run from bottom to distinguish statements vs options
+  // Approach: scan lines and collect option indices from bottom
+  // But we also need to handle allowNumeric logic: numeric options only after seenOptions (letter/Bangla)
+  // For simplicity, we will attempt to detect option run by scanning bottom-up with parseOptionLine
+  // First, try to find contiguous option block at end
+  let optionStartIdx = -1;
+  let optionCount = 0;
+  // Build array of parsed option info — exclude question header and statement lines from being considered options
+  const lineOptionInfo: Array<ReturnType<typeof parseOptionLine>> = nonAnswerLines.map((l, idx) => {
+    if (idx === 0 && isQuestionHeaderLine(l)) return null;
+    if (isStatementLine(l)) return null;
+    return parseOptionLine(l, true);
+  });
+  // Find last contiguous suffix of option lines (allow empty lines ignored, but we filtered empty)
+  let suffixStart = nonAnswerLines.length;
+  for (let i = nonAnswerLines.length - 1; i >= 0; i--) {
+    if (lineOptionInfo[i] !== null) {
+      suffixStart = i;
     } else {
-      // Only allow numeric 1-4 as options after we've already seen at least one letter option, or after options started
+      if (suffixStart !== nonAnswerLines.length && i < suffixStart - 1) {
+        // Gap: if we have collected some options and encounter non-option, break if we have at least 2
+        const collected = nonAnswerLines.length - suffixStart;
+        if (collected >= 2) break;
+        // otherwise continue scanning upward to find earlier isolated option false positive
+        suffixStart = nonAnswerLines.length;
+      }
+    }
+  }
+  // Validate suffix: must contain at least 2 options and their indices should be plausible (0-3)
+  let isValidOptionSuffix = false;
+  if (suffixStart < nonAnswerLines.length) {
+    const suffixInfos = lineOptionInfo.slice(suffixStart).filter((x) => x !== null) as NonNullable<ReturnType<typeof parseOptionLine>>[];
+    if (suffixInfos.length >= 2 && suffixInfos.length <= 4) {
+      // Check indices: should include at least 2 distinct and be within 0-3, and ideally be 0..n or consistent
+      const idxs = suffixInfos.map((o) => o!.index);
+      // For suffix, indices should be increasing or set {0,1,2,3} in order (maybe unordered due to detection order)
+      // We'll sort by appearance order; they should be in order 0,1,2,3 or 0,1,2 etc.
+      // For numeric statements mixed, we've already filtered statement lines as non-option? But numeric statements would have been considered option with allowNumeric true, so they'd be in suffix erroneously.
+      // To distinguish, check if suffixInfos include all 0..(len-1) sequentially. If suffix is [0,1,2,0,1,2,3] len 7 -> not valid (7>4)
+      // So we already limit to 4, but need to handle case where suffix includes statement numeric plus options numeric -> would be >4 or non-sequential
+      // Handle: if suffixInfos length >4, truncate to last 4
+      // Validate sequential: idxs should be 0,1,2,3 for len4 or 0,1,2 for len3 etc. If not, try to find last sequential segment
+      const sortedIdxs = [...idxs].sort((a, b) => a - b);
+      // For valid suffix, idxs should be already sorted ascending and without duplicates
+      const isSorted = idxs.every((v, idx) => idx === 0 || v > idxs[idx - 1]);
+      const isUnique = new Set(idxs).size === idxs.length;
+      if (isSorted && isUnique && idxs[0] === 0 && idxs[idxs.length - 1] === idxs.length - 1) {
+        isValidOptionSuffix = true;
+      } else {
+        // Try to extract last sequential segment within suffix
+        // Find longest suffix segment that is 0..k
+        let bestStart = 0;
+        for (let s = 0; s < idxs.length; s++) {
+          let ok = true;
+          for (let k = s; k < idxs.length; k++) {
+            if (idxs[k] !== k - s) { ok = false; break; }
+          }
+          if (ok && idxs[s] === 0) { bestStart = s; isValidOptionSuffix = true; break; }
+        }
+        if (isValidOptionSuffix) {
+          // Adjust suffixStart to bestStart
+          const offset = bestStart;
+          suffixStart += offset;
+        } else {
+          // Fallback: if suffix contains bangla/english mix, consider valid if at least 2 options and indices 0-3
+          if (idxs.length >= 2 && idxs.every((v) => v >= 0 && v < 4) && isUnique) {
+            isValidOptionSuffix = true;
+          }
+        }
+      }
+    }
+  }
+
+  if (isValidOptionSuffix && suffixStart < nonAnswerLines.length) {
+    // Extract options from suffix
+    optionStartIdx = suffixStart;
+    for (let i = suffixStart; i < nonAnswerLines.length; i++) {
+      const info = lineOptionInfo[i];
+      if (info) {
+        const idx = info.index;
+        const ck = info.isCorrectMarker;
+        if (options[idx] === "") options[idx] = info.text;
+        else options[idx] += " " + info.text;
+        if (ck && optionMarkerCorrectIdx === null) optionMarkerCorrectIdx = idx;
+        seenOptions = true;
+      }
+    }
+    // Question lines are everything before suffix
+    const qLinesRaw = nonAnswerLines.slice(0, optionStartIdx);
+    // Process question header stripping for first line only
+    if (qLinesRaw.length > 0) {
+      const first = qLinesRaw[0];
+      const stripped = stripQuestionHeader(first);
+      if (stripped) {
+        originalNumber = stripped.header;
+        if (stripped.stripped) qLinesRaw[0] = stripped.stripped;
+        else qLinesRaw.shift(); // header alone, next line is question
+      }
+    }
+    // Remaining qLinesRaw includes statements and question text; join
+    // Preserve statements as separate lines: join with "\n" then also collapse?
+    // We'll keep them as they are, joining with " " for single-line but preserve line breaks for statements
+    // For statements we keep original numbering; they are already in qLinesRaw as lines
+    if (qLinesRaw.length > 0) {
+      // Filter out empty
+      const filtered = qLinesRaw.filter((l) => l.trim().length > 0);
+      // Join: if statements contain numbered items, keep newline separation to preserve readability
+      // We'll join with " " but for statements that are numeric, keep newline?
+      // Simpler: join with "\n" if any line looks like statement, else " "
+      const hasStatement = filtered.some((l) => isStatementLine(l));
+      if (hasStatement) {
+        questionLines = filtered;
+      } else {
+        questionLines = [filtered.join(" ")];
+      }
+    }
+    optionCount = options.filter((o) => o.trim()).length;
+  } else {
+    // Fallback: No clear suffix - try line-by-line sequential as before (handles cases where options not at very end due to stray lines)
+    // We'll do sequential scan similar to original but with upgraded helpers
+    for (let i = 0; i < nonAnswerLines.length; i++) {
+      const line = nonAnswerLines[i];
+      const strippedHeader = stripQuestionHeader(line);
+      const isHeader = strippedHeader !== null;
+      // Decide allowNumeric: if seenOptions already true, allow numeric
       const allowNumeric = seenOptions;
       const opt = parseOptionLine(line, allowNumeric);
-      if (opt) {
+      if (opt && !( !seenOptions && isHeader)) {
+        // This is option
+        // But need to avoid treating numeric header "1. Statement" as numeric option when not yet seenOptions and isHeader true
+        // Already checked
         seenOptions = true;
-      // If this is first option encountered, everything before is question
-      // For first block, questionLines may already have content
-      const idx = opt.index;
-      if (options[idx] === "") {
-        options[idx] = opt.text;
-      } else {
-        // Duplicate index — append as continuation? Or treat as new? For now append with space
-        options[idx] = options[idx] + " " + opt.text;
+        const idx = opt.index;
+        if (options[idx] === "") options[idx] = opt.text;
+        else options[idx] += " " + opt.text;
+        if (opt.isCorrectMarker && optionMarkerCorrectIdx === null) optionMarkerCorrectIdx = idx;
+        continue;
       }
-      if (opt.isCorrectMarker) {
-        // If marker indicates correct, remember; answer line takes precedence later if both
-        optionMarkerCorrectIdx = idx;
-        if (correctIndex === null) correctIndex = idx;
-      }
-      continue;
-      }
-    }
-
-    // Not option, not answer -> part of question text (unless it's after options, then could be stray answer explanation)
-    if (!seenOptions) {
-      // Before options, it's question
-      if (questionLines.length === 0) {
-        // First question line may contain numbering
-        const mNum = line.match(/^\s*((?:Q\s*|Question\s*)?\d{1,3}\s*[.)\-:])\s*(.*)$/i);
-        if (mNum) {
-          originalNumber = mNum[1].trim();
-          const rest = mNum[2].trim();
-          if (rest) questionLines.push(rest);
-          else {
-            // Numbering line without text, next line will be question
-            // Leave questionLines empty for now
-          }
+      if (!seenOptions) {
+        if (questionLines.length === 0 && strippedHeader) {
+          originalNumber = strippedHeader.header;
+          if (strippedHeader.stripped) questionLines.push(strippedHeader.stripped);
         } else {
           questionLines.push(line);
         }
       } else {
-        questionLines.push(line);
-      }
-    } else {
-      // After options started, non-option non-answer line could be:
-      // - continuation of question? unlikely after options
-      // - explanation/extra, ignore unless it's answer-like
-      // We treat it as additional question line only if options not yet complete and line is long
-      // Otherwise ignore. But for robustness, if we have not yet seen all 4 options, and line is not empty,
-      // it might be a line-break within option text without label (multiline option)
-      // We'll append to last option if that option exists and next line is not option?
-      // Simpler: ignore stray lines after options unless they look like answer
-      // If options partially filled and line looks like continuation, append to last filled option
-      const lastIdx = options.findLastIndex ? options.findLastIndex((o) => o !== "") : (() => {
-        for (let k = 3; k >= 0; k--) if (options[k] !== "") return k;
-        return -1;
-      })();
-      // If this stray line is not option/answer and we have at least one option, treat as continuation of last option if options incomplete?
-      // Heuristic: if line length > 3 and not question-like, append to last option
-      // But to avoid polluting, only if line is short and seems like option continuation without label
-      if (lastIdx >= 0 && lastIdx < 3 && options[lastIdx + 1] === "" && line.length < 120) {
-        // Could be next option without label? Try to treat as next option sequentially
-        // Only if we expect next index
-        // Instead, push as next option in order
-        const nextIdx = lastIdx + 1;
-        if (options[nextIdx] === "") {
-          // Assume this line is option text without label (e.g., line break)
-          options[nextIdx] = line;
-          continue;
+        // After options, non-option line stray - if not empty, could be continuation of last option
+        // Check if line looks like continuation (no header)
+        if (line.trim().length > 0 && options.some((o) => o)) {
+          // Find last filled option
+          let last = -1;
+          for (let k = 3; k >= 0; k--) if (options[k]) { last = k; break; }
+          if (last >= 0 && line.length < 150) {
+            // Append to last option as continuation only if plausible (not a new question)
+            // Avoid appending if line looks like question header for next block (but we are inside single block, shouldn't)
+            options[last] = `${options[last]} ${cleanOptionText(line)}`.trim();
+          }
         }
       }
-      // Otherwise, if questionLines is short, maybe it's continuation?
-      // We'll ignore stray after-options lines for now
     }
   }
 
-  // If questionLines empty but blockText first line had numbering stripped, we already handled
-  let question = questionLines.join(" ").replace(/\s+/g, " ").trim();
-  // Fallback: if still empty, try to extract first non-option line as question
+  let question = "";
+  if (questionLines.length > 0) {
+    // If questionLines contains multiple statement lines, join with newline to preserve structure
+    if (questionLines.length === 1) question = questionLines[0].replace(/\s+/g, " ").trim();
+    else {
+      // Check if any line is statement-like (starts with number)
+      const hasStmt = questionLines.some((l) => isStatementLine(l));
+      if (hasStmt) question = questionLines.join("\n").replace(/[ \t]+\n/g, "\n").trim();
+      else question = questionLines.join(" ").replace(/\s+/g, " ").trim();
+    }
+  }
   if (!question) {
-    const firstNonOption = lines.find((l) => !parseOptionLine(l) && !parseAnswerLine(l));
-    if (firstNonOption) question = stripNumbering(firstNonOption);
+    // Fallback: take first non-option line as question
+    const firstNonOption = nonAnswerLines.find((l) => !parseOptionLine(l, true));
+    if (firstNonOption) {
+      const sh = stripQuestionHeader(firstNonOption);
+      question = sh ? (sh.stripped || firstNonOption) : firstNonOption;
+      question = question.replace(/\s+/g, " ").trim();
+    }
   }
 
-  // If correctIndex still null but option marker had it, use that
+  // Resolve answer
+  if (answerPayloadRaw !== null) {
+    const mapped = mapAnswerPayloadToIndex(answerPayloadRaw, options);
+    if (mapped !== null) correctIndex = mapped;
+    else {
+      // If payload was like "Urochrome" but mapping failed due to normalization, keep as needs review
+      // Try alternative: if payload is single char but mapping failed due to punctuation, retry stripped
+      const alt = answerPayloadRaw.replace(/^[^\w\u0980-\u09FF]+|[^\w\u0980-\u09FF]+$/g, "").trim();
+      const mapped2 = mapAnswerPayloadToIndex(alt, options);
+      if (mapped2 !== null) correctIndex = mapped2;
+    }
+  }
   if (correctIndex === null && optionMarkerCorrectIdx !== null) correctIndex = optionMarkerCorrectIdx;
 
-  // Evaluate issues
+  // Issues
   const issues: string[] = [];
   if (!question || question.length < 3) issues.push("Question text missing or too short");
   const filledCount = options.filter((o) => o.trim().length > 0).length;
@@ -260,11 +634,8 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
     const missing = options.map((o, i) => (!o.trim() ? String.fromCharCode(65 + i) : null)).filter(Boolean) as string[];
     if (missing.length) issues.push(`Missing option ${missing.join(", ")}`);
   }
-  if (options.some((o, _i) => o.trim().length === 0)) {
-    // already covered
-  }
   if (filledCount < 2) issues.push("At least 2 options required");
-  if (correctIndex === null) issues.push("Correct answer not found (add Ans: A/B/C/D)");
+  if (correctIndex === null) issues.push("Answer could not be confidently detected — please verify.");
   else if (correctIndex < 0 || correctIndex >= 4 || !options[correctIndex]?.trim()) issues.push(`Correct answer ${String.fromCharCode(65 + (correctIndex ?? 0))} is empty`);
 
   const needsReview = issues.length > 0;
@@ -282,17 +653,194 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
   };
 }
 
-// Fallback line-parser for texts without consistent numbering
-function parseViaLineScan(text: string): ParsedPasteMcq[] {
+// Fallback inline extraction for blocks where line-based fails (e.g., no newlines)
+function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
+  const rawBlock = blockText;
+  // Find answer first
+  const answerRe = /(?:উত্তর\s*ঃ?\s*[:\-=—.]?|সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?|Ans(?:wer)?\.?\s*(?:is)?\s*[:\-=—.]?|Correct(?:\s+Answer)?\s*(?:is)?\s*[:\-=—.]?)\s*([^\n\r]+)/gi;
+  // We'll work on normalized block without injecting newlines
+  let answerPayload: string | null = null;
+  let answerPos = -1;
+  let mAns: RegExpExecArray | null;
+  // Find last answer occurrence
+  const tempAnsMatches: { payload: string; index: number }[] = [];
+  while ((mAns = answerRe.exec(blockText)) !== null) {
+    let p = (mAns[1] ?? "").trim();
+    p = p.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
+    if (p) tempAnsMatches.push({ payload: p, index: mAns.index });
+  }
+  if (tempAnsMatches.length > 0) {
+    const last = tempAnsMatches[tempAnsMatches.length - 1];
+    answerPayload = last.payload;
+    answerPos = last.index;
+  }
+  const textBeforeAnswer = answerPos >= 0 ? blockText.slice(0, answerPos) : blockText;
+
+  // Find option markers globally
+  const optGlobalRe = /(?:\(\s*([A-Da-d])\s*\)|[\(\[]\s*([A-Da-d])\s*[\)\]]|([A-Da-d])\s*[\.\)\:\-\—]|\([কখগঘ]\)|([কখগঘ])\s*[\.\)\:\-।]|\(([কখগঘ])\)|([1-4])\s*[\.\)\:\-]|([১-৪])\s*[\.\)\:\-।]|(i{1,3}|iv)\s*[\.\)\:\-]|(I{1,3}|IV)\s*[\.\)\:\-])/g;
+  // Simpler: use parseOptionLine positions by scanning with regex for each style separately
+  // Instead, collect positions via exec of a unified regex that captures label and delimiter
+  const unifiedRe = /(?:\(?\s*([A-Da-d])\s*\)?\s*[\.\)\:\-\—]\s+|\(?\s*([কখগঘ])\s*\)?\s*[\.\)\:\-।]?\s+|\(?\s*([1-4])\s*\)?\s*[\.\)\:\-]\s+|\(?\s*([১-৪])\s*\)?\s*[\.\)\:\-।]?\s+|\(?\s*(i{1,3}|iv)\s*\)?\s*[\.\)\:\-]\s+|\(?\s*(I{1,3}|IV)\s*\)?\s*[\.\)\:\-]\s+)/gi;
+  const matches: { start: number; end: number; label: string; style: string }[] = [];
+  let m: RegExpExecArray | null;
+  unifiedRe.lastIndex = 0;
+  while ((m = unifiedRe.exec(textBeforeAnswer)) !== null) {
+    const start = m.index;
+    const end = m.index + m[0].length;
+    let label = "";
+    let style = "";
+    if (m[1]) { label = m[1]; style = "en"; }
+    else if (m[2]) { label = m[2]; style = "bn"; }
+    else if (m[3]) { label = m[3]; style = "num"; }
+    else if (m[4]) { label = m[4]; style = "bnNum"; }
+    else if (m[5]) { label = m[5]; style = "romanL"; }
+    else if (m[6]) { label = m[6]; style = "romanU"; }
+    matches.push({ start, end, label, style });
+    if (m[0].length === 0) unifiedRe.lastIndex++;
+  }
+  if (matches.length < 2) return null;
+  // Find last consecutive group of 2-4 matches that are valid options
+  // Take last up to 4 matches as candidate option group
+  let candidateGroup = matches.slice(-4);
+  // Need to ensure they are distinct indices 0-3
+  const tmpOptions: [string, string, string, string] = ["", "", "", ""];
+  let hasValid = false;
+  for (let k = 0; k < candidateGroup.length; k++) {
+    const cg = candidateGroup[k];
+    let idx: number | null = null;
+    if (cg.style === "en") idx = cg.label.toUpperCase().charCodeAt(0) - 65;
+    else if (cg.style === "bn") idx = BN_OPT_MAP[cg.label];
+    else if (cg.style === "num") idx = parseInt(cg.label, 10) - 1;
+    else if (cg.style === "bnNum") idx = parseInt(bnDigitsToAscii(cg.label), 10) - 1;
+    else if (cg.style.startsWith("roman")) idx = romanToIndex(cg.label);
+    if (idx !== null && idx >= 0 && idx < 4) {
+      // text for this option is substring from end to next match start (or answerPos)
+      const nextStart = k + 1 < candidateGroup.length ? candidateGroup[k + 1].start : textBeforeAnswer.length;
+      const rawOptText = textBeforeAnswer.slice(cg.end, nextStart).trim();
+      // Clean up to next option marker or answer - need to remove trailing newline etc.
+      const cleaned = cleanOptionText(rawOptText.split(/\n/)[0] ?? rawOptText);
+      tmpOptions[idx] = cleaned;
+      hasValid = true;
+    }
+  }
+  if (!hasValid || tmpOptions.filter((o) => o.trim()).length < 2) return null;
+  // Question text is from after header strip up to first candidateGroup start
+  const firstOptStart = candidateGroup[0].start;
+  let qTextRaw = textBeforeAnswer.slice(0, firstOptStart).trim();
+  // Strip leading question number
+  const sh = stripQuestionHeader(qTextRaw);
+  if (sh) {
+    if (sh.stripped) qTextRaw = sh.stripped;
+    else {
+      // Header alone, try next segment before options? Keep as is without header
+      qTextRaw = qTextRaw.replace(/^\s*(?:\d+|[০-৯]+|Q\s*0*\d+|Question\s*(?:No\.?)?\s*\d+|প্রশ্ন\s*(?:নং\.?)?\s*\d+|[IVXLCDM]+)\s*[\.\)\:\-।\)]?\s*/i, "").trim();
+    }
+  }
+  // Clean question: remove extra spaces, keep statements if present
+  qTextRaw = qTextRaw.replace(/\s+/g, " ").trim();
+  // Resolve answer
+  let correctIndex: number | null = null;
+  if (answerPayload) {
+    correctIndex = mapAnswerPayloadToIndex(answerPayload, tmpOptions);
+  }
+  // Fallback to correct marker inside option text? Not needed
+
+  const issues: string[] = [];
+  if (!qTextRaw || qTextRaw.length < 3) issues.push("Question text missing or too short");
+  const filled = tmpOptions.filter((o) => o.trim()).length;
+  if (filled < 4) {
+    const missing = tmpOptions.map((o, i) => (!o.trim() ? String.fromCharCode(65 + i) : null)).filter(Boolean) as string[];
+    if (missing.length) issues.push(`Missing option ${missing.join(", ")}`);
+  }
+  if (filled < 2) issues.push("At least 2 options required");
+  if (correctIndex === null) issues.push("Answer could not be confidently detected — please verify.");
+  const needsReview = issues.length > 0;
+  return {
+    question: qTextRaw,
+    options: tmpOptions,
+    correctIndex,
+    rawBlock,
+    issues,
+    needsReview,
+    confidence: needsReview ? 0.7 : 0.95,
+    originalNumber: sh?.header ?? null,
+  };
+}
+
+// ── split by numbering (for block detection) ───────────────────────────────
+function splitByNumbering(text: string): string[] | null {
   const normalized = text.replace(/\r\n/g, "\n");
-  const rawLines = normalized.split("\n");
-  // We'll iterate and create blocks using state machine described earlier
-  type Block = { questionLines: string[]; options: [string, string, string, string]; correctIndex: number | null; rawLines: string[]; originalNumber: string | null };
+  // Extended regex to include BN digits, roman, Q, Question, প্রশ্ন
+  // We look for line starts that look like question headers
+  const headerPositions: number[] = [];
+  // Use line-based detection instead of global regex on whole text to support roman and BN
+  const lines = normalized.split("\n");
+  let offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isQuestionHeaderLine(line)) {
+      headerPositions.push(offset + line.indexOf(line.trimStart().charAt(0) >= " " ? line.trimStart() : line));
+      // Actually use offset of trimmed start
+      const trimmedStart = line.length - line.trimStart().length;
+      headerPositions.push(offset + trimmedStart);
+      // We will use simpler: push offset
+      // To avoid duplicates, we will recompute via global later
+    }
+    offset += line.length + 1; // +1 for \n
+  }
+  const regex = /(?:^|\n)\s*((?:প্রশ্ন\s*(?:নং\.?|No\.?)?\s*(?:\d+|[০-৯]+)|Question\s*(?:No\.?)?\s*(?:\d+|[০-৯]+)|Q\s*[\.\-]?\s*0*\d+|Q\s*[\.\)\:\-]\s*0*\d+|(?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)\-]\-?|(?:[IVXLCDM]{1,5}|[ivxlcdm]{1,5})\s*[\.\)\-]\-?)\s*)/g;
+  const matches: { index: number; length: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  const re2 = new RegExp(regex.source, "gi");
+  while ((m = re2.exec(normalized)) !== null) {
+    const full = m[0];
+    const marker = m[1];
+    if (!marker) continue;
+    const trimmed = marker.trim();
+    // Filter out option-like single letters that are actually options, not question headers
+    // e.g., "C.", "D." are roman but also option labels; avoid splitting on them
+    if (/^[CDBA]\s*[\.\)]$/i.test(trimmed)) {
+      // Check if this is likely an option: next non-space content is short (<80 chars) and next line not containing question-like text
+      // We skip this marker as question header
+      continue;
+    }
+    if (/^[cCdD]\s*[\.\)]$/.test(trimmed)) continue;
+    // Also skip "A.", "B." as question header (they are option labels, not question numbers)
+    if (/^[A-Da-d]\s*[\.\)]$/.test(trimmed)) continue;
+    const markerStart = m.index + full.length - marker.length;
+    matches.push({ index: markerStart, length: full.length, text: marker });
+  }
+  if (matches.length < 2) return null;
+  const blocks: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
+    const block = normalized.slice(start, end).trim();
+    if (block) blocks.push(block);
+  }
+  // Validate: at least some blocks contain at least 2 option-like lines (to avoid splitting on C./D. as questions)
+  const withOptions = blocks.filter((b) => {
+    const ls = b.split("\n");
+    const optCount = ls.filter((l) => parseOptionLine(l, true) !== null).length;
+    if (optCount >= 2) return true;
+    const inline = parseSingleBlockInline(b);
+    return inline !== null && inline.options.filter((o) => o.trim()).length >= 2;
+  }).length;
+  if (withOptions < Math.max(1, Math.floor(blocks.length * 0.5))) {
+    return null;
+  }
+  return blocks;
+}
+
+function parseViaLineScan(text: string): ParsedPasteMcq[] {
+  const withInlines = injectNewlinesForInline(text.replace(/\r\n/g, "\n"));
+  const rawLines = withInlines.split("\n");
+  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; rawLines: string[]; originalNumber: string | null };
   const blocks: Block[] = [];
   let current: Block | null = null;
 
   const flushCurrent = () => {
-    if (current && (current.questionLines.length > 0 || current.options.some((o) => o.trim()))) {
+    if (current && (current.questionLines.length > 0 || current.statements.length > 0 || current.options.some((o) => o.trim()))) {
       blocks.push(current);
     }
     current = null;
@@ -301,41 +849,68 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
   for (let idx = 0; idx < rawLines.length; idx++) {
     const line = rawLines[idx];
     const trimmed = line.trim();
-    if (trimmed === "") {
-      // blank delimiter: don't flush yet, but preserve as potential separator
-      continue;
-    }
-    const opt = parseOptionLine(line);
-    const ans = parseAnswerLine(line);
-    const isQStart = isNumberedQuestionStart(line);
-
-    if (ans) {
-      if (!current) {
-        // answer without question — ignore but create placeholder if needed?
-        continue;
+    if (trimmed === "") continue;
+    const payload = extractAnswerPayload(line);
+    if (payload !== null) {
+      if (!current) continue;
+      // Map later after options known? Store raw then resolve
+      // For line-scan we can directly map if options already have some
+      const mapped = mapAnswerPayloadToIndex(payload, current.options);
+      if (mapped !== null) current.correctIndex = mapped;
+      else {
+        // Store payload for later resolution (keep as string? We'll keep as pending)
+        // For now, if not mappable, keep payload to try later with full options
+        // We'll store as temporary marker: keep payload in a hidden field via rawLines and resolve after block completion
+        // Instead, save payload raw for later: we set a property via rawLines with special marker
+        (current as any)._pendingAnswerPayload = payload;
       }
-      current.correctIndex = ans.index;
       current.rawLines.push(line);
       continue;
     }
 
+    // Statement lines — must be checked before option, when still in question phase
+    if (current && current.options.every((o) => o === "") && isStatementLine(line)) {
+      current.statements.push(trimmed);
+      current.rawLines.push(line);
+      continue;
+    }
+
+    const isQStart = isQuestionHeaderLine(line);
+    // If this line looks like a new question header, handle before treating as option (to avoid header "১. ..." being taken as numeric option)
+    if (isQStart) {
+      // But if current exists and has no options yet and isQStart is actually a statement that slipped (e.g., roman statement not caught), isStatementLine already handled, so remaining is genuine question
+      // Check if this is truly a new question vs continuation: if current has no options, treat numeric 1.,2.,3. that are statements? They would have been caught as isStatementLine, so not here.
+      // So we can safely treat as new question header if current has content
+      if (current && (current.questionLines.length > 0 || current.statements.length > 0 || current.options.some((o) => o.trim()))) {
+        flushCurrent();
+      }
+      const sh = stripQuestionHeader(line);
+      let qText = line.trim();
+      let orig: string | null = null;
+      if (sh) {
+        orig = sh.header;
+        qText = sh.stripped;
+      } else {
+        qText = line.trim();
+      }
+      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: orig };
+      continue;
+    }
+
+    const opt = parseOptionLine(line, true);
     if (opt) {
       if (!current) {
-        current = { questionLines: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
       }
-      // If this option index already filled and we already have questionLines+some options, it suggests new question started missing its numbering
-      // Example: after finishing D, next line is "A. ..." for next question but we didn't flush
-      // Detect duplicate A when we already have A-D filled
-      if (current.options[opt.index] !== "" && current.options.every((o) => o === "" ) === false) {
-        // If we already have A filled and we see another A, and we have at least question + 2 options, flush and start new
-        const hasQuestion = current.questionLines.length > 0;
+      // Duplicate option label suggests new question if current already has question and at least 2 options
+      if (current.options[opt.index] !== "" && current.options.some((o) => o !== "")) {
+        const hasQuestion = current.questionLines.length > 0 || current.statements.length > 0;
         const filled = current.options.filter((o) => o.trim()).length;
         if (hasQuestion && filled >= 2) {
           flushCurrent();
-          current = { questionLines: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
+          current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
         }
       }
-      // Handle correct marker
       if (opt.isCorrectMarker && current.correctIndex === null) {
         current.correctIndex = opt.index;
       }
@@ -345,69 +920,60 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       continue;
     }
 
-    if (isQStart) {
-      // Numbered start — flush previous
-      if (current && (current.questionLines.length > 0 || current.options.some((o) => o.trim()))) {
-        flushCurrent();
-      }
-      const mNum = line.match(/^\s*((?:Q\s*|Question\s*)?\d{1,3}\s*[.)\-:])\s*(.*)$/i);
-      let qText = line.trim();
-      let orig: string | null = null;
-      if (mNum) {
-        orig = mNum[1].trim();
-        qText = mNum[2].trim();
-      } else {
-        qText = stripNumbering(line);
-      }
-      current = { questionLines: qText ? [qText] : [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: orig };
-      // If qText empty (line was just "5." ), next non-option line will fill question
-      continue;
-    }
-
-    // Plain text line (potential question text or continuation)
+    // Plain text
     if (!current) {
-      current = { questionLines: [trimmed], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
       continue;
     }
-    // Current exists
     const hasAnyOption = current.options.some((o) => o !== "");
     if (!hasAnyOption) {
-      // Still collecting question text (multiline question)
-      current.questionLines.push(trimmed);
-      current.rawLines.push(line);
+      if (current.statements.length > 0) {
+        current.statements[current.statements.length - 1] += " " + trimmed;
+        current.rawLines.push(line);
+      } else {
+        current.questionLines.push(trimmed);
+        current.rawLines.push(line);
+      }
     } else {
-      // We have started options; a plain text line now likely starts a new question (without numbering)
-      // Flush and start new question
+      // After options, plain text likely starts new question
       flushCurrent();
-      current = { questionLines: [trimmed], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
     }
   }
   flushCurrent();
 
-  // Convert blocks to ParsedPasteMcq
+  // Resolve pending answer payloads for blocks where answer was full text not yet mapped
+  for (const b of blocks) {
+    const pending = (b as any)._pendingAnswerPayload as string | undefined;
+    if (pending && b.correctIndex === null) {
+      const mapped = mapAnswerPayloadToIndex(pending, b.options);
+      if (mapped !== null) b.correctIndex = mapped;
+    }
+    delete (b as any)._pendingAnswerPayload;
+  }
+
   return blocks.map((b) => {
     const blockText = b.rawLines.join("\n");
-    const question = b.questionLines.join(" ").replace(/\s+/g, " ").trim();
-    const needs = (() => {
-      const issues: string[] = [];
-      if (!question || question.length < 3) issues.push("Question text missing or too short");
-      const filled = b.options.filter((o) => o.trim()).length;
-      if (filled < 4) {
-        const missing = b.options.map((o, i) => (!o.trim() ? String.fromCharCode(65 + i) : null)).filter(Boolean) as string[];
-        if (missing.length) issues.push(`Missing option ${missing.join(", ")}`);
-      }
-      if (filled < 2) issues.push("At least 2 options required");
-      if (b.correctIndex === null) issues.push("Correct answer not found (add Ans: A/B/C/D)");
-      else if (!b.options[b.correctIndex]?.trim()) issues.push(`Correct answer ${String.fromCharCode(65 + (b.correctIndex ?? 0))} is empty`);
-      return issues;
-    })();
-    const needsReview = needs.length > 0;
+    const baseQuestion = b.questionLines.join(" ").replace(/\s+/g, " ").trim();
+    const statementsText = b.statements.join("\n").trim();
+    const question = statementsText ? (baseQuestion ? `${baseQuestion}\n${statementsText}` : statementsText) : baseQuestion;
+    const issues: string[] = [];
+    if (!question || question.length < 3) issues.push("Question text missing or too short");
+    const filled = b.options.filter((o) => o.trim()).length;
+    if (filled < 4) {
+      const missing = b.options.map((o, i) => (!o.trim() ? String.fromCharCode(65 + i) : null)).filter(Boolean) as string[];
+      if (missing.length) issues.push(`Missing option ${missing.join(", ")}`);
+    }
+    if (filled < 2) issues.push("At least 2 options required");
+    if (b.correctIndex === null) issues.push("Answer could not be confidently detected — please verify.");
+    else if (!b.options[b.correctIndex]?.trim()) issues.push(`Correct answer ${String.fromCharCode(65 + (b.correctIndex ?? 0))} is empty`);
+    const needsReview = issues.length > 0;
     return {
       question,
       options: b.options,
       correctIndex: b.correctIndex,
       rawBlock: blockText,
-      issues: needs,
+      issues,
       needsReview,
       confidence: needsReview ? 0.7 : 0.95,
       originalNumber: b.originalNumber,
@@ -420,27 +986,62 @@ export function parsePastedMcqs(pastedText: string): ParsedPasteMcq[] {
   const normalized = pastedText.replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
 
-  // Try numbered split first (most reliable for pasted MCQs with numbering)
+  // Try numbered split first
   const numberedBlocks = splitByNumbering(normalized);
   if (numberedBlocks && numberedBlocks.length > 0) {
-    const parsed = numberedBlocks.map(parseSingleBlock);
-    // If parsing via numbered gave reasonable results (at least 60% with options), use it
-    const avgFilled = parsed.reduce((acc, p) => acc + p.options.filter((o) => o.trim()).length, 0) / parsed.length;
-    if (avgFilled >= 2) {
-      return parsed;
+    const parsed: ParsedPasteMcq[] = [];
+    for (const block of numberedBlocks) {
+      let p = parseSingleBlock(block);
+      if (p.options.filter((o) => o.trim()).length < 2) {
+        // Avoid converting statement lines (e.g., Roman I., II. statements) into options via inline fallback
+        const rawLines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+        const hasStatementLines = rawLines.some((l) => isStatementLine(l));
+        const hasADOptions = rawLines.some((l) => {
+          const t = l.trim();
+          return /^[A-Da-dকখগঘ(]/.test(t) && parseOptionLine(t, false) !== null;
+        });
+        if (hasStatementLines && !hasADOptions) {
+          // This block has statements but no real A-D/Bangla options (e.g., "III. Third Q?" with I., II. statements only) — keep as is with missing options warning
+          parsed.push(p);
+        } else {
+          const inline = parseSingleBlockInline(block);
+          if (inline && inline.options.filter((o) => o.trim()).length >= 2) parsed.push(inline);
+          else parsed.push(p);
+        }
+      } else {
+        parsed.push(p);
+      }
     }
-    // Otherwise fallback
+    const avgFilled = parsed.reduce((acc, p) => acc + p.options.filter((o) => o.trim()).length, 0) / (parsed.length || 1);
+    if (avgFilled >= 2) return parsed;
+    // otherwise fallback
   }
 
-  // Fallback: line-scan parser (handles missing numbering, inconsistent, blank lines)
   const viaLines = parseViaLineScan(normalized);
-  if (viaLines.length > 0) return viaLines;
+  if (viaLines.length > 0) {
+    const enhanced = viaLines.map((b) => {
+      if (b.options.filter((o) => o.trim()).length < 2) {
+        const rawLines = b.rawBlock.split("\n").map((l) => l.trim()).filter(Boolean);
+        const hasStatementLines = rawLines.some((l) => isStatementLine(l));
+        const hasADOptions = rawLines.some((l) => /^[A-Da-dকখগঘ(]/.test(l.trim()) && parseOptionLine(l, false) !== null);
+        if (hasStatementLines && !hasADOptions) return b;
+        const inline = parseSingleBlockInline(b.rawBlock);
+        if (inline && inline.options.filter((o) => o.trim()).length >= 2) return inline;
+      }
+      return b;
+    });
+    // Filter out blocks that still have <2 options (likely false splits) unless they're the only block
+    const filtered = enhanced.filter((b) => b.options.filter((o) => o.trim()).length >= 2 || b.question.length >= 10);
+    if (filtered.length > 0) return filtered;
+    return enhanced;
+  }
 
-  // Last resort: try to treat whole text as single block
-  return [parseSingleBlock(normalized)];
+  const single = parseSingleBlock(normalized);
+  const inlineSingle = parseSingleBlockInline(normalized);
+  if (inlineSingle && inlineSingle.options.filter((o) => o.trim()).length >= 2) return [inlineSingle];
+  return [single];
 }
 
-// Utility to recompute needsReview after edits
 export function recomputeParsedMcq(mcq: ParsedPasteMcq): ParsedPasteMcq {
   const issues: string[] = [];
   if (!mcq.question || mcq.question.trim().length < 3) issues.push("Question text missing or too short");
@@ -450,7 +1051,7 @@ export function recomputeParsedMcq(mcq: ParsedPasteMcq): ParsedPasteMcq {
     if (missing.length) issues.push(`Missing option ${missing.join(", ")}`);
   }
   if (filled < 2) issues.push("At least 2 options required");
-  if (mcq.correctIndex === null) issues.push("Correct answer not found (add Ans: A/B/C/D)");
+  if (mcq.correctIndex === null) issues.push("Answer could not be confidently detected — please verify.");
   else if (mcq.correctIndex < 0 || mcq.correctIndex >= 4 || !mcq.options[mcq.correctIndex]?.trim()) issues.push(`Correct answer ${String.fromCharCode(65 + (mcq.correctIndex ?? 0))} is empty`);
   const needsReview = issues.length > 0;
   return { ...mcq, issues, needsReview, confidence: needsReview ? 0.7 : 0.96 };
