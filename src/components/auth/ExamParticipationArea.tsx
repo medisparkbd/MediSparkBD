@@ -827,18 +827,20 @@ export default function ExamParticipationArea({
 
   return (
     <div className="space-y-4">
-      {/* Fixed Header — ONLY Total Questions (left) and Countdown Timer (right) */}
-      <div className="sticky top-0 z-20 -mx-4 border-b border-ink/10 bg-dark-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-bold text-heading">Total Questions: {totalQuestions}</span>
+      {/* Fixed exam header — Answered progress (left) + live countdown (right). Stays visible while scrolling. */}
+      <div className="sticky top-0 z-30 -mx-4 border-b border-ink/10 bg-dark-950/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-dark-950/80 sm:-mx-6 sm:px-6">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
+          <span className="shrink-0 whitespace-nowrap text-sm font-bold text-heading sm:text-[15px]">
+            Answered {answeredCount}/{totalQuestions}
+          </span>
           <span
-            className={`rounded-full px-3 py-1.5 font-mono text-sm font-extrabold sm:px-4 sm:text-base ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 font-mono text-sm font-extrabold tabular-nums sm:px-4 sm:text-base ${
               secondsLeft !== null && secondsLeft < 60
                 ? "bg-red-500/15 text-red-400"
                 : "bg-primary-600/15 text-primary-300"
             }`}
           >
-            Countdown Timer: {formatClock(secondsLeft ?? 0)}
+            {formatClock(secondsLeft ?? 0)}
           </span>
         </div>
       </div>
