@@ -26,7 +26,52 @@ export default function SeoSettingsPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [ogImageFile, setOgImageFile] = useState<File | null>(null);
+  const [ogImagePreview, setOgImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const ALLOWED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+  const ALLOWED_MIMES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+  const MAX_SIZE = 5 * 1024 * 1024;
+
+  // Create and revoke blob preview URL when file changes — prevents memory leaks and avoids storing blob: URLs
+  useEffect(() => {
+    if (!ogImageFile) {
+      setOgImagePreview("");
+      return;
+    }
+    const url = URL.createObjectURL(ogImageFile);
+    setOgImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [ogImageFile]);
+
+  function validateImageFile(file: File): string | null {
+    const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
+    if (ext && !ALLOWED_EXTENSIONS.includes(ext) && !ALLOWED_MIMES.includes(file.type)) {
+      return "Unsupported image type. Use PNG, JPG, WebP or GIF.";
+    }
+    if (file.size > MAX_SIZE) {
+      return "Social sharing image must be 5 MB or smaller.";
+    }
+    if (file.size === 0) return "Selected file is empty.";
+    return null;
+  }
+
+  function handleFileChange(file: File | null) {
+    setNotice(null);
+    if (!file) {
+      setOgImageFile(null);
+      return;
+    }
+    const err = validateImageFile(file);
+    if (err) {
+      setNotice({ kind: "error", text: err });
+      setOgImageFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setOgImageFile(file);
+    setNotice({ kind: "success", text: `Selected: ${file.name} (${(file.size / 1024).toFixed(0)} KB) — click Save to upload.` });
+  }
   const [adminStatus, setAdminStatus] = useState<
     "checking" | "admin" | "denied"
   >("checking");
@@ -103,6 +148,14 @@ export default function SeoSettingsPage() {
 
   async function handleSave() {
     if (!user || !settings) return;
+    // Client-side file validation before upload
+    if (ogImageFile) {
+      const err = validateImageFile(ogImageFile);
+      if (err) {
+        setNotice({ kind: "error", text: err });
+        return;
+      }
+    }
     setBusy(true);
     setNotice(null);
     try {
@@ -113,7 +166,10 @@ export default function SeoSettingsPage() {
       formData.set("keywords", settings.keywords);
       formData.set("ogTitle", settings.ogTitle);
       formData.set("ogDescription", settings.ogDescription);
-      if (ogImageFile) formData.set("ogImage", ogImageFile);
+      if (ogImageFile) {
+        // Ensure we send the file, not a blob: URL
+        formData.set("ogImage", ogImageFile, ogImageFile.name);
+      }
 
       const response = await fetch("/api/seo-settings", {
         method: "PUT",
@@ -125,21 +181,28 @@ export default function SeoSettingsPage() {
         seo?: SeoSettings;
       } | null;
       if (!response.ok) {
-        setNotice({
-          kind: "error",
-          text: data?.error ?? "Failed to save the SEO settings.",
-        });
+        const msg = data?.error ?? `Failed to save SEO settings (${response.status}).`;
+        setNotice({ kind: "error", text: msg });
         return;
       }
-      if (data?.seo) setSettings(data.seo);
+      if (data?.seo) {
+        // Validate returned URL is not a blob: URL before storing
+        if (data.seo.ogImageUrl && data.seo.ogImageUrl.startsWith("blob:")) {
+          setNotice({ kind: "error", text: "Server returned an invalid image URL. Please try again." });
+          return;
+        }
+        setSettings(data.seo);
+      }
       setOgImageFile(null);
+      setOgImagePreview("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       setNotice({
         kind: "success",
-        text: "SEO settings saved. Changes are now live on the website.",
+        text: "SEO settings saved. Image URL stored and live on the website.",
       });
-    } catch {
-      setNotice({ kind: "error", text: "Failed to save the SEO settings." });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to save the SEO settings.";
+      setNotice({ kind: "error", text: msg });
     } finally {
       setBusy(false);
     }
@@ -180,9 +243,7 @@ export default function SeoSettingsPage() {
     }
   }
 
-  const previewImageUrl = ogImageFile
-    ? URL.createObjectURL(ogImageFile)
-    : settings?.ogImageUrl || "";
+  const previewImageUrl = ogImagePreview || settings?.ogImageUrl || "";
 
   const previewTitle = settings?.ogTitle || settings?.siteTitle || "MediSpark — HSC Academic & Medical Admission Preparation";
 
@@ -333,10 +394,19 @@ export default function SeoSettingsPage() {
                         ref={fileInputRef}
                         type="file"
                         accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
-                        onChange={(e) => setOgImageFile(e.target.files?.[0] ?? null)}
+                        onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
                         aria-label="Upload social sharing image"
-                        className="block w-full max-w-xs cursor-pointer rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs text-neutral-400 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-700"
+                        className="block w-full max-w-xs cursor-pointer rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs text-neutral-400 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-50"
+                        disabled={busy}
                       />
+                      {ogImageFile && (
+                        <p className="text-xs font-medium text-primary-600 admin-dark:text-primary-400">
+                          Ready to upload: {ogImageFile.name} — click Save Changes to store permanently.
+                        </p>
+                      )}
+                      {busy && ogImageFile && (
+                        <p className="text-xs font-semibold text-amber-600 admin-dark:text-amber-400">Uploading image…</p>
+                      )}
                       {(settings.ogImageUrl || ogImageFile) && (
                         <button
                           type="button"

@@ -296,26 +296,54 @@ export default function WebsiteInformationPage() {
   // ── Social sharing (OG) image upload ─────────────────────────────────────
   async function uploadOgImage(file: File) {
     if (!file) return;
+    // Client-side validation: type and size
+    const allowedExts = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+    const allowedMimes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
+    if (ext && !allowedExts.includes(ext) && !allowedMimes.includes(file.type)) {
+      toast.showToast("error", "Unsupported image type. Use PNG, JPG, WebP or GIF.");
+      if (ogImageRef.current) ogImageRef.current.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.showToast("error", "Social sharing image must be 5 MB or smaller.");
+      if (ogImageRef.current) ogImageRef.current.value = "";
+      return;
+    }
+    if (file.size === 0) {
+      toast.showToast("error", "Selected file is empty.");
+      if (ogImageRef.current) ogImageRef.current.value = "";
+      return;
+    }
     setUploading("og-image");
     try {
       const formData = new FormData();
-      formData.append("ogImage", file);
+      formData.append("ogImage", file, file.name);
       const res = await fetch("/api/seo-settings", {
         method: "PUT",
         headers: { Authorization: `Bearer ${await token()}` },
         body: formData,
       });
-      const data = (await res.json()) as { error?: string; seo?: { ogImageUrl?: string } };
+      const data = (await res.json().catch(() => null)) as { error?: string; seo?: { ogImageUrl?: string } } | null;
       if (!res.ok) {
-        toast.showToast("error", data.error ?? "Image upload failed.");
+        const msg = data?.error ?? `Image upload failed (${res.status}).`;
+        toast.showToast("error", msg);
         return;
       }
-      if (data.seo?.ogImageUrl) {
+      if (data?.seo?.ogImageUrl) {
+        if (data.seo.ogImageUrl.startsWith("blob:")) {
+          toast.showToast("error", "Server returned an invalid image URL.");
+          return;
+        }
         setOgImageUrl(data.seo.ogImageUrl);
+        toast.showToast("success", "Social sharing image uploaded and live.");
+      } else if (data?.seo) {
+        // No URL returned but seo updated — keep current preview
         toast.showToast("success", "Social sharing image saved.");
       }
-    } catch {
-      toast.showToast("error", "Image upload failed.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Image upload failed.";
+      toast.showToast("error", msg);
     } finally {
       setUploading(null);
       if (ogImageRef.current) ogImageRef.current.value = "";
@@ -379,25 +407,29 @@ export default function WebsiteInformationPage() {
 
     // 3) SEO (meta title + description, preserving keywords/OG fields)
     try {
-      const seoRes = await fetch("/api/seo-settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await token()}`,
-        },
-        body: JSON.stringify({
-          siteTitle: siteTitle.trim(),
-          metaDescription: metaDescription.trim(),
-          keywords: preservedSeo.keywords,
-          ogTitle: preservedSeo.ogTitle,
-          ogDescription: preservedSeo.ogDescription,
-          ogImageUrl,
-        }),
-      });
-      const seoData = (await seoRes.json()) as { error?: string };
-      if (!seoRes.ok) {
-        errors.push(seoData.error ?? "Failed to save SEO settings.");
-      }
+      if (ogImageUrl && ogImageUrl.startsWith("blob:")) {
+        errors.push("Social sharing image is a temporary preview. Please re-upload the image file.");
+      } else {
+        const seoRes = await fetch("/api/seo-settings", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${await token()}`,
+          },
+          body: JSON.stringify({
+            siteTitle: siteTitle.trim(),
+            metaDescription: metaDescription.trim(),
+            keywords: preservedSeo.keywords,
+            ogTitle: preservedSeo.ogTitle,
+            ogDescription: preservedSeo.ogDescription,
+            ogImageUrl,
+          }),
+        });
+        const seoData = (await seoRes.json()) as { error?: string };
+        if (!seoRes.ok) {
+          errors.push(seoData.error ?? "Failed to save SEO settings.");
+        }
+        }
     } catch {
       errors.push("Failed to save SEO settings.");
     }
