@@ -167,6 +167,7 @@ export default function SocialLinksManagementPage() {
       toast.showToast("error", "URL must start with https://");
       return;
     }
+    if (!links) return;
     const key = slugifyLabel(addForm.label);
     if (!key || key.length < 2) {
       toast.showToast("error", "Platform Name must produce a valid slug (at least 2 characters).");
@@ -280,6 +281,7 @@ export default function SocialLinksManagementPage() {
   }
 
   async function toggleActive(key: string) {
+    if (!links) return;
     const link = links.find((l) => l.key === key);
     if (!link) return;
     setBusyKey(key);
