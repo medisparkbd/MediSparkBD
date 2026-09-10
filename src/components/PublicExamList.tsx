@@ -53,6 +53,7 @@ export default function PublicExamList({
   renderManage?: (exam: PublicExam) => React.ReactNode;
 }) {
   const [batch, setBatch] = useState("All Batches");
+  const [mode, setMode] = useState<"all" | "live" | "practice">("all");
   const { user } = useAuth();
   const [completedSet, setCompletedSet] = useState<Set<string>>(new Set());
 
@@ -84,7 +85,8 @@ export default function PublicExamList({
   const filtered = exams.filter(
     (exam) =>
       (showDrafts || exam.published) &&
-      (batch === "All Batches" || exam.batch === batch),
+      (batch === "All Batches" || exam.batch === batch) &&
+      (mode === "all" || (exam.examMode ?? "live") === mode),
   );
 
   const grouped = useMemo(() => {
@@ -109,10 +111,17 @@ export default function PublicExamList({
   const selectClass =
     "rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-heading transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30";
 
+  const modeButtonClass = (active: boolean) =>
+    `shrink-0 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+      active
+        ? "bg-white text-[#0b1e3a] shadow"
+        : "bg-dark-800 text-neutral-300 ring-1 ring-white/10 hover:bg-dark-700 hover:text-white"
+    }`;
+
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <select
             aria-label="Filter by batch"
             value={batch}
@@ -126,6 +135,22 @@ export default function PublicExamList({
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            aria-pressed={mode === "live"}
+            onClick={() => setMode((prev) => (prev === "live" ? "all" : "live"))}
+            className={modeButtonClass(mode === "live")}
+          >
+            Live Exam
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "practice"}
+            onClick={() => setMode((prev) => (prev === "practice" ? "all" : "practice"))}
+            className={modeButtonClass(mode === "practice")}
+          >
+            Practice Exam
+          </button>
         </div>
 
         <p className="text-sm font-medium text-neutral-400">
@@ -137,7 +162,7 @@ export default function PublicExamList({
         <div className="mb-10 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
           <p className="font-semibold text-heading">No exams found</p>
           <p className="mt-1 text-sm text-neutral-400">
-            Try changing the batch filter.
+            Try changing the batch or exam mode filter.
           </p>
         </div>
       )}

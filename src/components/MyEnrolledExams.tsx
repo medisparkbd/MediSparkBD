@@ -40,6 +40,7 @@ function toPublicExam(exam: MyExam): PublicExam {
     negativePerWrong: neg,
     scheduledAt: exam.scheduledAt ?? null,
     endsAt: null,
+    examMode: "live",
     examDate: scheduledIso.slice(0, 10),
     examTime: scheduledIso
       ? new Date(scheduledIso).toLocaleTimeString("en-US", {

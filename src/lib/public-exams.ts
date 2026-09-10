@@ -23,6 +23,8 @@ export type ExamStatus =
 
 export type CourseType = "Academic" | "Admission";
 
+export type ExamMode = "live" | "practice";
+
 export type PublicExam = {
   id: string;
   /** Owning Public Exam Control category (course_categories.id). */
@@ -32,6 +34,8 @@ export type PublicExam = {
   description?: string | null;
   /** Public banner image (admin-managed) shown on the details page. */
   bannerUrl?: string | null;
+  /** Live Exam vs Practice Exam — independent from status/schedule. */
+  examMode: ExamMode;
   batch: string;
   courseType: CourseType;
   subject: string;
