@@ -316,6 +316,47 @@ export default function MaterialPdfGeneratorPage() {
           const style = clonedDoc.createElement("style");
           style.textContent = `@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap');`;
           clonedDoc.head.appendChild(style);
+          // Fix: html2canvas 1.4.1 cannot parse oklch() (Tailwind v4 default). Convert to rgb via canvas.
+          try {
+            const fixStyle = clonedDoc.createElement("style");
+            fixStyle.textContent = `.a4-page, .a4-page * { color-scheme: light !important; } .a4-page { background-color: #ffffff !important; }`;
+            clonedDoc.head.appendChild(fixStyle);
+            const all = clonedDoc.querySelectorAll(".a4-page, .a4-page *");
+            // Use a canvas to convert oklch -> rgb (ctx.fillStyle normalizes)
+            const c = clonedDoc.createElement("canvas") as HTMLCanvasElement;
+            c.width = 1; c.height = 1;
+            const ctx = c.getContext("2d");
+            const props = ["color", "background-color", "border-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "column-rule-color", "background"];
+            const win = clonedDoc.defaultView;
+            if (win && ctx) {
+              all.forEach((node) => {
+                const htmlEl = node as HTMLElement;
+                const cs = win.getComputedStyle(htmlEl);
+                props.forEach((prop) => {
+                  const val = cs.getPropertyValue(prop);
+                  if (val && val.includes("oklch")) {
+                    let rgb = "";
+                    try {
+                      ctx.fillStyle = "#ffffff";
+                      ctx.fillStyle = val;
+                      rgb = ctx.fillStyle;
+                    } catch {}
+                    if (!rgb || rgb.includes("oklch")) {
+                      if (prop.includes("background")) rgb = "#ffffff";
+                      else if (prop.includes("border") || prop.includes("column")) rgb = "#cbd5e1";
+                      else if (prop === "color") rgb = "#0f172a";
+                      else rgb = "#ffffff";
+                    }
+                    htmlEl.style.setProperty(prop, rgb, "important");
+                  }
+                });
+                const bs = cs.getPropertyValue("box-shadow");
+                if (bs && bs.includes("oklch")) htmlEl.style.setProperty("box-shadow", "none", "important");
+                const bgImg = cs.getPropertyValue("background-image");
+                if (bgImg && bgImg.includes("oklch")) htmlEl.style.setProperty("background-image", "none", "important");
+              });
+            }
+          } catch {}
         },
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.92);
