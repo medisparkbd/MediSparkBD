@@ -115,6 +115,10 @@ export default function ExamParticipationArea({
   const submittedRef = useRef(false);
   const answersRef = useRef<Record<number, number>>({});
   const tokenRef = useRef<string | null>(null);
+  // Exam Fixed Header — measured offsets so it stays directly below the normal website header
+  const [headerOffset, setHeaderOffset] = useState(64);
+  const [examHeaderHeight, setExamHeaderHeight] = useState(48);
+  const examFixedHeaderRef = useRef<HTMLDivElement>(null);
 
   /**
    * Activate a freshly created server session — locks in the start time and
@@ -346,6 +350,39 @@ export default function ExamParticipationArea({
     );
     return () => clearTimeout(timer);
   }, [secondsLeft, outcome, terminatedNotice, submit]);
+
+  // Exam Fixed Header positioning — keep it directly below the normal website header (sticky Navbar).
+  // Measures the live header height so the sticky exam header sticks at the correct offset and never overlaps the Navbar.
+  useEffect(() => {
+    if (!begun || outcome || terminatedNotice) return;
+    function updateOffsets() {
+      const header = document.querySelector("header");
+      if (header) {
+        // Navbar is sticky top-0; its height is the offset where the exam header should stick
+        const h = Math.round(header.getBoundingClientRect().height);
+        if (h) setHeaderOffset(h);
+      }
+      if (examFixedHeaderRef.current) {
+        const h = examFixedHeaderRef.current.offsetHeight;
+        if (h && h !== examHeaderHeight) setExamHeaderHeight(h);
+      }
+    }
+    updateOffsets();
+    window.addEventListener("scroll", updateOffsets, { passive: true });
+    window.addEventListener("resize", updateOffsets);
+    const iv = setInterval(updateOffsets, 500);
+    // also observe announcement dismissal / header height changes
+    const ro = new ResizeObserver(updateOffsets);
+    const headerEl = document.querySelector("header");
+    if (headerEl) ro.observe(headerEl);
+    if (examFixedHeaderRef.current) ro.observe(examFixedHeaderRef.current);
+    return () => {
+      window.removeEventListener("scroll", updateOffsets);
+      window.removeEventListener("resize", updateOffsets);
+      clearInterval(iv);
+      ro.disconnect();
+    };
+  }, [begun, outcome, terminatedNotice, examHeaderHeight]);
 
   // Interrupted active exam → automatically submit and cannot be recovered/resumed.
   // Handles tab close, navigation away, refresh, and hidden tab.
@@ -827,8 +864,17 @@ export default function ExamParticipationArea({
 
   return (
     <div className="space-y-4">
-      {/* Fixed exam header — Answered progress (left) + live countdown (right). Stays visible while scrolling. */}
-      <div className="sticky top-0 z-30 -mx-4 border-b border-ink/10 bg-dark-950/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-dark-950/80 sm:-mx-6 sm:px-6">
+      {/* Exam Fixed Header — separate sticky header directly below the normal website header.
+          Must remain permanently visible while scrolling: uses sticky with dynamic top (Navbar height).
+          Placed OUTSIDE the scrollable question-paper container, questions scroll underneath.
+          LEFT: Answered X/Y (same answeredCount) | RIGHT: live countdown (same secondsLeft state). */}
+      <div
+        ref={examFixedHeaderRef}
+        className="sticky z-40 -mx-4 border-b border-ink/10 bg-dark-950/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-dark-950/80 sm:-mx-6 sm:px-6"
+        style={{ top: `${headerOffset}px` }}
+        role="region"
+        aria-label="Exam progress and timer"
+      >
         <div className="flex items-center justify-between gap-2 sm:gap-3">
           <span className="shrink-0 whitespace-nowrap text-sm font-bold text-heading sm:text-[15px]">
             Answered {answeredCount}/{totalQuestions}
@@ -845,7 +891,7 @@ export default function ExamParticipationArea({
         </div>
       </div>
 
-      {/* Exam paper — all questions vertically, free scroll */}
+      {/* Exam paper — all questions vertically, free scroll. Has top spacing so first question never hidden underneath the sticky header */}
       <div className="rounded-2xl border border-ink/10 bg-dark-900 p-4 sm:p-6">
 
         {/* Questions list */}
