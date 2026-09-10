@@ -1,15 +1,12 @@
-export type SocialPlatformKey =
-  | "facebook"
-  | "youtube"
-  | "telegram"
-  | "instagram"
-  | "linkedin";
+export type SocialPlatformKey = string;
 
 export type SocialLink = {
   key: SocialPlatformKey;
   label: string;
   url: string | null;
   isActive: boolean;
+  icon?: string | null;
+  sortOrder?: number;
 };
 
 export const SOCIAL_PLATFORMS: Array<{
@@ -21,14 +18,17 @@ export const SOCIAL_PLATFORMS: Array<{
   { key: "telegram", label: "Telegram" },
   { key: "instagram", label: "Instagram" },
   { key: "linkedin", label: "LinkedIn" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "tiktok", label: "TikTok" },
 ];
 
-export function isSocialPlatformKey(key: string): key is SocialPlatformKey {
-  return SOCIAL_PLATFORMS.some((platform) => platform.key === key);
+export function isSocialPlatformKey(key: string): boolean {
+  if (SOCIAL_PLATFORMS.some((platform) => platform.key === key)) return true;
+  return /^[a-z0-9][a-z0-9-_]{1,49}$/.test(key);
 }
 
 export function getSocialLabel(key: SocialPlatformKey): string {
-  return SOCIAL_PLATFORMS.find((platform) => platform.key === key)?.label ?? key;
+  return SOCIAL_PLATFORMS.find((platform) => platform.key === key)?.label ?? key.charAt(0).toUpperCase() + key.slice(1);
 }
 
 export function isValidSocialUrl(value: string): boolean {

@@ -1,30 +1,34 @@
 import { fetchActiveSocialLinks } from "@/lib/social-links";
 import { fetchHomepageSections } from "@/lib/homepage-sections";
 import { getSocialPlatformIcon } from "@/components/social-icons";
-import type { SocialPlatformKey } from "@/lib/social-links-constants";
 import SectionHeading, { JoinIcon } from "@/components/home/SectionHeading";
 
-const JOIN_PLATFORMS: Array<{
-  key: SocialPlatformKey;
-  description: string;
-  buttonLabel: string;
-}> = [
-  {
-    key: "facebook",
-    description: "Follow us on Facebook",
-    buttonLabel: "Follow on Facebook",
-  },
-  {
-    key: "youtube",
-    description: "Subscribe to our YouTube channel",
-    buttonLabel: "Subscribe on YouTube",
-  },
-  {
-    key: "telegram",
-    description: "Join our Telegram community",
-    buttonLabel: "Join on Telegram",
-  },
-];
+const JOIN_DESCRIPTIONS: Record<string, string> = {
+  facebook: "Follow us on Facebook",
+  youtube: "Subscribe to our YouTube channel",
+  telegram: "Join our Telegram community",
+  instagram: "Follow us on Instagram",
+  linkedin: "Connect on LinkedIn",
+  whatsapp: "Chat with us on WhatsApp",
+  tiktok: "Follow us on TikTok",
+};
+
+const JOIN_BUTTON_LABELS: Record<string, string> = {
+  facebook: "Follow on Facebook",
+  youtube: "Subscribe on YouTube",
+  telegram: "Join on Telegram",
+  instagram: "Follow on Instagram",
+  linkedin: "Connect on LinkedIn",
+  whatsapp: "Chat on WhatsApp",
+  tiktok: "Follow on TikTok",
+};
+
+function getJoinDescription(label: string, key: string): string {
+  return JOIN_DESCRIPTIONS[key] ?? `Connect with us on ${label}`;
+}
+function getJoinButtonLabel(label: string, key: string): string {
+  return JOIN_BUTTON_LABELS[key] ?? `Join on ${label}`;
+}
 
 export default async function JoinWithUs({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -44,12 +48,17 @@ export default async function JoinWithUs({
   // Heading is fixed to "Join With Us Now!" per design spec; description remains DB-driven
   const description = descriptionProp ?? joinSection?.description ?? "Connect with MediSpark on your favourite platforms and never miss an update.";
 
-  // Only the 3 required platforms, in defined order, enabled + has URL
-  const visible = JOIN_PLATFORMS.map((p) => {
-    const found = activeLinks.find((l) => l.key === p.key);
-    if (!found || !found.url) return null;
-    return { ...p, url: found.url, label: found.label };
-  }).filter(Boolean) as Array<{ key: string; description: string; buttonLabel: string; url: string; label: string }>;
+  // DB-driven: any active platform with URL, in admin-defined sort_order
+  const visible = activeLinks
+    .filter((link) => link.url)
+    .map((link) => ({
+      key: link.key,
+      label: link.label,
+      url: link.url as string,
+      iconPath: link.icon || getSocialPlatformIcon(link.key),
+      description: getJoinDescription(link.label, link.key),
+      buttonLabel: getJoinButtonLabel(link.label, link.key),
+    }));
 
   if (visible.length === 0) return null;
 
@@ -65,7 +74,8 @@ export default async function JoinWithUs({
 
         <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
           {visible.map((platform) => {
-            const iconPath = getSocialPlatformIcon(platform.key);
+            const iconPath = platform.iconPath;
+            const isUrlIcon = Boolean(iconPath && (iconPath.startsWith("http") || iconPath.startsWith("data:")));
             return (
               <a
                 key={platform.key}
@@ -75,7 +85,10 @@ export default async function JoinWithUs({
                 className="group flex flex-col rounded-2xl border border-ink/10 bg-dark-900 p-6 text-center shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/50 hover:shadow-primary-900/20 hover:-translate-y-1"
               >
                 <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/15 text-primary-500 transition group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-primary-900/40">
-                  {iconPath ? (
+                  {isUrlIcon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={iconPath!} alt="" className="h-7 w-7 rounded object-contain" />
+                  ) : iconPath ? (
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="h-7 w-7">
                       <path d={iconPath} />
                     </svg>
