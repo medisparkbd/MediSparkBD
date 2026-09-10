@@ -276,6 +276,82 @@ export default function MaterialPdfGeneratorPage() {
     input.click();
   };
 
+  // Shared core: build PDF Blob client-side (no server round-trip)
+  const buildPdfBlob = async (): Promise<Blob> => {
+    if (questions.length === 0) throw new Error("No questions to generate.");
+    if (!previewRef.current) throw new Error("Preview not ready — please try again.");
+    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+      import("jspdf"),
+      import("html2canvas"),
+    ]);
+    // Ensure Bangla fonts and images loaded
+    // @ts-ignore
+    if (document.fonts?.ready) await document.fonts.ready;
+    const imgs = Array.from(previewRef.current.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((res) => {
+            if ((img as HTMLImageElement).complete) res();
+            else {
+              (img as HTMLImageElement).onload = () => res();
+              (img as HTMLImageElement).onerror = () => res();
+            }
+          }),
+      ),
+    );
+    await new Promise((r) => setTimeout(r, 300));
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const pageEls = previewRef.current.querySelectorAll<HTMLElement>(".a4-page");
+    if (!pageEls || pageEls.length === 0) throw new Error("Preview not ready");
+    for (let i = 0; i < pageEls.length; i++) {
+      const el = pageEls[i];
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement("style");
+          style.textContent = `@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap');`;
+          clonedDoc.head.appendChild(style);
+        },
+      });
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH, undefined, "FAST");
+    }
+    const blob: Blob = pdf.output("blob");
+    if (!blob || blob.size === 0) throw new Error("Generated PDF is empty — please try again.");
+    return blob;
+  };
+
+  const triggerClientDownload = (blob: Blob, fileName: string) => {
+    // Always create a fresh object URL from the Blob — ensures download lands on user's device, not server
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.style.display = "none";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    // iOS Safari fallback: download attribute ignored -> open in new tab
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } else {
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
+    }
+  };
+
   const handleGeneratePdf = async () => {
     if (questions.length === 0) {
       setToast("No questions to generate.");
@@ -290,7 +366,6 @@ export default function MaterialPdfGeneratorPage() {
     setGenerating(true);
     setGenerateError(null);
     setPdfReady(false);
-    // Revoke previous Blob URL to prevent memory leaks before creating new one
     if (pdfUrl) {
       URL.revokeObjectURL(pdfUrl);
       pdfUrlRef.current = null;
@@ -298,59 +373,8 @@ export default function MaterialPdfGeneratorPage() {
     setPdfUrl(null);
     setPdfBlob(null);
     try {
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas"),
-      ]);
-      // Ensure Bangla fonts and images loaded
-      // @ts-ignore
-      if (document.fonts?.ready) await document.fonts.ready;
-      // Wait for all images inside preview to load
-      const imgs = Array.from(previewRef.current.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map(
-          (img) =>
-            new Promise<void>((res) => {
-              if ((img as HTMLImageElement).complete) res();
-              else {
-                (img as HTMLImageElement).onload = () => res();
-                (img as HTMLImageElement).onerror = () => res();
-              }
-            }),
-        ),
-      );
-      await new Promise((r) => setTimeout(r, 300));
-
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-      const pageEls = previewRef.current.querySelectorAll<HTMLElement>(".a4-page");
-      if (!pageEls || pageEls.length === 0) throw new Error("Preview not ready");
-      for (let i = 0; i < pageEls.length; i++) {
-        const el = pageEls[i];
-        const canvas = await html2canvas(el, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          onclone: (clonedDoc) => {
-            // Force font ensure in clone
-            const style = clonedDoc.createElement("style");
-            style.textContent = `@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap');`;
-            clonedDoc.head.appendChild(style);
-          },
-        });
-        const imgData = canvas.toDataURL("image/jpeg", 0.92);
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH, undefined, "FAST");
-      }
-      // Create Blob and Object URL correctly for reliable download (Chrome/Android/desktop)
-      const blob: Blob = pdf.output("blob");
-      if (!blob || blob.size === 0) throw new Error("Generated PDF is empty — please try again.");
+      const blob = await buildPdfBlob();
       const url = URL.createObjectURL(blob);
-      // Verify Blob type is PDF
-      // Store for Download button — do not auto-revoke immediately to allow multiple clicks
       setPdfBlob(blob);
       setPdfUrl(url);
       pdfUrlRef.current = url;
@@ -366,32 +390,46 @@ export default function MaterialPdfGeneratorPage() {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (generating) {
       setToast("Please wait — generating PDF…");
       return;
     }
-    if (!pdfReady || !pdfBlob || !pdfUrl) {
-      setToast("Please click Generate PDF first.");
-      setGenerateError("No PDF generated yet — click Generate PDF first.");
-      return;
-    }
     try {
       const fileName = `${sanitizeFileName(materialName)}.pdf`;
-      // Create anchor with download attribute — forces download (no new tab), works on Chrome/Android
-      const a = document.createElement("a");
-      a.href = pdfUrl;
-      a.download = fileName;
-      a.style.display = "none";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      // Clean up anchor immediately, but keep Blob URL alive for multiple downloads
-      // Revocation happens only on next Generate or unmount to prevent memory leaks without breaking re-downloads
-      setTimeout(() => {
-        if (a.parentNode) document.body.removeChild(a);
-      }, 100);
-      setToast("PDF downloaded");
+      // If already generated, download the stored blob immediately (client-side)
+      let blobToDownload: Blob | null = pdfBlob;
+      // Also try ref in case state not yet flushed (ultra-fast click after Generate)
+      if (!blobToDownload && pdfUrlRef.current && pdfBlob) blobToDownload = pdfBlob;
+      // If no blob yet, auto-generate first then download — single click generates + downloads to device
+      if (!blobToDownload || !pdfReady) {
+        setGenerating(true);
+        setGenerateError(null);
+        if (pdfUrl) {
+          URL.revokeObjectURL(pdfUrl);
+          pdfUrlRef.current = null;
+        }
+        setPdfUrl(null);
+        setPdfBlob(null);
+        try {
+          blobToDownload = await buildPdfBlob();
+          const url = URL.createObjectURL(blobToDownload);
+          setPdfBlob(blobToDownload);
+          setPdfUrl(url);
+          pdfUrlRef.current = url;
+          setPdfReady(true);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "PDF generation failed — please try again.";
+          setGenerateError(msg);
+          setToast(msg);
+          return;
+        } finally {
+          setGenerating(false);
+        }
+      }
+      if (!blobToDownload) throw new Error("No PDF to download — please click Generate PDF first.");
+      triggerClientDownload(blobToDownload, fileName);
+      setToast("PDF downloaded to your device");
       setGenerateError(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Download failed — please try again.";
@@ -891,18 +929,22 @@ D. 150 দিন
               </button>
               <button
                 onClick={handleDownloadPdf}
-                disabled={generating || !pdfReady}
+                disabled={generating}
                 className="rounded-xl border border-[#cbd5e1] bg-white px-6 py-3 text-sm font-bold text-[#0b1e3a] hover:bg-slate-50 disabled:opacity-40 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-white"
-                title={!pdfReady ? "Click Generate PDF first" : "Download PDF"}
+                title={generating ? "Generating PDF…" : pdfReady ? "Download PDF to your device" : "Download PDF (auto-generates if needed) — saves to your device"}
               >
-                Download PDF
+                {generating ? "Preparing…" : "Download PDF"}
               </button>
             </div>
-            {pdfReady && !generating && (
+            {pdfReady && !generating ? (
               <p className="mt-2 text-center text-xs font-semibold text-emerald-700 admin-dark:text-emerald-300">
-                ✓ PDF ready — click Download PDF to save {sanitizeFileName(materialName)}.pdf
+                ✓ PDF ready — click Download PDF to save {sanitizeFileName(materialName)}.pdf to your device
               </p>
-            )}
+            ) : !pdfReady && !generating && questions.length > 0 ? (
+              <p className="mt-2 text-center text-xs text-slate-500 admin-dark:text-[#8da0c0]">
+                Tip: Download PDF auto-generates first if needed — file saves directly to your device (not server)
+              </p>
+            ) : null}
           </>
         )}
 
