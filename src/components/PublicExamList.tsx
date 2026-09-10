@@ -109,10 +109,10 @@ export default function PublicExamList({
   const visibleSections = detailsBase ? examSections : examSections.filter((s) => s.key === "Live");
 
   const selectClass =
-    "rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-heading transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30";
+    "rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-heading transition-colors duration-75 ease-out focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 touch-manipulation";
 
   const modeButtonClass = (active: boolean) =>
-    `shrink-0 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+    `shrink-0 select-none touch-manipulation rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide transform-gpu will-change-transform transition-colors duration-75 ease-out active:scale-[0.97] ${
       active
         ? "bg-white text-[#0b1e3a] shadow"
         : "bg-dark-800 text-neutral-300 ring-1 ring-white/10 hover:bg-dark-700 hover:text-white"

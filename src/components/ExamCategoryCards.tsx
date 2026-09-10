@@ -143,17 +143,17 @@ export default function ExamCategoryCards({
           <Link
             key={key}
             href={`${basePath}/${key}`}
-            className="group relative flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 p-6 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 active:scale-[0.99]"
+            className="group relative flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 p-6 shadow-lg shadow-black/20 transform-gpu will-change-transform transition duration-150 ease-out hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 active:scale-[0.99] touch-manipulation"
           >
-            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl transition duration-300 group-hover:bg-primary-600/20" />
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl transition duration-150 ease-out group-hover:bg-primary-600/20" />
             <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
 
             {/* Icon on the left, exam category name beside it — same as CategoryCard */}
             <div className="relative flex items-center gap-4">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600/15 text-primary-500 transition duration-300 group-hover:bg-primary-600 group-hover:text-heading group-hover:shadow-md group-hover:shadow-primary-900/50">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600/15 text-primary-500 transition duration-150 ease-out group-hover:bg-primary-600 group-hover:text-heading group-hover:shadow-md group-hover:shadow-primary-900/50">
                 <Icon />
               </span>
-              <h3 className="text-lg font-extrabold leading-snug text-heading transition duration-300 group-hover:text-primary-400 sm:text-xl">
+              <h3 className="text-lg font-extrabold leading-snug text-heading transition duration-150 ease-out group-hover:text-primary-400 sm:text-xl">
                 {label}
               </h3>
             </div>
@@ -188,10 +188,10 @@ export default function ExamCategoryCards({
 
             {/* Same button style as CategoryCard — only text differs: Explore Exam */}
             <div className="relative mt-auto pt-6">
-              <span className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition duration-300 group-hover:bg-primary-700 group-hover:shadow-primary-900/60">
+              <span className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition duration-150 ease-out group-hover:bg-primary-700 group-hover:shadow-primary-900/60">
                 Explore Exam
                 <svg
-                  className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+                  className="h-4 w-4 transition-transform duration-150 ease-out group-hover:translate-x-1"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.4"

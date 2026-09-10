@@ -154,11 +154,11 @@ export default function ExamCard({
       : "border-ink/10 shadow-lg shadow-black/20 hover:border-primary-600/50";
 
   const buttonClasses =
-    "w-full rounded-xl px-4 py-3 text-sm font-bold transition active:scale-[0.98]";
+    "w-full rounded-xl px-4 py-3 text-sm font-bold touch-manipulation select-none transform-gpu will-change-transform transition-colors duration-75 ease-out active:scale-[0.97]";
 
   return (
     <article
-      className={`group flex flex-col overflow-hidden rounded-2xl bg-dark-900 transition duration-300 hover:-translate-y-1 ${cardClasses}`}
+      className={`group flex flex-col overflow-hidden rounded-2xl bg-dark-900 transform-gpu transition duration-150 ease-out hover:-translate-y-1 active:scale-[0.99] ${cardClasses}`}
     >
       {/* Exam banner — per-exam image managed from the Admin Panel */}
       <div className="relative h-32 w-full bg-gradient-to-br from-primary-600/25 via-dark-900 to-dark-950 sm:h-36">
@@ -167,7 +167,7 @@ export default function ExamCard({
           <img
             src={exam.bannerUrl}
             alt={`${exam.name} banner`}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transform-gpu transition duration-150 ease-out group-hover:scale-[1.03]"
           />
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -190,7 +190,7 @@ export default function ExamCard({
 
       <div className="flex flex-1 flex-col p-5">
         <h3
-          className={`text-lg font-bold leading-snug transition ${
+          className={`text-lg font-bold leading-snug transition-colors duration-150 ease-out ${
             isLive
               ? "text-heading group-hover:text-primary-400"
               : "text-heading group-hover:text-primary-400"

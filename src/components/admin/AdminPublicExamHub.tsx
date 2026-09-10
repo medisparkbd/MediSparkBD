@@ -38,7 +38,7 @@ export default function AdminPublicExamHub() {
           <button
             type="button"
             onClick={() => setShowManager((current) => !current)}
-            className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary-900/40 transition hover:bg-primary-500 active:scale-[0.98]"
+            className="touch-manipulation select-none rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary-900/40 transform-gpu will-change-transform transition-colors duration-75 ease-out active:scale-[0.97] hover:bg-primary-500"
           >
             {showManager ? "Hide Manager" : "+ Add / Manage Exams"}
           </button>
