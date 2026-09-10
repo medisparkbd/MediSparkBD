@@ -127,11 +127,13 @@ export async function PUT(request: NextRequest) {
       try {
         ogImageUrl = await saveFile("seo", imageFile.name, await imageFile.arrayBuffer());
       } catch (uploadError) {
+        console.error("[seo-settings] Social Share Image upload failed:", uploadError);
         const msg = uploadError instanceof Error ? uploadError.message : "Image upload failed.";
         return NextResponse.json({ error: msg }, { status: 500 });
       }
       // Ensure we never store a blob: URL
       if (ogImageUrl.startsWith("blob:")) {
+        console.error("[seo-settings] Upload returned blob: URL, rejecting:", ogImageUrl);
         return NextResponse.json({ error: "Upload returned an invalid URL." }, { status: 500 });
       }
       merged.ogImageUrl = ogImageUrl;
@@ -149,7 +151,7 @@ export async function PUT(request: NextRequest) {
 
     // Live Website synchronization: bust cached SEO so new image appears immediately
     try {
-      (revalidateTag as unknown as (tag: string, profile: string) => void)("seo", "max");
+      revalidateTag("seo", "max");
       revalidatePath("/", "layout");
       revalidatePath("/admin/website/seo");
       revalidatePath("/admin/website-information");
@@ -168,6 +170,7 @@ export async function PUT(request: NextRequest) {
       },
     );
   } catch (error) {
+    console.error("[seo-settings] Failed to save SEO settings:", error);
     const message =
       error instanceof Error ? error.message : "Failed to save SEO settings.";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -188,7 +191,7 @@ export async function DELETE(request: NextRequest) {
     const seo = await saveSeoSettings({ ...current, ogImageUrl: "" }, admin.uid);
     if (current.ogImageUrl) await removeFile(current.ogImageUrl);
     try {
-      (revalidateTag as unknown as (tag: string, profile: string) => void)("seo", "max");
+      revalidateTag("seo", "max");
       revalidatePath("/", "layout");
       revalidatePath("/admin/website/seo");
       revalidatePath("/admin/website-information");
@@ -203,6 +206,7 @@ export async function DELETE(request: NextRequest) {
       },
     );
   } catch (error) {
+    console.error("[seo-settings] Failed to remove Social Share Image:", error);
     const message =
       error instanceof Error ? error.message : "Failed to remove the image.";
     return NextResponse.json({ error: message }, { status: 500 });

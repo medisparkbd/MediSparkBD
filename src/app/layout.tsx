@@ -82,6 +82,12 @@ export async function generateMetadata(): Promise<Metadata> {
       images: seo.ogImageUrl ? [seo.ogImageUrl] : undefined,
       type: "website",
     },
+    twitter: {
+      card: "summary_large_image",
+      title: seo.ogTitle || siteTitle,
+      description: seo.ogDescription || description,
+      images: seo.ogImageUrl ? [seo.ogImageUrl] : undefined,
+    },
   };
 }
 
