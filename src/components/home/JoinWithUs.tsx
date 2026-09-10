@@ -72,7 +72,7 @@ export default async function JoinWithUs({
           </p>
         ) : null}
 
-        <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
+        <div className="mx-auto mt-8 grid max-w-5xl grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3">
           {visible.map((platform) => {
             const iconPath = platform.iconPath;
             const isUrlIcon = Boolean(iconPath && (iconPath.startsWith("http") || iconPath.startsWith("data:")));
@@ -82,27 +82,32 @@ export default async function JoinWithUs({
                 href={platform.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex flex-col rounded-2xl border border-ink/10 bg-dark-900 p-6 text-center shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/50 hover:shadow-primary-900/20 hover:-translate-y-1"
+                className="group flex flex-col rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/50 hover:shadow-primary-900/20 hover:-translate-y-0.5"
               >
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/15 text-primary-500 transition group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-primary-900/40">
-                  {isUrlIcon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={iconPath!} alt="" className="h-7 w-7 rounded object-contain" />
-                  ) : iconPath ? (
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="h-7 w-7">
-                      <path d={iconPath} />
-                    </svg>
-                  ) : (
-                    <span className="text-sm font-bold">{platform.label.charAt(0)}</span>
-                  )}
-                </span>
-                <h3 className="mt-4 text-base font-extrabold text-heading">{platform.label}</h3>
-                <p className="mt-1.5 min-h-10 text-sm leading-relaxed text-neutral-400">
+                {/* Top Row — Horizontal: Logo + Platform Name */}
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600/15 text-primary-500 transition group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-primary-900/40">
+                    {isUrlIcon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={iconPath!} alt="" className="h-5 w-5 rounded object-contain" />
+                    ) : iconPath ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="h-5 w-5">
+                        <path d={iconPath} />
+                      </svg>
+                    ) : (
+                      <span className="text-xs font-bold">{platform.label.charAt(0)}</span>
+                    )}
+                  </span>
+                  <h3 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-none text-heading">{platform.label}</h3>
+                </div>
+                {/* Below Platform Name — Description */}
+                <p className="mt-3 text-[13px] leading-snug text-neutral-400">
                   {platform.description}
                 </p>
-                <span className="mt-5 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary-900/30 transition group-hover:bg-primary-700">
+                {/* Below Description — Action Button */}
+                <span className="mt-3 inline-flex items-center justify-center gap-1.5 self-start rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-primary-900/30 transition group-hover:bg-primary-700">
                   {platform.buttonLabel}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M7 17L17 7M17 7H7m10 0v10" />
                   </svg>
                 </span>
