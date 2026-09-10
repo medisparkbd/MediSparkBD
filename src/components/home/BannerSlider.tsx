@@ -82,7 +82,7 @@ export default function BannerSlider() {
         aria-label="Featured banners"
         className="relative w-full overflow-hidden bg-dark-950"
       >
-        <div className="aspect-[8/3] w-full animate-pulse bg-dark-900 sm:aspect-[16/5]" />
+        <div className="aspect-[16/7] w-full animate-pulse bg-dark-900 sm:aspect-[16/6]" />
       </section>
     );
   }
@@ -151,7 +151,7 @@ export default function BannerSlider() {
           return (
             <div
               key={slide.id}
-              className="relative aspect-[8/3] w-full shrink-0 sm:aspect-[16/5]"
+              className="relative aspect-[16/7] w-full shrink-0 sm:aspect-[16/6]"
             >
               {hashTarget ? (
                 <a

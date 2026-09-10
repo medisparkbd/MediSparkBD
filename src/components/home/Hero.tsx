@@ -24,7 +24,7 @@ export default function Hero({
       <div className="pointer-events-none absolute -bottom-48 -right-32 h-[30rem] w-[30rem] rounded-full bg-primary-900/40 blur-3xl" />
       <div className="pointer-events-none absolute right-0 top-24 hidden h-full w-32 opacity-60 lg:block bg-dna" />
 
-      <div className="relative mx-auto max-w-3xl px-4 pb-20 pt-10 text-center sm:px-6 sm:pb-28 sm:pt-16">
+      <div className="relative mx-auto max-w-3xl px-4 pb-14 pt-8 text-center sm:px-6 sm:pb-20 sm:pt-12">
         <div className="animate-fade-up">
           <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-heading sm:text-5xl xl:text-6xl">
             {hero.headline
