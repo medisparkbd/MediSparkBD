@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { mainNavLinks } from "@/lib/nav-links";
+import { useExamLock } from "@/components/exam/ExamLockContext";
 
 const icons: Record<string, ReactNode> = {
   "/": (
@@ -84,6 +85,10 @@ const icons: Record<string, ReactNode> = {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { isLocked } = useExamLock();
+
+  // Hide completely during active exam — mobile, tablet, desktop
+  if (isLocked) return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
