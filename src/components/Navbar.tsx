@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import { loginHref } from "@/lib/nav-links";
 import { useAuth } from "@/lib/auth-context";
+import { useExamLock } from "@/components/exam/ExamLockContext";
 import {
   DEFAULT_NAVBAR_CONFIG,
   NAVBAR_SECTION_FALLBACKS,
@@ -37,6 +38,7 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
   const router = useRouter();
   const settings = config ?? DEFAULT_NAVBAR_CONFIG;
   const { user } = useAuth();
+  const { isLocked, requestExit } = useExamLock();
   const actionHref = user ? "/dashboard" : loginHref;
   const actionLabel = user ? "Dashboard" : "Login";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,6 +89,26 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
     return /^\/#[\w-]+$/.test(href);
   }
 
+  function handleGuardedNav(
+    e: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) {
+    if (!isLocked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (isSectionLink(href)) {
+      requestExit(() => {
+        void goToSection(href);
+      });
+    } else {
+      // absolute URL for pending navigation
+      const url = href.startsWith("http") ? href : window.location.origin + href;
+      requestExit(() => {
+        window.location.href = url;
+      });
+    }
+  }
+
   return (
     <header
       className={`sticky top-0 z-50 border-b border-ink/10 bg-dark-950/90 backdrop-blur transition-all duration-300 ${
@@ -100,6 +122,7 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
       >
         <Link
           href="/"
+          onClick={(e) => handleGuardedNav(e, "/")}
           className={`flex w-1/3 max-w-[330px] shrink-0 transition-all duration-300 hover:opacity-90 ${
             scrolled ? "lg:max-w-[220px]" : ""
           }`}
@@ -111,6 +134,7 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
           <Link
             href="/dashboard/notifications"
             aria-label="Notifications"
+            onClick={(e) => handleGuardedNav(e, "/dashboard/notifications")}
             className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-ink/10 bg-ink/5 text-neutral-300 transition hover:border-primary-500/50 hover:bg-primary-500/10 hover:text-heading"
           >
             <svg
@@ -134,6 +158,7 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
           {settings.showLoginButton && (
             <Link
               href={actionHref}
+              onClick={(e) => handleGuardedNav(e, actionHref)}
               title={user ? "Dashboard" : undefined}
               aria-label={user ? "Dashboard" : undefined}
               className={
@@ -223,6 +248,22 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
                           href={item.href}
                           role="menuitem"
                           onClick={(event) => {
+                            if (isLocked) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const href = item.href as string;
+                              if (isSectionLink(href)) {
+                                requestExit(() => void goToSection(href));
+                              } else {
+                                const url = href.startsWith("http")
+                                  ? href
+                                  : window.location.origin + href;
+                                requestExit(() => {
+                                  window.location.href = url;
+                                });
+                              }
+                              return;
+                            }
                             if (isSectionLink(item.href as string)) {
                               event.preventDefault();
                               void goToSection(item.href as string);

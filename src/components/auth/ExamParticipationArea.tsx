@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import { useExamLock } from "@/components/exam/ExamLockContext";
 import {
   ExamRulesList,
   type ExamRulesData,
@@ -95,6 +96,11 @@ export default function ExamParticipationArea({
   const examHref = `/exam/${examId}`;
   const loginHref = `/login?next=${encodeURIComponent(examHref)}`;
   const { user, profile, authLoading, profileLoading } = useAuth();
+  const {
+    setLocked: setExamLocked,
+    registerExitHandler,
+    unregisterExitHandler,
+  } = useExamLock();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -335,6 +341,34 @@ export default function ExamParticipationArea({
       setSubmitting(false);
     }
   }, [examId, user]);
+
+  // ── Exam Navigation Lock: hide BottomNav + block navigation during active attempt ──
+  useEffect(() => {
+    const locked = begun && !outcome && !terminatedNotice && !alreadyAttempted;
+    setExamLocked(locked);
+    return () => setExamLocked(false);
+  }, [begun, outcome, terminatedNotice, alreadyAttempted, setExamLocked]);
+
+  // Register auto-submit as the exit handler for the confirmation modal
+  useEffect(() => {
+    const locked = begun && !outcome && !terminatedNotice && !alreadyAttempted;
+    if (locked) {
+      registerExitHandler(() => {
+        void submit();
+      });
+    } else {
+      unregisterExitHandler();
+    }
+    return () => unregisterExitHandler();
+  }, [
+    begun,
+    outcome,
+    terminatedNotice,
+    alreadyAttempted,
+    submit,
+    registerExitHandler,
+    unregisterExitHandler,
+  ]);
 
   // Countdown + auto-submit when time runs out. The timer only exists once
   // the attempt has actually begun (rules accepted).
