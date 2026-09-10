@@ -103,6 +103,9 @@ export default function PublicExamList({
     return map;
   }, [filtered, categoryId]);
 
+  // Public category page (detailsBase falsy) must end after the Exam Card — keep only Live, hide Available/Upcoming/Previous/Expired sections per spec.
+  const visibleSections = detailsBase ? examSections : examSections.filter((s) => s.key === "Live");
+
   const selectClass =
     "rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-heading transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30";
 
@@ -141,9 +144,9 @@ export default function PublicExamList({
 
       <div className="space-y-14">
         {categoryId ? (
-          /* Single pre-filtered category — status sections only. */
+          /* Single pre-filtered category — status sections only. Public: only Live, admin: all */
           <div className="space-y-8">
-            {examSections.map((section) => (
+            {visibleSections.map((section) => (
               <div key={section.key}>
                 <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-heading">
                   {section.label}
@@ -196,7 +199,7 @@ export default function PublicExamList({
               </div>
 
               <div className="space-y-8">
-                {examSections.map((section) => (
+                {visibleSections.map((section) => (
                   <div key={section.key}>
                     <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-heading">
                       {section.label}
