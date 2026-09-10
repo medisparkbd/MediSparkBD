@@ -201,6 +201,7 @@ export default function SeoSettingsPage() {
         text: "SEO settings saved. Image URL stored and live on the website.",
       });
     } catch (e) {
+      console.error("[SEO] Failed to save SEO settings:", e);
       const msg = e instanceof Error ? e.message : "Failed to save the SEO settings.";
       setNotice({ kind: "error", text: msg });
     } finally {
@@ -236,7 +237,8 @@ export default function SeoSettingsPage() {
         kind: "success",
         text: "Social sharing image removed.",
       });
-    } catch {
+    } catch (e) {
+      console.error("[SEO] Failed to remove Social Share Image:", e);
       setNotice({ kind: "error", text: "Failed to remove the social sharing image." });
     } finally {
       setBusy(false);

@@ -342,6 +342,7 @@ export default function WebsiteInformationPage() {
         toast.showToast("success", "Social sharing image saved.");
       }
     } catch (e) {
+      console.error("[Website Information] Social Share Image upload failed:", e);
       const msg = e instanceof Error ? e.message : "Image upload failed.";
       toast.showToast("error", msg);
     } finally {
