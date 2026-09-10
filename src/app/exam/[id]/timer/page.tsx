@@ -110,6 +110,7 @@ export default function TimerSelectionPage({
                 negativePerWrong: 0,
                 scheduledAt: null,
                 endsAt: null,
+                examMode: "live" as const,
                 examDate: "",
                 examTime: "",
                 status: "Live" as const,

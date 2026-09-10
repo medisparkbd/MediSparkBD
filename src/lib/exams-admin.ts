@@ -25,8 +25,10 @@ function invalidateExamsCache(): void {
 
 export type ExamKind = "public" | "practice" | "enrolled";
 export type ExamStatus = "draft" | "published" | "closed";
+export type ExamMode = "live" | "practice";
 
 export const EXAM_KINDS: ExamKind[] = ["public", "practice", "enrolled"];
+export const EXAM_MODES: ExamMode[] = ["live", "practice"];
 
 export type ExamQuestionOption = string;
 
@@ -38,6 +40,8 @@ export type Exam = {
   /** Public banner image shown on the exam details page. */
   bannerUrl: string | null;
   kind: ExamKind;
+  /** Live Exam vs Practice Exam — independent from Published/Draft and Running/Upcoming/Expired. */
+  examMode: ExamMode;
   batchId: string;
   subject: string;
   courseType: "Academic" | "Admission";
@@ -119,6 +123,7 @@ type ExamRow = {
   description: string | null;
   banner_url: string | null;
   kind: string;
+  exam_mode: string;
   batch_id: string;
   subject: string;
   course_type: string;
@@ -185,6 +190,7 @@ function rowToExam(row: ExamRow): Exam {
         : row.kind === "enrolled"
           ? "enrolled"
           : "public",
+    examMode: row.exam_mode === "practice" ? "practice" : "live",
     batchId: row.batch_id ?? "",
     subject: row.subject ?? "",
     courseType: row.course_type === "Admission" ? "Admission" : "Academic",
@@ -364,7 +370,8 @@ async function ensureTables(): Promise<void> {
   await exec(`CREATE TABLE IF NOT EXISTS exams (
     id VARCHAR(64) NOT NULL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    kind ENUM('public','practice') NOT NULL DEFAULT 'public',
+    kind ENUM('public','practice','enrolled') NOT NULL DEFAULT 'public',
+    exam_mode ENUM('live','practice') NOT NULL DEFAULT 'live',
     batch_id VARCHAR(32) NOT NULL DEFAULT '',
     subject VARCHAR(191) NOT NULL DEFAULT '',
     course_type ENUM('Academic','Admission') NOT NULL DEFAULT 'Academic',
@@ -484,6 +491,12 @@ async function ensureTables(): Promise<void> {
   } catch {
     // Best effort.
   }
+  // ── Exam Mode: Live vs Practice (separate from Published/Draft and Running/Upcoming) ──
+  try {
+    await ensureColumn("exams", "exam_mode", "`exam_mode` ENUM('live','practice') NOT NULL DEFAULT 'live' AFTER kind");
+  } catch {
+    // Best effort — column may already exist.
+  }
   // ── Exam System v2: rule_template + marks_per_question + question_image ──
   try {
     await ensureColumn("exams", "rule_template", "`rule_template` VARCHAR(32) NULL AFTER category_id");
@@ -578,7 +591,7 @@ async function ensureTables(): Promise<void> {
   ensureTablesReady = true;
 }
 
-const EXAM_COLUMNS = `id, title, description, banner_url, kind, batch_id,
+const EXAM_COLUMNS = `id, title, description, banner_url, kind, exam_mode, batch_id,
   subject, chapter_id, sort_order, course_type, duration_minutes,
   total_marks, marks_per_question, negative_marks, negative_enabled, negative_per_wrong,
   second_timer_enabled, second_timer_deduction, question_count, status,
@@ -721,6 +734,8 @@ export async function saveExam(
   const kind: ExamKind = EXAM_KINDS.includes(input.kind as ExamKind)
     ? (input.kind as ExamKind)
     : "public";
+  const rawExamMode = asString((input as Record<string, unknown>).examMode) || asString((input as Record<string, unknown>).exam_mode as string);
+  const examMode: ExamMode = rawExamMode === "practice" ? "practice" : "live";
   const courseIds = Array.isArray(input.courseIds)
     ? Array.from(new Set(input.courseIds.map(String).map((value) => value.trim()).filter(Boolean)))
     : [];
@@ -842,10 +857,10 @@ export async function saveExam(
   const isNew = existing.length === 0;
   await exec(
     `INSERT INTO exams (${EXAM_COLUMNS}, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE title = VALUES(title), description = VALUES(description),
        banner_url = VALUES(banner_url),
-       kind = VALUES(kind), batch_id = VALUES(batch_id),
+       kind = VALUES(kind), exam_mode = VALUES(exam_mode), batch_id = VALUES(batch_id),
        subject = VALUES(subject), chapter_id = VALUES(chapter_id), sort_order = VALUES(sort_order),
        category_id = VALUES(category_id), rule_template = VALUES(rule_template),
        course_type = VALUES(course_type),
@@ -859,12 +874,13 @@ export async function saveExam(
        featured = VALUES(featured),
        scheduled_at = VALUES(scheduled_at), ends_at = VALUES(ends_at),
        answer_key = VALUES(answer_key), created_by = VALUES(created_by)`,
-     [
+    [
       id,
       title,
       asString(input.description) || null,
       asString(input.bannerUrl) || null,
       kind,
+      examMode,
       asString(input.batchId),
       asString(input.subject),
       chapterId,
@@ -1262,13 +1278,14 @@ export async function duplicateExam(sourceId: string, adminUid: string): Promise
   const maxRows = await query<{ m: number | null }[]>(`SELECT MAX(sort_order) AS m FROM exams`);
   const nextOrder = (maxRows[0]?.m ?? 0) + 1;
   await exec(
-    `INSERT INTO exams (${EXAM_COLUMNS}, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO exams (${EXAM_COLUMNS}, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       newId,
       newTitle,
       src.description,
       src.banner_url,
       src.kind,
+      (src as unknown as { exam_mode?: string }).exam_mode ?? "live",
       src.batch_id,
       src.subject,
       src.chapter_id,

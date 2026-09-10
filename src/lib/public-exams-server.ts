@@ -36,6 +36,7 @@ function toPublicExam(exam: Exam): PublicExam {
     name: exam.title,
     description: exam.description ?? null,
     bannerUrl: exam.bannerUrl ?? null,
+    examMode: exam.examMode ?? "live",
     batch,
     courseType: exam.courseType,
     subject: exam.subject,
