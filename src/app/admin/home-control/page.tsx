@@ -7,6 +7,7 @@ import JerseyGallery from "@/components/home/JerseyGallery";
 import Mentors from "@/components/home/Mentors";
 import StudentReviews from "@/components/home/StudentReviews";
 import FaqSection from "@/components/home/FaqSection";
+import JoinWithUs from "@/components/home/JoinWithUs";
 import PromotionsSection from "@/components/home/PromotionsSection";
 import Footer from "@/components/Footer";
 import HomeControlBar from "@/components/admin/HomeControlBar";
@@ -16,7 +17,6 @@ import { fetchHeroSettings } from "@/lib/hero-settings";
 import { fetchPublishedReviewRecords } from "@/lib/reviews-store";
 import { fetchPublishedFaqs } from "@/lib/faq-store";
 import { fetchActiveJerseys } from "@/lib/content-admin";
-import { fetchActiveSocialLinks } from "@/lib/social-links";
 import type { StudentReview } from "@/lib/reviews";
 import type { HomepageSection } from "@/lib/homepage-sections-constants";
 import type { ReactNode } from "react";
@@ -31,14 +31,13 @@ export const dynamic = "force-dynamic";
  * interfaces; every target API re-verifies admin authorization.
  */
 export default async function HomeControlPage() {
-  const [sections, heroSettings, reviewRecords, publishedFaqs, activeJerseys, socialLinks] =
+  const [sections, heroSettings, reviewRecords, publishedFaqs, activeJerseys] =
     await Promise.all([
       fetchHomepageSections(),
       fetchHeroSettings(),
       fetchPublishedReviewRecords(),
       fetchPublishedFaqs(),
       fetchActiveJerseys(),
-      fetchActiveSocialLinks(),
     ]);
   const activeSections = sections.filter((section) => section.isActive);
 
@@ -73,7 +72,6 @@ export default async function HomeControlPage() {
       case "banner":
         return <BannerSlider />;
       case "hero":
-        // Hero visibility is controlled from Admin → Website → Hero Section.
         return heroSettings.isActive ? <Hero hero={heroSettings} /> : null;
       case "featured-courses":
         return <FeaturedCourses {...textProps} />;
@@ -87,6 +85,8 @@ export default async function HomeControlPage() {
         return <StudentReviews reviews={publishedReviews} {...textProps} />;
       case "faq":
         return <FaqSection faqs={publishedFaqs} {...textProps} />;
+      case "join-with-us":
+        return <JoinWithUs {...textProps} />;
       default:
         return null;
     }
@@ -111,17 +111,12 @@ export default async function HomeControlPage() {
   function renderControlledSection(section: HomepageSection): ReactNode | null {
     switch (section.key) {
       case "banner":
-        // The slider is fully dynamic — no manual banner entries exist.
-        // Edit opens the Sliding Banner interface showing its live sources.
         return controlled("banner", renderSectionNode(section), "/admin/home-control/banner");
       case "hero":
         return (
           <div key="hero">
             {renderSectionNode(section)}
-            <HomeControlBar
-              sectionKey="hero"
-              editHref="/admin/website/homepage/hero"
-            />
+            <HomeControlBar sectionKey="hero" editHref="/admin/website/homepage/hero" />
             <div className="flex justify-center px-4 pb-4">
               <HeroTextEditor />
             </div>
@@ -146,6 +141,11 @@ export default async function HomeControlPage() {
           href: "/admin/content/faq",
           label: "FAQ",
         });
+      case "join-with-us":
+        return controlled("join-with-us", renderSectionNode(section), "/admin/website/social-links", {
+          href: "/admin/website/social-links",
+          label: "Social Media",
+        });
       default:
         return null;
     }
@@ -161,27 +161,23 @@ export default async function HomeControlPage() {
 
   const ourSuccessActive = activeSections.some((section) => section.key === "our-success");
 
-  const socialLinksNode: ReactNode = (
-    <div className="border-t border-white/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-4 py-12 text-center sm:px-6">
-      <p className="text-lg font-extrabold tracking-tight text-heading">Social Links</p>
-      <p className="mt-1 text-xs text-neutral-500">Follow MediSpark</p>
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-        {socialLinks.length > 0 ? (
-          socialLinks.map((link) => (
-            <a
-              key={link.key}
-              href={link.url ?? "#"}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="rounded-full border border-white/15 bg-white admin-dark:bg-[#112544] px-4 py-2 text-xs font-bold text-neutral-200 transition hover:border-[#93c5fd] hover:text-primary-300"
-            >
-              {link.label}
-            </a>
-          ))
-        ) : (
-          <p className="text-xs text-neutral-500">No social links yet.</p>
-        )}
-      </div>
+  // Join With Us Now! — same component, position and data as the Live Website
+  const joinSection = sections.find((s) => s.key === "join-with-us");
+  const joinNode: ReactNode = (
+    <JoinWithUs
+      key="join-with-us"
+      title={joinSection?.title ?? undefined}
+      description={joinSection?.description ?? undefined}
+    />
+  );
+  const joinControlledNode: ReactNode = (
+    <div key="join-with-us-controlled">
+      {joinNode}
+      <HomeControlBar
+        sectionKey="join-with-us"
+        editHref="/admin/website/social-links"
+        add={{ href: "/admin/website/social-links", label: "Social Media" }}
+      />
     </div>
   );
 
@@ -190,7 +186,7 @@ export default async function HomeControlPage() {
       {/* Live copy of the homepage — identical to the Main Website */}
       <PromotionsSection />
       {activeSections
-        .filter((section) => section.key !== "jersey")
+        .filter((section) => section.key !== "jersey" && section.key !== "join-with-us")
         .flatMap((section) => {
           const nodes = [renderControlledSection(section)];
           // Exact website order: Our Success → Jersey → Mentors.
@@ -209,6 +205,10 @@ export default async function HomeControlPage() {
               }),
             );
           }
+          // Required order: FAQ → Join With Us Now! (same as Live Website)
+          if (section.key === "faq") {
+            if (joinSection?.isActive !== false) nodes.push(joinControlledNode);
+          }
           return nodes;
         })}
       {/* Fallback: both neighbours disabled but jersey still published. */}
@@ -219,21 +219,13 @@ export default async function HomeControlPage() {
             label: "Jersey",
           })
         : null}
-
-      {/* Social Links — lives in the site footer on the Main Website */}
-      <div>
-        {socialLinksNode}
-        <HomeControlBar
-          sectionKey="social-links"
-          editHref="/admin/website/social-links"
-          add={{ href: "/admin/website/social-links", label: "Social Link" }}
-        />
-      </div>
+      {/* If FAQ is disabled/hidden, still show Join With Us before Footer (mirrors Live Website fallback) */}
+      {!activeSections.some((s) => s.key === "faq") && joinSection?.isActive !== false ? joinControlledNode : null}
 
       {/* Footer — the EXACT Main Website footer component (same layout,
-          design, typography, links, social icons and responsiveness).
-          The bar below adds admin-only [Edit] / [+ Add ...] controls; Edit
-          opens one dedicated interface for every editable footer element. */}
+           design, typography, links, social icons and responsiveness).
+           The bar below adds admin-only [Edit] / [+ Add ...] controls; Edit
+           opens one dedicated interface for every editable footer element. */}
       <div>
         <Footer />
         <HomeControlBar
