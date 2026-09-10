@@ -382,6 +382,18 @@ body {
   overflow-x: clip;
 }
 
+/* Exam Phase — hide non-essential info, keep only fixed header + paper */
+html[data-exam-locked="true"] .exam-page-section {
+  padding-top: 0.75rem !important;
+  padding-bottom: 1rem !important;
+}
+html[data-exam-locked="true"] .exam-content-wrapper {
+  margin-top: 0 !important;
+}
+html[data-exam-locked="true"] body {
+  padding-bottom: 0 !important;
+}
+
 
 /* ============ Admin Navy Smart Design Language ============ */
 [data-admin-theme] {

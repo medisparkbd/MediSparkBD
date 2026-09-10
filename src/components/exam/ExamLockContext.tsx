@@ -187,6 +187,22 @@ export function ExamLockProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Expose exam lock to CSS — allows exam pages to hide banner/details via [data-exam-locked]
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isLocked) {
+      root.setAttribute("data-exam-locked", "true");
+      document.body.style.paddingBottom = "0";
+    } else {
+      root.removeAttribute("data-exam-locked");
+      document.body.style.paddingBottom = "";
+    }
+    return () => {
+      root.removeAttribute("data-exam-locked");
+      document.body.style.paddingBottom = "";
+    };
+  }, [isLocked]);
+
   // Global click interceptor for anchors when locked
   useEffect(() => {
     if (!isLocked) return;
