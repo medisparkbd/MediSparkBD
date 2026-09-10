@@ -17,12 +17,12 @@ type Props = {
 export default function SectionHeading({ icon: Icon, children }: Props) {
   return (
     <div className="mx-auto flex max-w-full justify-center px-2">
-      <div className="inline-flex max-w-full items-center gap-2 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-3 py-3 shadow-lg shadow-black/10 sm:gap-3 sm:px-6 sm:py-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-md shadow-primary-900/30 sm:h-10 sm:w-10 lg:h-11 lg:w-11">
+      <div className="inline-flex max-w-full items-center gap-2 overflow-hidden rounded-2xl bg-primary-600 px-3 py-3 shadow-xl shadow-primary-600/25 ring-1 ring-primary-600 sm:gap-3 sm:px-6 sm:py-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/20 shadow-sm backdrop-blur sm:h-10 sm:w-10 lg:h-11 lg:w-11">
           <Icon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
         </span>
         <h2
-          className={`${headingFont.className} whitespace-nowrap text-[11px] font-bold tracking-tight text-heading min-[360px]:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-[22px] leading-none`}
+          className={`${headingFont.className} whitespace-nowrap text-[11px] font-bold tracking-tight text-white min-[360px]:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-[22px] leading-none`}
         >
           {children}
         </h2>
