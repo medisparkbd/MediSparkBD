@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   useAdminGate,
   inputClass,
@@ -47,9 +48,22 @@ export function MediaUploadField({
 }: MediaUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const gate = useAdminGate();
+  const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+
+  async function getAuthToken(): Promise<string | null> {
+    if (gate.token) return gate.token;
+    if (user) {
+      try {
+        return await user.getIdToken();
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 
   function isAllowedImage(fileName: string): boolean {
     const dot = fileName.lastIndexOf(".");
@@ -66,7 +80,8 @@ export function MediaUploadField({
       setError("Unsupported file type. Use JPG, JPEG, PNG or WEBP.");
       return;
     }
-    if (!gate.token) {
+    const token = await getAuthToken();
+    if (!token) {
       setError("Not authorized — please sign in as an admin.");
       return;
     }
@@ -97,7 +112,7 @@ export function MediaUploadField({
       const response = await fetch("/api/uploads", {
         method: "POST",
         body: formData,
-        headers: { Authorization: `Bearer ${gate.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = (await response.json().catch(() => ({}))) as {
         url?: string;
