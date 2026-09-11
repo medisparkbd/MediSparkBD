@@ -62,14 +62,19 @@ export default function LoginClient() {
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
     setError(null);
-    // Call popup synchronously in the click handler's tick — any prior
-    // async gap (even setState) can make the browser treat window.open as
-    // not user-initiated and block it as auth/popup-blocked.
+    // Keep popup in the same tick as the click — do not await anything
+    // before signInWithPopup, otherwise the browser no longer treats
+    // window.open as user-initiated and blocks it.
+    let popupPromise: Promise<unknown> | null = null;
     try {
+      popupPromise = signInWithGoogle();
       setSigningIn(true);
-      const studentProfile = await signInWithGoogle();
+      const studentProfile = await popupPromise;
       if (studentProfile) {
-        router.replace(studentProfile ? next || "/dashboard" : registerHref);
+        router.replace(next || "/dashboard");
+      } else if (studentProfile === null) {
+        // null means success with no profile yet (first login) → go to register
+        router.replace(registerHref);
       } else {
         setSigningIn(false);
       }
@@ -77,8 +82,10 @@ export default function LoginClient() {
       const msg = err instanceof Error ? err.message : "";
       if (/popup-blocked/i.test(msg)) {
         setError(
-          "Popup blocked — please allow popups for medisparkgo.vercel.app in your browser (address bar → popup icon → Always allow), then try again.",
+          "Popup blocked — please allow popups for medisparkgo.vercel.app (address bar → popup icon → Always allow), then click Continue with Google again. Alternatively, allow third-party popups in your browser settings.",
         );
+      } else if (/popup-closed-by-user/i.test(msg)) {
+        setError(null);
       } else {
         setError(msg || "Google sign-in failed. Please try again.");
       }
