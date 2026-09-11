@@ -163,28 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       throw new Error("Firebase authentication is not configured.");
     }
-    // Popup-first: completes sign-in in the same page (no redirect round-trip,
-    // no stale redirect state to break getRedirectResult). Falls back to the
-    // redirect flow only when popups are unavailable/blocked (e.g. in-app
-    // browsers on mobile), which is processed on mount.
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      setUser(result.user);
-      setAuthLoading(false);
-      await loadUserData(result.user);
-      return null;
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        /popup-blocked|popup-closed-by-user|operation-not-supported|unavailable/i.test(
-          err.message,
-        )
-      ) {
-        await signInWithRedirect(auth, googleProvider);
-        return null;
-      }
-      throw err;
-    }
+    // Always use popup new window (as requested). Never silently redirect.
+    const result = await signInWithPopup(auth, googleProvider);
+    setUser(result.user);
+    setAuthLoading(false);
+    await loadUserData(result.user);
+    return null;
   }, [loadUserData]);
 
   const logout = useCallback(async () => {
