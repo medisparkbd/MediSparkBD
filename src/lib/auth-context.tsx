@@ -163,13 +163,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       throw new Error("Firebase authentication is not configured.");
     }
-    // Try a popup first (fast, no page reload). If the browser blocks the
-    // popup (auth/popup-blocked) or popups aren't supported in this
-    // environment, fall back to full-page redirect so login still works
-    // without any popup. Redirect completion is handled by
-    // getRedirectResult + onAuthStateChanged on mount above.
+    // Try a popup first (fast, no page reload). Some desktop browsers block
+    // the popup's third-party storage/cookies, in which case the popup
+    // promise NEVER settles (no resolve, no reject) and the UI would hang
+    // on "Signing in..." forever. Race it against a timeout so a hung popup
+    // falls back to full-page redirect, which uses top-level navigation and
+    // works even with third-party cookies blocked. Redirect completion is
+    // handled by getRedirectResult + onAuthStateChanged on mount above.
+    const POPUP_TIMEOUT_MS = 60_000;
+    let popupTimer: ReturnType<typeof setTimeout> | null = null;
+    const popupTimeout = new Promise<never>((_, reject) => {
+      popupTimer = setTimeout(
+        () => reject({ code: "auth/popup-timeout" }),
+        POPUP_TIMEOUT_MS,
+      );
+    });
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await Promise.race([
+        signInWithPopup(auth, googleProvider),
+        popupTimeout,
+      ]);
       setUser(result.user);
       setAuthLoading(false);
       await loadUserData(result.user);
@@ -183,7 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment" ||
-        code === "auth/web-storage-unsupported"
+        code === "auth/web-storage-unsupported" ||
+        code === "auth/internal-error" ||
+        code === "auth/network-request-failed" ||
+        code === "auth/popup-timeout"
       ) {
         await signInWithRedirect(auth, googleProvider);
         return null;
@@ -192,6 +208,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Login popup closed before completing. Please try again.");
       }
       throw err;
+    } finally {
+      if (popupTimer) clearTimeout(popupTimer);
     }
   }, [loadUserData]);
 
