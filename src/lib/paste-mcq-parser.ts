@@ -8,7 +8,7 @@ export type ParsedPasteMcq = {
   question: string;
   options: [string, string, string, string];
   correctIndex: number | null;
-  marks: number | null;
+  marks: number;
   rawBlock: string;
   issues: string[];
   needsReview: boolean;
@@ -246,14 +246,11 @@ function parseOptionLine(line: string, allowNumeric = true): { index: number; te
   return null;
 }
 
-// ── mark detection ─────────────────────────────────────────────────────────
-function extractMarkPayload(line: string): number | null {
-  const t = line.trim();
-  if (!t) return null;
-  const m = t.match(/^\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*(\d+(?:\.\d+)?)\s*$/i);
-  if (!m) return null;
-  const v = parseFloat(m[1]);
-  return Number.isFinite(v) && v >= 0 ? v : null;
+// ── mark handling ──────────────────────────────────────────────────────────
+// Per latest spec: DO NOT detect MARK/Marks — every MCQ gets Mark = 1.
+// MARK lines are silently skipped.
+function isMarkLine(line: string): boolean {
+  return /^\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*\d+(?:\.\d+)?\s*$/i.test(line.trim());
 }
 
 // ── answer detection ───────────────────────────────────────────────────────
@@ -444,9 +441,8 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
       // Don't add to nonAnswerLines
       continue;
     }
-    const markPayload = extractMarkPayload(line);
-    if (markPayload !== null) {
-      markValue = markPayload; // keep last
+    if (isMarkLine(line)) {
+      // Fixed mark = 1 per spec — silently skip MARK lines
       continue;
     }
     nonAnswerLines.push(line);
@@ -669,7 +665,7 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
     question,
     options,
     correctIndex,
-    marks: markValue,
+    marks: 1,
     rawBlock,
     issues,
     needsReview,
@@ -769,7 +765,7 @@ function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
   qTextRaw = qTextRaw.replace(/\s+/g, " ").trim();
   // Resolve answer
   let correctIndex: number | null = null;
-  let marks: number | null = null;
+  let marks: number = 1;
   // Check for MARK in the block (after answer)
   const markMatch = rawBlock.match(/(?:^|\n)\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*(\d+(?:\.\d+)?)\s*$/im);
   if (markMatch) {
@@ -872,7 +868,7 @@ function splitByNumbering(text: string): string[] | null {
 function parseViaLineScan(text: string): ParsedPasteMcq[] {
   const withInlines = injectNewlinesForInline(text.replace(/\r\n/g, "\n"));
   const rawLines = withInlines.split("\n");
-  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; marks: number | null; rawLines: string[]; originalNumber: string | null };
+  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; marks: number; rawLines: string[]; originalNumber: string | null };
   const blocks: Block[] = [];
   let current: Block | null = null;
 
@@ -887,10 +883,9 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     const line = rawLines[idx];
     const trimmed = line.trim();
     if (trimmed === "") continue;
-    const markP = extractMarkPayload(line);
-    if (markP !== null) {
+    if (isMarkLine(line)) {
       if (!current) continue;
-      current.marks = markP;
+      // Fixed mark = 1 — skip line, keep marks = 1
       current.rawLines.push(line);
       continue;
     }
@@ -937,14 +932,14 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       } else {
         qText = line.trim();
       }
-      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: orig };
+      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: orig };
       continue;
     }
 
     const opt = parseOptionLine(line, true);
     if (opt) {
       if (!current) {
-        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [], originalNumber: null };
       }
       // Duplicate option label suggests new question if current already has question and at least 2 options
       if (current.options[opt.index] !== "" && current.options.some((o) => o !== "")) {
@@ -952,7 +947,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
         const filled = current.options.filter((o) => o.trim()).length;
         if (hasQuestion && filled >= 2) {
           flushCurrent();
-        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [], originalNumber: null };
         }
       }
       if (opt.isCorrectMarker && current.correctIndex === null) {
@@ -966,7 +961,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
 
     // Plain text
     if (!current) {
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: null };
       continue;
     }
     const hasAnyOption = current.options.some((o) => o !== "");
@@ -981,7 +976,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     } else {
       // After options, plain text likely starts new question
       flushCurrent();
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: null };
     }
   }
   flushCurrent();
