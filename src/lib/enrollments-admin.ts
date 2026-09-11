@@ -138,13 +138,16 @@ const PAYMENT_COLUMNS = `,
          e.approved_at, e.approved_by, e.rejected_at, e.rejected_by,
          ea.coupon_code, ea.created_at AS payment_created_at`;
 
-/** Latest (best-effort) application join for coupon + payment submission time. */
+/** Latest (best-effort) application join for coupon + payment submission time.
+ *  Derived table (one grouped pass) instead of a correlated subquery per
+ *  enrollment row — same result, far fewer index probes on large tables. */
 const PAYMENT_JOIN = `
-  LEFT JOIN enrollment_applications ea ON ea.id = (
-    SELECT ea2.id FROM enrollment_applications ea2
-    WHERE ea2.student_uid = e.student_uid AND ea2.course_id = e.course_id
-    ORDER BY ea2.created_at DESC LIMIT 1
-  )`;
+  LEFT JOIN (
+    SELECT student_uid, course_id, MAX(id) AS latest_id
+    FROM enrollment_applications
+    GROUP BY student_uid, course_id
+  ) latest_app ON latest_app.student_uid = e.student_uid AND latest_app.course_id = e.course_id
+  LEFT JOIN enrollment_applications ea ON ea.id = latest_app.latest_id`;
 
 // Back-compat alias used by older code paths (base select without payment join).
 const SELECT_ENROLLMENTS = `${SELECT_BASE}${FROM_CLAUSE}`;
@@ -288,7 +291,7 @@ export async function acceptEnrollmentApplication(
   await ensureApprovalColumns();
   try {
     return await withTransaction(async (connection: PoolConnection) => {
-      const [rows] = await connection.execute<ApplicationRow[]>(
+      const [rows] = await connection.query<ApplicationRow[]>(
         `SELECT id, enrollment_status, student_uid, course_id, course_kind
          FROM enrollments WHERE id = ? FOR UPDATE`,
         [id],
@@ -308,7 +311,7 @@ export async function acceptEnrollmentApplication(
       }
 
       // Atomic accept — guarded on still-pending so concurrent accepts lose.
-      const [result] = await connection.execute<ResultSetHeader>(
+      const [result] = await connection.query<ResultSetHeader>(
         `UPDATE enrollments
          SET enrollment_status = 'active', approved_at = NOW(), approved_by = ?
          WHERE id = ? AND enrollment_status = 'pending'`,
@@ -322,7 +325,7 @@ export async function acceptEnrollmentApplication(
       }
 
       // Keep the courses registry consistent for this specific course.
-      await connection.execute(
+      await connection.query(
         "INSERT IGNORE INTO courses (course_id, kind) VALUES (?, ?)",
         [application.course_id, application.course_kind],
       );
@@ -350,7 +353,7 @@ export async function rejectEnrollmentApplication(
   await ensureApprovalColumns();
   try {
     return await withTransaction(async (connection: PoolConnection) => {
-      const [rows] = await connection.execute<ApplicationRow[]>(
+      const [rows] = await connection.query<ApplicationRow[]>(
         `SELECT id, enrollment_status FROM enrollments WHERE id = ? FOR UPDATE`,
         [id],
       );
@@ -371,7 +374,7 @@ export async function rejectEnrollmentApplication(
         };
       }
 
-      const [result] = await connection.execute<ResultSetHeader>(
+      const [result] = await connection.query<ResultSetHeader>(
         `UPDATE enrollments
          SET enrollment_status = 'cancelled', rejected_at = NOW(), rejected_by = ?
          WHERE id = ? AND enrollment_status = 'pending'`,

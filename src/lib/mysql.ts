@@ -26,14 +26,17 @@ export function getMysqlPool(): mysql.Pool | null {
       database: mysqlDatabase,
       user: mysqlUser,
       password: mysqlPassword,
-      // Optimized for Vercel serverless: small pool, fast release
-      connectionLimit: 5,
-      maxIdle: 2,
+      // Optimized for Vercel serverless + remote Azure MySQL: allow a few
+      // more concurrent connections so parallel admin fetches don't queue,
+      // release idle ones fast to respect the small server max_connections.
+      connectionLimit: 8,
+      maxIdle: 4,
       idleTimeout: 15_000,
       connectTimeout: 10_000,
       waitForConnections: true,
       enableKeepAlive: true,
-      queueLimit: 50,
+      keepAliveInitialDelay: 5_000,
+      queueLimit: 100,
       // Azure MySQL enforces TLS
       ssl:
         process.env.MYSQL_SSL === "false"
@@ -47,12 +50,24 @@ export function getMysqlPool(): mysql.Pool | null {
   return pool;
 }
 
-// Simple in-memory query cache for GET requests (invalidated on mutations)
+// Simple in-memory query cache for GET requests (invalidated on mutations).
+// Bounded LRU: evicts the oldest entry once full so long-lived serverless
+// instances never grow memory unboundedly.
 const queryCache = new Map<string, { data: unknown; expires: number }>();
 const CACHE_TTL = 5_000; // 5 seconds default
+const CACHE_MAX_ENTRIES = 500;
 
 function cacheKey(sql: string, params?: unknown[]): string {
   return sql + "|" + JSON.stringify(params ?? []);
+}
+
+function cacheSet(key: string, data: unknown, expires: number): void {
+  if (queryCache.size >= CACHE_MAX_ENTRIES) {
+    // Map preserves insertion order — delete the oldest entry.
+    const oldest = queryCache.keys().next();
+    if (!oldest.done) queryCache.delete(oldest.value);
+  }
+  queryCache.set(key, { data, expires });
 }
 
 export async function query<T>(
@@ -63,23 +78,36 @@ export async function query<T>(
   const client = getMysqlPool();
   if (!client) throw new Error("Database is not configured.");
 
-  // Cache GET queries (SELECT) by default
-  const useCache = options?.cache !== false && sql.trim().toUpperCase().startsWith("SELECT");
+  // Cache GET queries (SELECT) by default. Locking reads and
+  // information_schema introspection are never cached.
+  const upper = sql.trim().toUpperCase();
+  const useCache =
+    options?.cache !== false &&
+    upper.startsWith("SELECT") &&
+    !upper.includes("FOR UPDATE") &&
+    !upper.includes("INFORMATION_SCHEMA");
   const ttl = typeof options?.cache === "number" ? options.cache : CACHE_TTL;
   const key = cacheKey(sql, params);
 
   if (useCache) {
     const cached = queryCache.get(key);
     if (cached && cached.expires > Date.now()) {
+      // Refresh LRU position on hit.
+      queryCache.delete(key);
+      queryCache.set(key, cached);
       return cached.data as T;
     }
   }
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const [rows] = await client.execute(sql, params as never);
+      // NOTE: pool.query (text protocol) instead of pool.execute (binary
+      // prepare). Against remote Azure MySQL every prepared statement costs
+      // an extra PREPARE round-trip over WAN latency — query() halves the
+      // round-trips per statement. Placeholders are still safely escaped.
+      const [rows] = await client.query(sql, params as never);
       if (useCache) {
-        queryCache.set(key, { data: rows, expires: Date.now() + ttl });
+        cacheSet(key, rows, Date.now() + ttl);
       }
       return rows as T;
     } catch (err: unknown) {
@@ -113,7 +141,7 @@ export async function exec(
   if (!client) throw new Error("Database is not configured.");
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const [result] = await client.execute<mysql.ResultSetHeader>(sql, params as never);
+      const [result] = await client.query<mysql.ResultSetHeader>(sql, params as never);
       // Invalidate relevant cache on write
       const tableMatch = sql.match(/\b(INSERT|UPDATE|DELETE|REPLACE)\s+(?:INTO\s+)?`?(\w+)`?/i);
       if (tableMatch) invalidateQueryCache(tableMatch[2]);

@@ -25,40 +25,45 @@ export async function isAdminUid(
 ): Promise<boolean> {
   if (!isMysqlConfigured) return false;
 
-  if (uid) {
-    try {
-      // Inactive admins are no longer authorized — see Admin Management.
-      const rows = await query<{ uid: string }[]>(
-        "SELECT uid FROM admins WHERE uid = ? AND is_active = 1 LIMIT 1",
-        [uid],
-      );
-      if (rows.length > 0) return true;
-    } catch {
-      // Migration (src/sql/admins-management-migration.sql) may not be
-      // applied yet — fall back to plain lookup so nobody gets locked out.
-      try {
-        const rows = await query<{ uid: string }[]>(
-          "SELECT uid FROM admins WHERE uid = ? LIMIT 1",
-          [uid],
-        );
-        if (rows.length > 0) return true;
-      } catch {
-        return false;
-      }
-    }
-  }
+  // Single round-trip: match by uid OR verified email in one query instead
+  // of two sequential lookups.
+  const hasUid = typeof uid === "string" && uid.length > 0;
+  const cleanEmail = typeof email === "string" && email.length > 0 ? email : null;
+  if (!hasUid && !cleanEmail) return false;
 
-  // Email fallback keeps access working even when the underlying Firebase
-  // project (and therefore UID) changes. Only verified emails are trusted.
-  if (!email) return false;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (hasUid) {
+    conditions.push("uid = ?");
+    params.push(uid);
+  }
+  if (cleanEmail) {
+    conditions.push("LOWER(email) = LOWER(?)");
+    params.push(cleanEmail);
+  }
   try {
+    // Inactive admins are no longer authorized — see Admin Management.
     const rows = await query<{ uid: string }[]>(
-      "SELECT uid FROM admins WHERE LOWER(email) = LOWER(?) AND is_active = 1 LIMIT 1",
-      [email],
+      `SELECT uid FROM admins WHERE is_active = 1 AND (${conditions.join(" OR ")}) LIMIT 1`,
+      params,
     );
-    return rows.length > 0;
-  } catch {
+    if (rows.length > 0) return true;
+    // No active match — still check plain lookup? No: inactive must stay
+    // denied. Only fall through to the legacy (pre-migration) lookup on
+    // query failure below.
     return false;
+  } catch {
+    // Migration (src/sql/admins-management-migration.sql) may not be
+    // applied yet — fall back to plain lookup so nobody gets locked out.
+    try {
+      const rows = await query<{ uid: string }[]>(
+        `SELECT uid FROM admins WHERE ${conditions.join(" OR ")} LIMIT 1`,
+        params,
+      );
+      return rows.length > 0;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -93,10 +98,10 @@ export async function requireAdmin(
 ): Promise<DecodedIdToken | null> {
   const user = await getFirebaseUser(request);
   if (!user) return null;
-  const emailOk = user.email_verified === true;
-  const authorized =
-    (await isAdminUid(user.uid)) ||
-    (emailOk ? await isAdminUid(null, user.email) : false);
+  // Email fallback keeps access working even when the underlying Firebase
+  // project (and therefore UID) changes. Only verified emails are trusted.
+  const email = user.email_verified === true ? (user.email ?? null) : null;
+  const authorized = await isAdminUid(user.uid, email);
   return authorized ? user : null;
 }
 
@@ -110,9 +115,16 @@ export async function requirePermission(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   permission: AdminPermission,
 ): Promise<DecodedIdToken | null> {
-  const user = await requireAdmin(request);
+  const user = await getFirebaseUser(request);
   if (!user) return null;
-  const { role } = await resolveAdminPermissions(user.email);
+  // The admin check and the role lookup are independent queries — run them
+  // concurrently instead of sequentially to halve auth latency.
+  const email = user.email_verified === true ? (user.email ?? null) : null;
+  const [authorized, { role }] = await Promise.all([
+    isAdminUid(user.uid, email),
+    resolveAdminPermissions(user.email),
+  ]);
+  if (!authorized) return null;
   // Temporary: all three levels have identical access.
   if (role === "admin" || role === "moderator" || role === "teacher") return user;
   return null;
@@ -128,9 +140,16 @@ export async function requireAnyPermission(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   permissions: readonly AdminPermission[],
 ): Promise<DecodedIdToken | null> {
-  const user = await requireAdmin(request);
+  const user = await getFirebaseUser(request);
   if (!user) return null;
-  const { role } = await resolveAdminPermissions(user.email);
+  // The admin check and the role lookup are independent queries — run them
+  // concurrently instead of sequentially to halve auth latency.
+  const email = user.email_verified === true ? (user.email ?? null) : null;
+  const [authorized, { role }] = await Promise.all([
+    isAdminUid(user.uid, email),
+    resolveAdminPermissions(user.email),
+  ]);
+  if (!authorized) return null;
   // Temporary: all three levels have identical access.
   if (role === "admin" || role === "moderator" || role === "teacher") return user;
   return null;

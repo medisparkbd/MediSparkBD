@@ -3,6 +3,7 @@ import { requirePermission, requireAnyPermission } from "@/lib/admin";
 import { logAdminAction } from "@/lib/administration";
 import {
   fetchExams,
+  fetchExamById,
   saveExam,
   deleteExam,
   setExamStatus,
@@ -30,29 +31,30 @@ export async function GET(request: NextRequest) {
           EXAM_KINDS.includes(value as ExamKind),
         )
     : [];
-  let exams =
-    kinds.length > 0
-      ? (await fetchExams()).filter((exam) => kinds.includes(exam.kind))
-      : await fetchExams();
-  // Single-exam fetch for the management page (?id=<examId>).
-  const idParam = request.nextUrl.searchParams.get("id");
-  if (idParam && idParam.trim()) {
-    exams = exams.filter((exam) => exam.id === idParam.trim());
+  // Single-exam fetch for the management page (?id=<examId>) — one row
+  // instead of the whole table.
+  const idParam = request.nextUrl.searchParams.get("id")?.trim() ?? "";
+  if (idParam) {
+    const exam = await fetchExamById(idParam);
+    return NextResponse.json(
+      { exams: exam ? [exam] : [] },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
   // Backend-enforced category isolation (category_id synced from Course
   // Control categories). Exams without a category never leak into a list.
-  const categoryId = request.nextUrl.searchParams.get("categoryId");
-  if (categoryId && categoryId.trim()) {
-    exams = exams.filter((exam) => exam.categoryId === categoryId.trim());
-  }
-  const chapterId = request.nextUrl.searchParams.get("chapterId");
-  if (chapterId && chapterId.trim()) {
-    exams = exams.filter((exam) => exam.chapterId === chapterId.trim());
-  }
+  // Filters are pushed into SQL — no full-table transfer.
+  const categoryId = request.nextUrl.searchParams.get("categoryId")?.trim() || undefined;
+  const chapterId = request.nextUrl.searchParams.get("chapterId")?.trim() || undefined;
   const archivedParam = request.nextUrl.searchParams.get("archived");
   if (archivedParam === "0" || archivedParam === "false") {
     // Hide archived (closed) when explicitly requested, otherwise show all.
   }
+  const exams = await fetchExams({
+    kinds,
+    categoryId,
+    chapterId,
+  });
   return NextResponse.json(
     { exams },
     { headers: { "Cache-Control": "no-store" } },

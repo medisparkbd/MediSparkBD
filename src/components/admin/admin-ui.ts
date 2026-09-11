@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getAuth, onIdTokenChanged } from "firebase/auth";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getAuth, onIdTokenChanged, type User } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 
 export type AdminGate = {
@@ -17,50 +17,248 @@ export type AdminGate = {
 };
 
 /** Shared admin access gate — verifies the signed-in user is an admin. */
+type GateResult = {
+  uid: string;
+  isAdmin: boolean;
+  role: string;
+  permissions: string[];
+  token: string | null;
+};
+
+// Cross-instance gate cache: every useAdminGate hook (shell + page + widgets)
+// shares one in-flight request and one cached result, so client-side
+// navigation never refires /api/admin and never flashes a loader.
+const GATE_CACHE_TTL_MS = 5 * 60_000;
+const GATE_SESSION_PREFIX = "medispark:admin-gate:";
+
+let memoryGate: { uid: string; result: GateResult; at: number } | null = null;
+let gateInFlight: { uid: string; promise: Promise<GateResult | null> } | null =
+  null;
+
+function readSessionGate(uid: string): GateResult | null {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return null;
+    const raw = window.sessionStorage.getItem(GATE_SESSION_PREFIX + uid);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      at?: number;
+      role?: string;
+      permissions?: string[];
+    };
+    if (!parsed || typeof parsed.at !== "number") return null;
+    if (Date.now() - parsed.at > GATE_CACHE_TTL_MS) return null;
+    return {
+      uid,
+      isAdmin: true,
+      role: typeof parsed.role === "string" ? parsed.role : "admin",
+      permissions: Array.isArray(parsed.permissions)
+        ? parsed.permissions.map(String)
+        : [],
+      token: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readCachedGate(
+  uid: string,
+): (GateResult & { fresh: boolean; at: number }) | null {
+  if (memoryGate && memoryGate.uid === uid) {
+    const fresh = Date.now() - memoryGate.at < GATE_CACHE_TTL_MS;
+    if (fresh || Date.now() - memoryGate.at < GATE_CACHE_TTL_MS * 6) {
+      return { ...memoryGate.result, fresh, at: memoryGate.at };
+    }
+    memoryGate = null;
+  }
+  const session = readSessionGate(uid);
+  if (session) {
+    memoryGate = { uid, result: session, at: Date.now() };
+    return { ...session, fresh: true, at: Date.now() };
+  }
+  return null;
+}
+
+function applyGateResult(uid: string, result: GateResult): void {
+  memoryGate = { uid, result, at: Date.now() };
+  try {
+    if (typeof window !== "undefined" && window.sessionStorage && result.isAdmin) {
+      window.sessionStorage.setItem(
+        GATE_SESSION_PREFIX + uid,
+        JSON.stringify({
+          at: Date.now(),
+          role: result.role,
+          permissions: result.permissions,
+        }),
+      );
+    }
+  } catch {
+    // Cache is best-effort (private mode etc.).
+  }
+}
+
+async function fetchSharedGate(user: User): Promise<GateResult | null> {
+  const uid = user.uid;
+  if (gateInFlight && gateInFlight.uid === uid) return gateInFlight.promise;
+  const promise = (async (): Promise<GateResult | null> => {
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin", {
+        headers: { Authorization: `Bearer ${idToken}` },
+        cache: "no-store",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { isAdmin?: boolean; role?: string; permissions?: string[] }
+        | null;
+      if (response.ok && data?.isAdmin) {
+        return {
+          uid,
+          isAdmin: true,
+          role: data.role ?? "admin",
+          permissions: Array.isArray(data.permissions)
+            ? data.permissions.map(String)
+            : [],
+          token: idToken,
+        };
+      }
+      return { uid, isAdmin: false, role: "admin", permissions: [], token: idToken };
+    } catch {
+      return null;
+    }
+  })();
+  gateInFlight = { uid, promise };
+  try {
+    return await promise;
+  } finally {
+    if (gateInFlight?.promise === promise) gateInFlight = null;
+  }
+}
+
 export function useAdminGate(): AdminGate {
   const { user, authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(() =>
+    user ? readCachedGate(user.uid)?.isAdmin ?? null : null,
+  );
   const [token, setToken] = useState<string | null>(null);
-  const [role, setRole] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const [role, setRole] = useState<string | null>(() =>
+    user ? (readCachedGate(user.uid)?.role ?? null) : null,
+  );
+  const [permissions, setPermissions] = useState<string[]>(() =>
+    user ? (readCachedGate(user.uid)?.permissions ?? []) : [],
+  );
 
-  // Admin check — runs once per signed-in user.
+  // Admin check — shared across every hook instance: one network request per
+  // user, cached for 5 minutes so page-to-page navigation is instant.
+  const lastUidRef = useRef<string | null>(null);
   useEffect(() => {
     if (authLoading || !user) return;
+    const uid = user.uid;
+    // New user (login switch): drop stale state, resolve below.
+    if (lastUidRef.current !== null && lastUidRef.current !== uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAdmin(null);
+      setRole(null);
+      setPermissions([]);
+      setToken(null);
+    }
+    lastUidRef.current = uid;
     let cancelled = false;
-    void (async () => {
-      try {
-        const idToken = await user.getIdToken();
-        const response = await fetch("/api/admin", {
-          headers: { Authorization: `Bearer ${idToken}` },
-          cache: "no-store",
+
+    const applyResult = (result: GateResult) => {
+      if (result.uid !== uid) return;
+      applyGateResult(uid, result);
+      if (result.token) {
+        setToken((prev) => (prev === result.token ? prev : result.token));
+      }
+      if (result.isAdmin) {
+        setIsAdmin(true);
+        setRole(result.role);
+        setPermissions(result.permissions);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    const cached = readCachedGate(uid);
+    if (cached) {
+      // Paint instantly from cache.
+      setIsAdmin(cached.isAdmin);
+      if (cached.isAdmin) {
+        setRole(cached.role);
+        setPermissions(cached.permissions);
+      }
+      if (!cached.fresh) {
+        // Stale cache: revalidate silently in the background.
+        void fetchSharedGate(user).then((result) => {
+          if (!cancelled && result) applyResult(result);
         });
-        const data = (await response.json().catch(() => null)) as
-          | { isAdmin?: boolean; role?: string; permissions?: string[] }
-          | null;
-        if (cancelled) return;
-        if (response.ok && data?.isAdmin) {
-          setIsAdmin(true);
-          setRole(data.role ?? "admin");
-          setPermissions(Array.isArray(data.permissions) ? data.permissions : []);
-        } else {
-          setIsAdmin(false);
-        }
-      } catch {
-        if (!cancelled) setIsAdmin(false);
+      } else if (cached.token) {
+        setToken((prev) => (prev === cached.token ? prev : cached.token));
+      } else {
+        // Fresh role cache but no token yet — mint one silently.
+        void user
+          .getIdToken()
+          .then((t) => {
+            if (!cancelled) setToken((prev) => (prev === t ? prev : t));
+          })
+          .catch(() => undefined);
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      const result = await fetchSharedGate(user);
+      if (cancelled) return;
+      if (result) {
+        applyResult(result);
+      } else {
+        // No cache and the check failed — deny like before (next mount retries).
+        setIsAdmin(false);
       }
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
+
+  // Signed out: drop any previous user's gate state so a stale `ready`
+  // can never leak into the logged-out UI.
+  useEffect(() => {
+    if (!authLoading && !user) {
+      lastUidRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAdmin(null);
+      setRole(null);
+      setPermissions([]);
+      setToken(null);
+      try {
+        if (typeof window !== "undefined" && window.sessionStorage) {
+          const keys: string[] = [];
+          for (let i = 0; i < window.sessionStorage.length; i += 1) {
+            const key = window.sessionStorage.key(i);
+            if (key && key.startsWith(GATE_SESSION_PREFIX)) keys.push(key);
+          }
+          for (const key of keys) window.sessionStorage.removeItem(key);
+        }
+      } catch {
+        // Best-effort.
+      }
+    }
+  }, [authLoading, user]);
 
   // Keep the token fresh: Firebase rotates ID tokens hourly, and a stale
   // token in state made every admin write fail with 401 after an hour.
   useEffect(() => {
     if (!user) return;
     return onIdTokenChanged(getAuth(), (refreshed) => {
-      void refreshed?.getIdToken().then(setToken).catch(() => setToken(null));
+      if (refreshed?.uid !== user.uid) return;
+      void refreshed
+        ?.getIdToken()
+        .then((t) => setToken((prev) => (prev === t ? prev : t)))
+        .catch(() => setToken(null));
     });
   }, [user]);
 

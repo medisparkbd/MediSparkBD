@@ -387,28 +387,58 @@ async function resolveCategoryId(
  * (`course_categories`). Backfills legacy rows that only carry the ENUM
  * `category` display name. Called lazily before category-filtered reads so a
  * course added/renamed/moved in Course Control is reflected immediately.
+ *
+ * Throttled: at most one sync per 60s per server instance (concurrent
+ * callers share the in-flight run). Category renames therefore propagate
+ * within about a minute — same freshness as the rest of the site's caches.
  */
-export async function syncCatalogCategoryIds(): Promise<void> {
-  await ensureTables();
-  const { ensureSchema } = await import("@/lib/course-categories-store");
-  await ensureSchema();
-  const categories = await query<Array<{ id: string; name: string; slug: string }>>(
-    `SELECT id, name, slug FROM course_categories`,
-  );
-  if (categories.length === 0) return;
-  const rows = await query<
-    Array<{ slug: string; category: string; category_id: string | null }>
-  >(`SELECT slug, category, category_id FROM catalog_courses`);
-  for (const row of rows) {
-    const categoryId = await resolveCategoryId(row.category, categories);
-    // Re-link when missing or stale (e.g. course moved to another category
-    // in Course Control) so Content Control always follows Course Control.
-    if (categoryId && categoryId !== (row.category_id ?? "")) {
-      await exec(`UPDATE catalog_courses SET category_id = ? WHERE slug = ?`, [
-        categoryId,
-        row.slug,
-      ]);
+const CATEGORY_SYNC_TTL_MS = 60_000;
+let lastCategorySyncAt = 0;
+let categorySyncInFlight: Promise<void> | null = null;
+
+export async function syncCatalogCategoryIds(force = false): Promise<void> {
+  if (!force && Date.now() - lastCategorySyncAt < CATEGORY_SYNC_TTL_MS) return;
+  if (categorySyncInFlight) {
+    await categorySyncInFlight;
+    return;
+  }
+  categorySyncInFlight = (async () => {
+    await ensureTables();
+    const { ensureSchema } = await import("@/lib/course-categories-store");
+    await ensureSchema();
+    const categories = await query<Array<{ id: string; name: string; slug: string }>>(
+      `SELECT id, name, slug FROM course_categories`,
+    );
+    lastCategorySyncAt = Date.now();
+    if (categories.length === 0) return;
+    const rows = await query<
+      Array<{ slug: string; category: string; category_id: string | null }>
+    >(`SELECT slug, category, category_id FROM catalog_courses`);
+    const updates: Array<{ slug: string; categoryId: string }> = [];
+    for (const row of rows) {
+      const categoryId = await resolveCategoryId(row.category, categories);
+      // Re-link when missing or stale (e.g. course moved to another category
+      // in Course Control) so Content Control always follows Course Control.
+      if (categoryId && categoryId !== (row.category_id ?? "")) {
+        updates.push({ slug: row.slug, categoryId });
+      }
     }
+    if (updates.length === 0) return;
+    // One batched UPDATE instead of N sequential round-trips.
+    const cases = updates.map(() => "WHEN ? THEN ?").join(" ");
+    const params: unknown[] = [];
+    for (const update of updates) params.push(update.slug, update.categoryId);
+    for (const update of updates) params.push(update.slug);
+    const placeholders = updates.map(() => "?").join(",");
+    await exec(
+      `UPDATE catalog_courses SET category_id = CASE slug ${cases} END WHERE slug IN (${placeholders})`,
+      params,
+    );
+  })();
+  try {
+    await categorySyncInFlight;
+  } finally {
+    categorySyncInFlight = null;
   }
 }
 

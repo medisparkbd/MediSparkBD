@@ -25,46 +25,120 @@ export function notifyEnrollmentChanged() {
 }
 
 /** Live course list + per-course pending application counts (MySQL).
- *  Pass categoryId to get ONLY that Course Control category's courses. */
-export function useControlCourses(categoryId = "") {
-  const { user, authLoading } = useAuth();
-  const [courses, setCourses] = useState<ControlCourse[] | null>(null);
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(true);
+ *  Pass categoryId to get ONLY that Course Control category's courses.
+ *
+ *  Shared across hook instances: concurrent mounts reuse one in-flight
+ *  request and results are cached 30s, so the home page + enrollment pages
+ *  together fire a single summary request instead of one each. Background
+ *  polls never flip `loading` (no skeleton flash) and pause when the tab
+ *  is hidden. */
+const SUMMARY_TTL_MS = 30_000;
+type SummaryCacheEntry = { courses: ControlCourse[]; at: number };
+const summaryCache = new Map<string, SummaryCacheEntry>();
+const summaryInFlight = new Map<string, Promise<ControlCourse[] | null>>();
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
+async function fetchSummary(
+  token: string,
+  categoryId: string,
+): Promise<ControlCourse[] | null> {
+  const key = categoryId;
+  const ongoing = summaryInFlight.get(key);
+  if (ongoing) return ongoing;
+  const promise = (async (): Promise<ControlCourse[] | null> => {
     try {
-      const token = await user.getIdToken();
       const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
       const res = await fetch(`/api/admin/enrollment-control/summary${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
-      if (!res.ok) throw new Error("failed");
+      if (!res.ok) return null;
       const data = (await res.json()) as { courses?: ControlCourse[] };
-      setCourses(Array.isArray(data.courses) ? data.courses : []);
-      setError(false);
+      const courses = Array.isArray(data.courses) ? data.courses : [];
+      summaryCache.set(key, { courses, at: Date.now() });
+      return courses;
     } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
+      return null;
     }
-  }, [user, categoryId]);
+  })();
+  summaryInFlight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    if (summaryInFlight.get(key) === promise) summaryInFlight.delete(key);
+  }
+}
+
+export function useControlCourses(categoryId = "") {
+  const { user, authLoading } = useAuth();
+  const [courses, setCourses] = useState<ControlCourse[] | null>(() => {
+    const cached = summaryCache.get(categoryId);
+    return cached && Date.now() - cached.at < SUMMARY_TTL_MS
+      ? cached.courses
+      : null;
+  });
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    const cached = summaryCache.get(categoryId);
+    return !(cached && Date.now() - cached.at < SUMMARY_TTL_MS);
+  });
+
+  const load = useCallback(
+    async (silent = false) => {
+      if (!user) return;
+      const cached = summaryCache.get(categoryId);
+      if (cached && Date.now() - cached.at < SUMMARY_TTL_MS) {
+        setCourses(cached.courses);
+        setError(false);
+        setLoading(false);
+        return;
+      }
+      if (!silent) setLoading(true);
+      try {
+        const token = await user.getIdToken();
+        const fresh = await fetchSummary(token, categoryId);
+        if (fresh === null) {
+          // Keep stale data on transient failure; error only when empty.
+          setCourses((prev) => {
+            if (prev === null) setError(true);
+            return prev;
+          });
+        } else {
+          setCourses(fresh);
+          setError(false);
+        }
+      } catch {
+        setCourses((prev) => {
+          if (prev === null) setError(true);
+          return prev;
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, categoryId],
+  );
 
   // Refresh every 30s so a new application raises its badge automatically,
   // plus immediately after any accept/reject via the shared event.
   useEffect(() => {
     if (!user) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-    const interval = setInterval(() => void load(), 30_000);
-    const onChanged = () => void load();
+    void load(true);
+    const interval = setInterval(() => {
+      // No work while the tab is hidden — refresh on return instead.
+      if (typeof document !== "undefined" && document.hidden) return;
+      void load(true);
+    }, 30_000);
+    const onChanged = () => void load(true);
+    const onVisible = () => {
+      if (typeof document !== "undefined" && !document.hidden) void load(true);
+    };
     window.addEventListener(ENROLLMENT_CHANGED_EVENT, onChanged);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(interval);
       window.removeEventListener(ENROLLMENT_CHANGED_EVENT, onChanged);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user, load]);
 

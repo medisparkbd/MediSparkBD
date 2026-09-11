@@ -89,26 +89,33 @@ export async function fetchStudents(
   if (options.search && options.search.trim().length > 0) {
     const term = `%${options.search.trim()}%`;
     conditions.push(
-      "(full_name LIKE ? OR student_id LIKE ? OR email LIKE ? OR contact_number LIKE ?)",
+      "(s.full_name LIKE ? OR s.student_id LIKE ? OR s.email LIKE ? OR s.contact_number LIKE ?)",
     );
     params.push(term, term, term, term);
   }
   if (options.status === "active") {
-    conditions.push("(is_active IS NULL OR is_active = 1)");
+    conditions.push("(s.is_active IS NULL OR s.is_active = 1)");
   } else if (options.status === "deactivated") {
-    conditions.push("is_active = 0");
+    conditions.push("s.is_active = 0");
   }
 
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   try {
+    // Single pass: LEFT JOIN + GROUP BY instead of a correlated COUNT(*)
+    // subquery per student row (500 index probes → 1 grouped scan).
     const rows = await query<StudentRow[]>(
       `SELECT s.uid, s.student_id, s.full_name, s.gender, s.institution, s.hsc_batch,
               s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
               s.provider, s.is_active, s.created_at,
-              (SELECT COUNT(*) FROM enrollments e WHERE e.student_uid = s.uid) AS enrollment_count
-       FROM students s ${whereClause}
+              COUNT(e.student_uid) AS enrollment_count
+       FROM students s
+       LEFT JOIN enrollments e ON e.student_uid = s.uid
+       ${whereClause}
+       GROUP BY s.uid, s.student_id, s.full_name, s.gender, s.institution, s.hsc_batch,
+                s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
+                s.provider, s.is_active, s.created_at
        ORDER BY s.created_at DESC
        LIMIT 500`,
       params,

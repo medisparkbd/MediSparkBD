@@ -645,16 +645,71 @@ async function applyLiveTotals(exams: Exam[]): Promise<Exam[]> {
   return exams;
 }
 
-export async function fetchExams(kind?: ExamKind): Promise<Exam[]> {
+export type ExamListFilters = {
+  kind?: ExamKind;
+  kinds?: ExamKind[];
+  ids?: string[];
+  categoryId?: string;
+  chapterId?: string;
+};
+
+/** Normalize the fetchExams argument (legacy single-kind string or filters). */
+function normalizeExamFilters(
+  kindOrFilters?: ExamKind | ExamListFilters,
+): { filters: ExamListFilters; cacheable: boolean } {
+  if (typeof kindOrFilters === "string") {
+    return { filters: { kind: kindOrFilters }, cacheable: false };
+  }
+  const filters = kindOrFilters ?? {};
+  const cacheable =
+    !filters.kind &&
+    (!filters.kinds || filters.kinds.length === 0) &&
+    (!filters.ids || filters.ids.length === 0) &&
+    !filters.categoryId &&
+    !filters.chapterId;
+  return { filters, cacheable };
+}
+
+export async function fetchExams(
+  kindOrFilters?: ExamKind | ExamListFilters,
+): Promise<Exam[]> {
+  const { filters, cacheable } = normalizeExamFilters(kindOrFilters);
   const now = Date.now();
-  if (!kind && examsCache && now - examsCache.at < EXAMS_CACHE_TTL) {
+  if (cacheable && examsCache && now - examsCache.at < EXAMS_CACHE_TTL) {
     return examsCache.data;
   }
   try {
     await ensureTables();
-    const rows = kind
-      ? await query<ExamRow[]>(`SELECT ${EXAM_COLUMNS} FROM exams WHERE kind = ? ORDER BY sort_order ASC, created_at DESC`, [kind])
-      : await query<ExamRow[]>(`SELECT ${EXAM_COLUMNS} FROM exams ORDER BY sort_order ASC, created_at DESC`);
+    // Push filters into SQL so list/manage pages never transfer + totalize
+    // the whole exams table when they only need one kind/category/exam.
+    const where: string[] = [];
+    const params: unknown[] = [];
+    const kinds = filters.kinds?.length
+      ? filters.kinds
+      : filters.kind
+        ? [filters.kind]
+        : [];
+    if (kinds.length > 0) {
+      where.push(`kind IN (${kinds.map(() => "?").join(",")})`);
+      params.push(...kinds);
+    }
+    if (filters.ids?.length) {
+      where.push(`id IN (${filters.ids.map(() => "?").join(",")})`);
+      params.push(...filters.ids);
+    }
+    if (filters.categoryId) {
+      where.push(`category_id = ?`);
+      params.push(filters.categoryId);
+    }
+    if (filters.chapterId) {
+      where.push(`chapter_id = ?`);
+      params.push(filters.chapterId);
+    }
+    const clause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const rows = await query<ExamRow[]>(
+      `SELECT ${EXAM_COLUMNS} FROM exams ${clause} ORDER BY sort_order ASC, created_at DESC`,
+      params,
+    );
     let assignments: Map<string, string[]> | null = null;
     if (rows.some((row) => row.kind === "enrolled")) {
       assignments = await fetchCourseAssignments();
@@ -665,7 +720,7 @@ export async function fetchExams(kind?: ExamKind): Promise<Exam[]> {
       return exam;
     });
     const withTotals = await applyLiveTotals(exams);
-    if (!kind) examsCache = { data: withTotals, at: now };
+    if (cacheable) examsCache = { data: withTotals, at: now };
     return withTotals;
   } catch {
     return [];
@@ -1122,7 +1177,7 @@ export async function saveQuestionsBulk(
     // Determine next sort_order once
     let nextOrder = 1;
     try {
-      const [rows] = await conn.execute(`SELECT MAX(sort_order) AS m FROM exam_questions WHERE exam_id = ?`, [cleanExamId]);
+      const [rows] = await conn.query(`SELECT MAX(sort_order) AS m FROM exam_questions WHERE exam_id = ?`, [cleanExamId]);
       const r = rows as unknown as { m: number | null }[];
       nextOrder = (r[0]?.m ?? 0) + 1;
     } catch {
@@ -1146,18 +1201,18 @@ export async function saveQuestionsBulk(
       const isActive = input.isActive === false ? 0 : 1;
       const existingId = Number(input.id);
       if (Number.isInteger(existingId) && existingId > 0) {
-        const [curRows] = await conn.execute(`SELECT exam_id FROM exam_questions WHERE id = ? LIMIT 1`, [existingId]);
+        const [curRows] = await conn.query(`SELECT exam_id FROM exam_questions WHERE id = ? LIMIT 1`, [existingId]);
         const cur = curRows as unknown as { exam_id: string | null }[];
         if (!cur[0]) throw new Error(`Question ${existingId} not found.`);
         const orderClause = explicitOrder !== null ? `, sort_order = ${explicitOrder}` : "";
-        await conn.execute(
+        await conn.query(
           `UPDATE exam_questions SET exam_id = ?, bank_subject = ?, question = ?, question_image = ?, options = ?, correct_index = ?, explanation = ?, marks = ?, is_active = ?${orderClause} WHERE id = ?`,
           [cleanExamId, subject, text, qImage, JSON.stringify(options), correctIndex, explanation, marks, isActive, existingId],
         );
         ids.push(existingId);
       } else {
         const sortOrder = explicitOrder ?? nextOrder++;
-        const [result] = await conn.execute(
+        const [result] = await conn.query(
           `INSERT INTO exam_questions (exam_id, bank_subject, question, question_image, options, correct_index, explanation, marks, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [cleanExamId, subject, text, qImage, JSON.stringify(options), correctIndex, explanation, marks, sortOrder, isActive],
         );
@@ -1167,9 +1222,9 @@ export async function saveQuestionsBulk(
     }
     // Recompute exam totals once, within transaction (single connection, no extra pool roundtrip)
     try {
-      const [totRows] = await conn.execute(`SELECT COUNT(*) AS count, SUM(marks) AS marks FROM exam_questions WHERE exam_id = ? AND is_active = 1`, [cleanExamId]);
+      const [totRows] = await conn.query(`SELECT COUNT(*) AS count, SUM(marks) AS marks FROM exam_questions WHERE exam_id = ? AND is_active = 1`, [cleanExamId]);
       const tot = (totRows as unknown as { count: number; marks: string | null }[])[0];
-      await conn.execute(`UPDATE exams SET question_count = ?, total_marks = ? WHERE id = ?`, [tot?.count ?? 0, Number(tot?.marks ?? 0) || 0, cleanExamId]);
+      await conn.query(`UPDATE exams SET question_count = ?, total_marks = ? WHERE id = ?`, [tot?.count ?? 0, Number(tot?.marks ?? 0) || 0, cleanExamId]);
     } catch {
       // Best-effort
     }

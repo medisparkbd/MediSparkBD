@@ -93,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(studentProfile);
     setEnrollments(studentEnrollments);
     setProfileLoading(false);
+    return studentProfile;
   }, []);
 
   useEffect(() => {
@@ -185,9 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
       setUser(result.user);
       setAuthLoading(false);
-      await loadUserData(result.user);
-      const studentProfile = await fetchProfile(result.user);
-      return studentProfile;
+      // loadUserData already fetches the profile — reuse it instead of a
+      // second /api/me round-trip.
+      return loadUserData(result.user);
     } catch (err) {
       const code =
         typeof err === "object" && err !== null && "code" in err

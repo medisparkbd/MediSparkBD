@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -168,20 +168,33 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
   const active = findActiveAdminNav(pathname);
 
-  // Filtered nav for RBAC — respects role permissions, keeps routes unchanged
-  const visibleNav = ADMIN_NAV.filter((item) =>
-    hasControlAccess(gate.role, gate.permissions, item.href),
+  // Filtered nav for RBAC — respects role permissions, keeps routes unchanged.
+  // Memoized: ADMIN_NAV is static, so this only recomputes when the role changes.
+  const visibleNav = useMemo(
+    () =>
+      ADMIN_NAV.filter((item) =>
+        hasControlAccess(gate.role, gate.permissions, item.href),
+      ),
+    [gate.role, gate.permissions],
   );
   const homeItem = visibleNav.find((i) => i.href === "/admin") ?? ADMIN_NAV[0];
-  const managementItems = visibleNav.filter((i) => i.href !== "/admin");
+  const managementItems = useMemo(
+    () => visibleNav.filter((i) => i.href !== "/admin"),
+    [visibleNav],
+  );
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(href + "/");
 
-  // Header title/breadcrumb prefers ADMIN_NAV match for new routes
-  const activeNavItem = [...ADMIN_NAV]
-    .sort((a, b) => b.href.length - a.href.length)
-    .find((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
+  // Header title/breadcrumb prefers ADMIN_NAV match for new routes.
+  // ADMIN_NAV sorted once (module-level order) instead of on every render.
+  const activeNavItem = useMemo(
+    () =>
+      [...ADMIN_NAV]
+        .sort((a, b) => b.href.length - a.href.length)
+        .find((item) => pathname === item.href || pathname.startsWith(item.href + "/")),
+    [pathname],
+  );
   const displayTitle = activeNavItem ? activeNavItem.label : active.title;
   const displayBreadcrumbs =
     activeNavItem && activeNavItem.href !== "/admin"
@@ -325,7 +338,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top header */}
-        <header className={`sticky top-0 z-40 flex h-16 shrink-0 items-center gap-3 border-b border-neutral-200 bg-white/90 px-4 backdrop-blur transition-all duration-300 sm:px-6 admin-dark:border-zinc-800 admin-dark:bg-zinc-900/90 ${scrolled ? "lg:shadow-lg lg:shadow-black/25" : ""}`}>
+        <header className={`sticky top-0 z-40 flex h-16 shrink-0 items-center gap-3 border-b border-neutral-200 bg-white px-4 transition-colors duration-200 sm:px-6 admin-dark:border-zinc-800 admin-dark:bg-zinc-900 ${scrolled ? "lg:shadow-lg lg:shadow-black/25" : ""}`}>
           <button
             type="button"
             aria-label="Open menu"

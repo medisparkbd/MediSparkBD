@@ -147,7 +147,7 @@ async function highestMarkFor(examId: string): Promise<number | null> {
 async function updateMeritPositions(examId: string): Promise<void> {
   try {
     await withTransaction(async (connection) => {
-      const [rows] = await connection.execute<RowDataPacket[]>(
+      const [rows] = await connection.query<RowDataPacket[]>(
         `SELECT id FROM exam_results
          WHERE exam_id = ?
          ORDER BY score DESC,
@@ -158,7 +158,7 @@ async function updateMeritPositions(examId: string): Promise<void> {
       );
       const ranked = rows as unknown as { id: number }[];
       for (const [index, row] of ranked.entries()) {
-        await connection.execute(`UPDATE exam_results SET merit_position = ? WHERE id = ?`, [
+        await connection.query(`UPDATE exam_results SET merit_position = ? WHERE id = ?`, [
           index + 1,
           row.id,
         ]);
