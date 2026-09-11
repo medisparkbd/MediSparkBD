@@ -8,6 +8,7 @@ export type ParsedPasteMcq = {
   question: string;
   options: [string, string, string, string];
   correctIndex: number | null;
+  marks: number | null;
   rawBlock: string;
   issues: string[];
   needsReview: boolean;
@@ -68,8 +69,15 @@ function stripQuestionHeader(line: string): { stripped: string; header: string }
     // Even if rest empty (header alone next line is question), treat as header
     return { stripped: rest, header };
   }
-  // 2) Question variants
+  // 2) Question variants (with number)
   m = raw.match(/^\s*(Question\s*(?:No\.?)?\s*(?:\d+|[০-৯]+)\s*[\.\)\:\-]?)\s*(.*)$/i);
+  if (m) {
+    const header = m[1].trim();
+    const rest = (m[2] ?? "").trim();
+    return { stripped: rest, header };
+  }
+  // 2b) Plain QUESTION: without number — e.g., "QUESTION: What is...?"
+  m = raw.match(/^\s*(QUESTION\s*[:\-])\s*(.*)$/i);
   if (m) {
     const header = m[1].trim();
     const rest = (m[2] ?? "").trim();
@@ -236,6 +244,16 @@ function parseOptionLine(line: string, allowNumeric = true): { index: number; te
   }
 
   return null;
+}
+
+// ── mark detection ─────────────────────────────────────────────────────────
+function extractMarkPayload(line: string): number | null {
+  const t = line.trim();
+  if (!t) return null;
+  const m = t.match(/^\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*(\d+(?:\.\d+)?)\s*$/i);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) && v >= 0 ? v : null;
 }
 
 // ── answer detection ───────────────────────────────────────────────────────
@@ -410,6 +428,7 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
   const options: [string, string, string, string] = ["", "", "", ""];
   let correctIndex: number | null = null;
   let answerPayloadRaw: string | null = null;
+  let markValue: number | null = null;
   let originalNumber: string | null = null;
   let seenOptions = false;
   let optionMarkerCorrectIdx: number | null = null;
@@ -423,6 +442,11 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
       // This line is answer
       answerPayloadRaw = payload; // keep last
       // Don't add to nonAnswerLines
+      continue;
+    }
+    const markPayload = extractMarkPayload(line);
+    if (markPayload !== null) {
+      markValue = markPayload; // keep last
       continue;
     }
     nonAnswerLines.push(line);
@@ -645,6 +669,7 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
     question,
     options,
     correctIndex,
+    marks: markValue,
     rawBlock,
     issues,
     needsReview,
@@ -727,19 +752,30 @@ function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
   // Question text is from after header strip up to first candidateGroup start
   const firstOptStart = candidateGroup[0].start;
   let qTextRaw = textBeforeAnswer.slice(0, firstOptStart).trim();
-  // Strip leading question number
+  // Strip leading question number or plain QUESTION:
   const sh = stripQuestionHeader(qTextRaw);
   if (sh) {
     if (sh.stripped) qTextRaw = sh.stripped;
     else {
       // Header alone, try next segment before options? Keep as is without header
-      qTextRaw = qTextRaw.replace(/^\s*(?:\d+|[০-৯]+|Q\s*0*\d+|Question\s*(?:No\.?)?\s*\d+|প্রশ্ন\s*(?:নং\.?)?\s*\d+|[IVXLCDM]+)\s*[\.\)\:\-।\)]?\s*/i, "").trim();
+      qTextRaw = qTextRaw.replace(/^\s*(?:\d+|[০-৯]+|Q\s*0*\d+|Question\s*(?:No\.?)?\s*\d+|QUESTION\s*[:\-]|প্রশ্ন\s*(?:নং\.?)?\s*\d+|[IVXLCDM]+)\s*[\.\)\:\-।\)]?\s*/i, "").trim();
     }
+  } else {
+    // Also strip plain QUESTION: without number if present
+    const qm = qTextRaw.match(/^\s*QUESTION\s*[:\-]\s*(.*)$/i);
+    if (qm) qTextRaw = (qm[1] ?? "").trim();
   }
   // Clean question: remove extra spaces, keep statements if present
   qTextRaw = qTextRaw.replace(/\s+/g, " ").trim();
   // Resolve answer
   let correctIndex: number | null = null;
+  let marks: number | null = null;
+  // Check for MARK in the block (after answer)
+  const markMatch = rawBlock.match(/(?:^|\n)\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*(\d+(?:\.\d+)?)\s*$/im);
+  if (markMatch) {
+    const v = parseFloat(markMatch[1]);
+    if (Number.isFinite(v) && v >= 0) marks = v;
+  }
   if (answerPayload) {
     correctIndex = mapAnswerPayloadToIndex(answerPayload, tmpOptions);
   }
@@ -759,6 +795,7 @@ function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
     question: qTextRaw,
     options: tmpOptions,
     correctIndex,
+    marks,
     rawBlock,
     issues,
     needsReview,
@@ -788,7 +825,7 @@ function splitByNumbering(text: string): string[] | null {
     }
     offset += line.length + 1; // +1 for \n
   }
-  const regex = /(?:^|\n)\s*((?:প্রশ্ন\s*(?:নং\.?|No\.?)?\s*(?:\d+|[০-৯]+)|Question\s*(?:No\.?)?\s*(?:\d+|[০-৯]+)|Q\s*[\.\-]?\s*0*\d+|Q\s*[\.\)\:\-]\s*0*\d+|(?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)\-]\-?|(?:[IVXLCDM]{1,5}|[ivxlcdm]{1,5})\s*[\.\)\-]\-?)\s*)/g;
+  const regex = /(?:^|\n)\s*((?:প্রশ্ন\s*(?:নং\.?|No\.?)?\s*(?:\d+|[০-৯]+)|Question\s*(?:No\.?)?\s*(?:\d+|[০-৯]+)|QUESTION\s*[:\-]|Q\s*[\.\-]?\s*0*\d+|Q\s*[\.\)\:\-]\s*0*\d+|(?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)\-]\-?|(?:[IVXLCDM]{1,5}|[ivxlcdm]{1,5})\s*[\.\)\-]\-?)\s*)/g;
   const matches: { index: number; length: number; text: string }[] = [];
   let m: RegExpExecArray | null;
   const re2 = new RegExp(regex.source, "gi");
@@ -835,7 +872,7 @@ function splitByNumbering(text: string): string[] | null {
 function parseViaLineScan(text: string): ParsedPasteMcq[] {
   const withInlines = injectNewlinesForInline(text.replace(/\r\n/g, "\n"));
   const rawLines = withInlines.split("\n");
-  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; rawLines: string[]; originalNumber: string | null };
+  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; marks: number | null; rawLines: string[]; originalNumber: string | null };
   const blocks: Block[] = [];
   let current: Block | null = null;
 
@@ -850,6 +887,13 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     const line = rawLines[idx];
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    const markP = extractMarkPayload(line);
+    if (markP !== null) {
+      if (!current) continue;
+      current.marks = markP;
+      current.rawLines.push(line);
+      continue;
+    }
     const payload = extractAnswerPayload(line);
     if (payload !== null) {
       if (!current) continue;
@@ -893,14 +937,14 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       } else {
         qText = line.trim();
       }
-      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: orig };
+      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: orig };
       continue;
     }
 
     const opt = parseOptionLine(line, true);
     if (opt) {
       if (!current) {
-        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [], originalNumber: null };
       }
       // Duplicate option label suggests new question if current already has question and at least 2 options
       if (current.options[opt.index] !== "" && current.options.some((o) => o !== "")) {
@@ -908,7 +952,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
         const filled = current.options.filter((o) => o.trim()).length;
         if (hasQuestion && filled >= 2) {
           flushCurrent();
-          current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [], originalNumber: null };
         }
       }
       if (opt.isCorrectMarker && current.correctIndex === null) {
@@ -922,7 +966,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
 
     // Plain text
     if (!current) {
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: null };
       continue;
     }
     const hasAnyOption = current.options.some((o) => o !== "");
@@ -937,7 +981,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     } else {
       // After options, plain text likely starts new question
       flushCurrent();
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: null, rawLines: [line], originalNumber: null };
     }
   }
   flushCurrent();
@@ -957,6 +1001,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     const baseQuestion = b.questionLines.join(" ").replace(/\s+/g, " ").trim();
     const statementsText = b.statements.join("\n").trim();
     const question = statementsText ? (baseQuestion ? `${baseQuestion}\n${statementsText}` : statementsText) : baseQuestion;
+    const marks = (b as any).marks ?? null;
     const issues: string[] = [];
     if (!question || question.length < 3) issues.push("Question text missing or too short");
     const filled = b.options.filter((o) => o.trim()).length;
@@ -968,14 +1013,16 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     if (b.correctIndex === null) issues.push("Answer could not be confidently detected — please verify.");
     else if (!b.options[b.correctIndex]?.trim()) issues.push(`Correct answer ${String.fromCharCode(65 + (b.correctIndex ?? 0))} is empty`);
     const needsReview = issues.length > 0;
+    const confidence = needsReview ? 0.7 : 0.95;
     return {
       question,
       options: b.options,
       correctIndex: b.correctIndex,
+      marks: (b as any).marks ?? null,
       rawBlock: blockText,
       issues,
       needsReview,
-      confidence: needsReview ? 0.7 : 0.95,
+      confidence,
       originalNumber: b.originalNumber,
     };
   });
@@ -1043,6 +1090,14 @@ export function parsePastedMcqs(pastedText: string): ParsedPasteMcq[] {
 }
 
 export function recomputeParsedMcq(mcq: ParsedPasteMcq): ParsedPasteMcq {
+  // Preserve marks if already set
+  if (mcq.marks == null) {
+    const markMatch = mcq.rawBlock.match(/(?:^|\n)\s*(?:MARK|MARKS)\s*[:\-=—.]?\s*(\d+(?:\.\d+)?)\s*$/im);
+    if (markMatch) {
+      const v = parseFloat(markMatch[1]);
+      if (Number.isFinite(v) && v >= 0) (mcq as any).marks = v;
+    }
+  }
   const issues: string[] = [];
   if (!mcq.question || mcq.question.trim().length < 3) issues.push("Question text missing or too short");
   const filled = mcq.options.filter((o) => o.trim()).length;
