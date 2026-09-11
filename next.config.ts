@@ -36,12 +36,9 @@ const nextConfig: NextConfig = {
         { key: "X-Content-Type-Options", value: "nosniff" },
       ],
     },
-    {
-      source: "/_next/static/:path*",
-      headers: [
-        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-      ],
-    },
+    // NOTE: no custom Cache-Control for /_next/static/* — Next.js already
+    // serves those hashed assets as `public, max-age=31536000, immutable`
+    // and warns if you try to override it.
     {
       source: "/:path*.(jpg|jpeg|png|webp|avif|svg|ico|woff|woff2)",
       headers: [
