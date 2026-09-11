@@ -5,20 +5,20 @@
 @custom-variant admin-dark (&:where([data-admin-theme="dark"] *, [data-admin-theme="dark"]));
 
 /* ============ Theme tokens ============ */
-/* Dark Mode is the default theme. */
+/* Dark Mode is the default theme — premium Deep Red + Black. */
 :root,
 :root[data-theme="dark"] {
-  --background: #0a0a0a;
+  --background: #120a0c;
   --foreground: #d4d4d8;
   --font-geist-sans: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
   --font-geist-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --surface-600: #333333;
-  --surface-700: #262626;
-  --surface-800: #1a1a1a;
-  --surface-850: #151515;
-  --surface-900: #111111;
-  --surface-950: #0a0a0a;
+  --surface-600: #3d2b30;
+  --surface-700: #2e1d22;
+  --surface-800: #221318;
+  --surface-850: #1b0e12;
+  --surface-900: #170c0f;
+  --surface-950: #120a0c;
 
   --text-muted-strong: #d4d4d8;
   --text-muted: #a1a1aa;
@@ -288,6 +288,41 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ============ Premium Deep Red + Black (Dark Mode only) ============ */
+/* Subtle deep-red tinted background with soft glows — never bright red.
+   Hierarchy: tinted dark background → black cards w/ thin red border → red accents.
+   Light Mode and Admin Panel are intentionally untouched. */
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(
+      1000px 480px at 12% -6%,
+      rgb(229 9 20 / 0.09),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 480px at 88% -4%,
+      rgb(229 9 20 / 0.07),
+      transparent 60%
+    ),
+    radial-gradient(
+      760px 520px at 50% 38%,
+      rgb(229 9 20 / 0.035),
+      transparent 70%
+    ),
+    var(--background);
+  background-attachment: fixed;
+}
+
+/* Black / near-black cards: keep dark, add a thin subtle deep-red border
+   so they separate cleanly from the tinted background. Only neutral
+   (border-ink-*) borders are retinted — existing colored borders
+   (primary/red/emerald/sky/…) and red cards are preserved as-is.
+   :where() keeps specificity low so hover:border-* states still win. */
+html[data-theme="dark"]
+  :where([class*="bg-dark-"][class*="border-ink"]) {
+  border-color: rgb(185 28 38 / 0.38);
 }
 
 ::selection {
