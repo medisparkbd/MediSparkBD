@@ -38,16 +38,6 @@ export default function LoginClient() {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      const redirectErr = sessionStorage.getItem("medispark:auth-redirect-error");
-      if (redirectErr) {
-        setError(redirectErr);
-        sessionStorage.removeItem("medispark:auth-redirect-error");
-      }
-    } catch {}
-  }, []);
-
   const registerHref = next
     ? `/register?next=${encodeURIComponent(next)}`
     : "/register";
@@ -61,34 +51,17 @@ export default function LoginClient() {
 
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
+    setSigningIn(true);
     setError(null);
-    // Keep popup in the same tick as the click — do not await anything
-    // before signInWithPopup, otherwise the browser no longer treats
-    // window.open as user-initiated and blocks it.
-    let popupPromise: Promise<unknown> | null = null;
     try {
-      popupPromise = signInWithGoogle();
-      setSigningIn(true);
-      const studentProfile = await popupPromise;
+      const studentProfile = await signInWithGoogle();
       if (studentProfile) {
-        router.replace(next || "/dashboard");
-      } else if (studentProfile === null) {
-        // null means success with no profile yet (first login) → go to register
-        router.replace(registerHref);
-      } else {
-        setSigningIn(false);
+        router.replace(studentProfile ? next || "/dashboard" : registerHref);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (/popup-blocked/i.test(msg)) {
-        setError(
-          "Popup blocked — please allow popups for medisparkgo.vercel.app (address bar → popup icon → Always allow), then click Continue with Google again. Alternatively, allow third-party popups in your browser settings.",
-        );
-      } else if (/popup-closed-by-user/i.test(msg)) {
-        setError(null);
-      } else {
-        setError(msg || "Google sign-in failed. Please try again.");
-      }
+      setError(
+        err instanceof Error ? err.message : "Google sign-in failed. Please try again.",
+      );
       setSigningIn(false);
     }
   };
