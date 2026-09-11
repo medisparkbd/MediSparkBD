@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
 import { fetchLiveExamCounts } from "@/lib/public-exams-server";
+import { cachedJson } from "@/lib/api-cache";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const counts = await fetchLiveExamCounts();
-    return NextResponse.json({ counts }, { status: 200 });
+    return cachedJson({ counts }, "API_MEDIUM");
   } catch {
-    return NextResponse.json(
+    return cachedJson(
       {
         counts: {
           "ssc-academic": 0,
@@ -17,7 +17,7 @@ export async function GET() {
           "varsity-admission": 0,
         },
       },
-      { status: 200 },
+      "API_MEDIUM"
     );
   }
 }

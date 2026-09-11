@@ -26,41 +26,61 @@ export function getMysqlPool(): mysql.Pool | null {
       database: mysqlDatabase,
       user: mysqlUser,
       password: mysqlPassword,
-      // Azure Flexible Server caps total connections (B1ms ~171). Every
-      // warm Vercel instance holds its own pool, so keep per-instance usage
-      // small and release idle connections quickly or bursts exhaust the
-      // server ("Too many connections" breaks saves mid-request).
+      // Optimized for Vercel serverless: small pool, fast release
       connectionLimit: 5,
       maxIdle: 2,
       idleTimeout: 15_000,
-      connectTimeout: 10000,
+      connectTimeout: 10_000,
       waitForConnections: true,
       enableKeepAlive: true,
       queueLimit: 50,
-      // Azure Database for MySQL enforces TLS connections.
+      // Azure MySQL enforces TLS
       ssl:
         process.env.MYSQL_SSL === "false"
           ? undefined
           : /azure\.com$/.test(mysqlHost) || process.env.MYSQL_SSL === "true"
             ? { rejectUnauthorized: false }
             : undefined,
-      // Report matched rows (not just changed rows) so "affectedRows > 0"
-      // stays true when an UPDATE sets a column to its current value.
       flags: ["FOUND_ROWS"],
     });
   }
   return pool;
 }
 
+// Simple in-memory query cache for GET requests (invalidated on mutations)
+const queryCache = new Map<string, { data: unknown; expires: number }>();
+const CACHE_TTL = 5_000; // 5 seconds default
+
+function cacheKey(sql: string, params?: unknown[]): string {
+  return sql + "|" + JSON.stringify(params ?? []);
+}
+
 export async function query<T>(
   sql: string,
   params?: unknown[],
+  options?: { cache?: number | false },
 ): Promise<T> {
   const client = getMysqlPool();
   if (!client) throw new Error("Database is not configured.");
+
+  // Cache GET queries (SELECT) by default
+  const useCache = options?.cache !== false && sql.trim().toUpperCase().startsWith("SELECT");
+  const ttl = typeof options?.cache === "number" ? options.cache : CACHE_TTL;
+  const key = cacheKey(sql, params);
+
+  if (useCache) {
+    const cached = queryCache.get(key);
+    if (cached && cached.expires > Date.now()) {
+      return cached.data as T;
+    }
+  }
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const [rows] = await client.execute(sql, params as never);
+      if (useCache) {
+        queryCache.set(key, { data: rows, expires: Date.now() + ttl });
+      }
       return rows as T;
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
@@ -74,6 +94,17 @@ export async function query<T>(
   throw new Error("Unreachable");
 }
 
+// Invalidate cache on mutations
+export function invalidateQueryCache(pattern?: string): void {
+  if (!pattern) {
+    queryCache.clear();
+    return;
+  }
+  for (const k of queryCache.keys()) {
+    if (k.includes(pattern)) queryCache.delete(k);
+  }
+}
+
 export async function exec(
   sql: string,
   params?: unknown[],
@@ -83,6 +114,9 @@ export async function exec(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const [result] = await client.execute<mysql.ResultSetHeader>(sql, params as never);
+      // Invalidate relevant cache on write
+      const tableMatch = sql.match(/\b(INSERT|UPDATE|DELETE|REPLACE)\s+(?:INTO\s+)?`?(\w+)`?/i);
+      if (tableMatch) invalidateQueryCache(tableMatch[2]);
       return result;
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;

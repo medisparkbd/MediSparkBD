@@ -11,13 +11,14 @@ import {
   MAX_HOMEPAGE_COURSE_IMAGE_SIZE,
   type HomepageCourseSlug,
 } from "@/lib/homepage-courses-constants";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
+// Public content: edge-cached for fast loads (5min revalidation).
 export const revalidate = 300;
 
 export async function GET() {
   const cards = await fetchHomepageCourses();
-  return NextResponse.json({ cards });
+  return cachedJson({ cards }, "API_MEDIUM");
 }
 
 export async function POST(request: NextRequest) {

@@ -14,13 +14,14 @@ import {
   ALLOWED_BANNER_EXTENSIONS,
   MAX_BANNER_FILE_SIZE,
 } from "@/lib/banners";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
+// Public content: edge-cached for fast loads (5min revalidation).
 export const revalidate = 300;
 
 export async function GET() {
   const slides = await fetchActiveBanners();
-  return NextResponse.json({ slides });
+  return cachedJson({ slides }, "API_MEDIUM");
 }
 
 function validateFile(file: File): string | null {

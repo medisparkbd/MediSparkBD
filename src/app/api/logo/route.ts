@@ -11,13 +11,10 @@ import { parseImageDimensions } from "@/lib/image-dimensions";
 import { ALLOWED_LOGO_EXTENSIONS, MAX_LOGO_FILE_SIZE } from "@/lib/logo";
 import { requirePermission } from "@/lib/admin";
 import { makeTransparentPng } from "@/lib/logo-background";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
+// Public content: edge-cached for fast loads (5min revalidation).
 export const revalidate = 300;
-
-const CACHE_HEADERS = {
-  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-};
 
 function parseMode(value: string | null): LogoMode | undefined {
   return value === "light" || value === "dark" ? value : undefined;
@@ -29,10 +26,7 @@ export async function GET() {
     fetchActiveLogo(),
     fetchThemeLogos(),
   ]);
-  return NextResponse.json(
-    { logo, light: themes.light, dark: themes.dark },
-    { headers: CACHE_HEADERS },
-  );
+  return cachedJson({ logo, light: themes.light, dark: themes.dark }, "API_MEDIUM");
 }
 
 export async function POST(request: NextRequest) {
@@ -138,7 +132,7 @@ export async function POST(request: NextRequest) {
     } catch {
       // revalidation is best-effort (may not be available in some runtimes)
     }
-    return NextResponse.json({ logo }, { headers: { ...CACHE_HEADERS, "Cache-Control": "no-store" } });
+    return NextResponse.json({ logo }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Logo save failed:", error);
     const message =
@@ -173,7 +167,7 @@ export async function DELETE(request: NextRequest) {
     } catch {
       // best-effort
     }
-    return NextResponse.json({ ok: true }, { headers: { ...CACHE_HEADERS, "Cache-Control": "no-store" } });
+    return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json(
       { error: "Could not restore the default logo." },

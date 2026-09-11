@@ -5,17 +5,14 @@ import {
   fetchActiveFeaturedSlugs,
   saveFeaturedCourses,
 } from "@/lib/featured-courses";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
+// Public content: edge-cached for fast loads (5min revalidation).
 export const revalidate = 300;
-
-const CACHE_HEADERS = {
-  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-};
 
 export async function GET() {
   const slugs = await fetchActiveFeaturedSlugs();
-  return NextResponse.json({ slugs }, { headers: CACHE_HEADERS });
+  return cachedJson({ slugs }, "API_MEDIUM");
 }
 
 /** Replace the full featured list (select / toggle / reorder). */

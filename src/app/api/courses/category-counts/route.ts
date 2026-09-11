@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchCourseCategoryCounts } from "@/lib/course-catalog";
 import { fetchActiveCourseCategories } from "@/lib/course-categories-store";
+import { cachedJson } from "@/lib/api-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export async function GET() {
       // Also expose normalized slug prefix (ssc, hsc, medical, varsity)
       slugCounts[cat.slug.toLowerCase()] = counts[cat.id] ?? 0;
     }
-    return NextResponse.json({ counts, slugCounts }, { status: 200 });
+    return cachedJson({ counts, slugCounts }, "API_MEDIUM");
   } catch {
-    return NextResponse.json({ counts: {}, slugCounts: {} }, { status: 200 });
+    return cachedJson({ counts: {}, slugCounts: {} }, "API_MEDIUM");
   }
 }

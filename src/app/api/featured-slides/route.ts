@@ -4,8 +4,9 @@ import { getLiveCourse } from "@/lib/course-catalog";
 import { getPayableFee, formatFee } from "@/lib/courses";
 import { fetchFeaturedPublicExams } from "@/lib/exams-admin";
 import { fetchFeaturedJerseys } from "@/lib/content-admin";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
+// Public content: edge-cached for fast loads (5min revalidation).
 export const revalidate = 300;
 
 /**
@@ -66,8 +67,5 @@ export async function GET() {
     // Featured jerseys are optional — never break the banner API.
   }
 
-  return NextResponse.json(
-    { slides },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return cachedJson({ slides }, "API_MEDIUM");
 }
