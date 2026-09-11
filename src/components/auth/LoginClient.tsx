@@ -61,17 +61,27 @@ export default function LoginClient() {
 
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
-    setSigningIn(true);
     setError(null);
+    // Call popup synchronously in the click handler's tick — any prior
+    // async gap (even setState) can make the browser treat window.open as
+    // not user-initiated and block it as auth/popup-blocked.
     try {
+      setSigningIn(true);
       const studentProfile = await signInWithGoogle();
       if (studentProfile) {
         router.replace(studentProfile ? next || "/dashboard" : registerHref);
+      } else {
+        setSigningIn(false);
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Google sign-in failed. Please try again.",
-      );
+      const msg = err instanceof Error ? err.message : "";
+      if (/popup-blocked/i.test(msg)) {
+        setError(
+          "Popup blocked — please allow popups for medisparkgo.vercel.app in your browser (address bar → popup icon → Always allow), then try again.",
+        );
+      } else {
+        setError(msg || "Google sign-in failed. Please try again.");
+      }
       setSigningIn(false);
     }
   };
