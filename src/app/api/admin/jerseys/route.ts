@@ -5,6 +5,7 @@ import {
   fetchJerseys,
   saveJersey,
   deleteJersey,
+  reorderJerseys,
 } from "@/lib/content-admin";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,26 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to save the jersey.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const admin = await requirePermission(request, "manageContent");
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  const body = (await request.json().catch(() => null)) as { order?: unknown } | null;
+  if (!body || !Array.isArray(body.order)) {
+    return NextResponse.json({ error: "Missing jersey order." }, { status: 400 });
+  }
+  try {
+    const jerseys = await reorderJerseys(body.order as string[]);
+    await logAdminAction(admin, "jersey.reorder", `${body.order.length} items`, request);
+    return NextResponse.json({ jerseys });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to reorder jerseys.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

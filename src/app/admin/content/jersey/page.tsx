@@ -171,6 +171,35 @@ export default function JerseyPage() {
     }
   }
 
+  async function move(id: string, direction: -1 | 1) {
+    const list = jerseys ?? [];
+    const index = list.findIndex((jersey) => jersey.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= list.length) return;
+    const order = list.map((jersey) => jersey.id);
+    [order[index], order[target]] = [order[target], order[index]];
+    setBusy(true);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/admin/jerseys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...gate.headers },
+        body: JSON.stringify({ order }),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string; jerseys?: Jersey[] } | null;
+      if (!response.ok) {
+        setNotice({ kind: "error", text: data?.error ?? "Failed to reorder." });
+        return;
+      }
+      setJerseys(data?.jerseys ?? []);
+      setNotice({ kind: "success", text: "Slider order updated on the home page." });
+    } catch {
+      setNotice({ kind: "error", text: "Network error — could not reorder." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleSection() {
     setBusy(true);
     setNotice(null);
@@ -229,7 +258,7 @@ export default function JerseyPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-[#0b1e3a] admin-dark:text-white">Jerseys</h2>
-          <p className="mt-1.5 text-sm text-slate-500 admin-dark:text-slate-400">Merchandise jerseys shown on the website.</p>
+          <p className="mt-1.5 text-sm text-slate-500 admin-dark:text-slate-400">Jersey slider on the home page — list order is the slide order. Active jerseys with images appear automatically.</p>
         </div>
         {sectionActive !== null && (
           <button
@@ -300,8 +329,30 @@ export default function JerseyPage() {
       </div>
 
       <ul className="mt-5 space-y-2">
-        {(jerseys ?? []).map((jersey) => (
+        {(jerseys ?? []).map((jersey, index) => (
           <li key={jersey.id} className={`${cardClass} flex items-center gap-3 px-4 py-3`}>
+            <span className="flex flex-col gap-1" aria-hidden={false}>
+              <button
+                type="button"
+                disabled={busy || index === 0}
+                aria-label={`Move ${jersey.name} up`}
+                title="Move up (earlier in slider)"
+                className="rounded-md border border-zinc-400/40 px-2 py-0.5 text-xs font-bold text-slate-500 transition hover:bg-zinc-500/10 disabled:opacity-30"
+                onClick={() => void move(jersey.id, -1)}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                disabled={busy || index === (jerseys ?? []).length - 1}
+                aria-label={`Move ${jersey.name} down`}
+                title="Move down (later in slider)"
+                className="rounded-md border border-zinc-400/40 px-2 py-0.5 text-xs font-bold text-slate-500 transition hover:bg-zinc-500/10 disabled:opacity-30"
+                onClick={() => void move(jersey.id, 1)}
+              >
+                ↓
+              </button>
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">{jersey.name}</span>
               <span className="block truncate text-xs text-slate-500">

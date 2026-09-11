@@ -238,6 +238,11 @@ async function ensureJerseysTable(): Promise<void> {
   } catch {
     // Column already exists — safe to ignore.
   }
+  try {
+    await exec(`ALTER TABLE jerseys ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER is_featured`);
+  } catch {
+    // Column already exists — safe to ignore.
+  }
 }
 
 export async function fetchActiveJerseys(): Promise<JerseyItem[]> {
@@ -281,23 +286,50 @@ export async function saveJersey(
     typeof input.id === "string" && input.id.trim()
       ? input.id.trim()
       : `jersey-${Date.now()}`;
-  await exec(
-    `INSERT INTO jerseys (id, name, note, image_url, link, price, is_active, is_featured)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE name = VALUES(name), note = VALUES(note),
-       image_url = VALUES(image_url), link = VALUES(link), price = VALUES(price),
-       is_active = VALUES(is_active), is_featured = VALUES(is_featured)`,
-    [
-      id,
-      name,
-      typeof input.note === "string" && input.note.trim() ? input.note.trim() : null,
-      typeof input.image === "string" && input.image.trim() ? input.image.trim() : null,
-      typeof input.link === "string" && input.link.trim() ? input.link.trim() : null,
-      Math.max(0, Number(input.price) || 0),
-      input.isActive === false ? 0 : 1,
-      input.featured === true ? 1 : 0,
-    ],
+  const nameValue = name;
+  const noteValue =
+    typeof input.note === "string" && input.note.trim() ? input.note.trim() : null;
+  const imageValue =
+    typeof input.image === "string" && input.image.trim() ? input.image.trim() : null;
+  const linkValue =
+    typeof input.link === "string" && input.link.trim() ? input.link.trim() : null;
+  const priceValue = Math.max(0, Number(input.price) || 0);
+  const isActiveValue = input.isActive === false ? 0 : 1;
+  const featuredValue = input.featured === true ? 1 : 0;
+  const existing = await query<{ id: string }[]>(
+    `SELECT id FROM jerseys WHERE id = ? LIMIT 1`,
+    [id],
   );
+  if (existing.length === 0) {
+    // New uploads append at the end of the live slider order.
+    const maxRow = await query<{ m: number | null }[]>(
+      `SELECT MAX(sort_order) AS m FROM jerseys`,
+    );
+    const nextOrder = (maxRow[0]?.m ?? -1) + 1;
+    await exec(
+      `INSERT INTO jerseys (id, name, note, image_url, link, price, is_active, is_featured, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, nameValue, noteValue, imageValue, linkValue, priceValue, isActiveValue, featuredValue, nextOrder],
+    );
+  } else {
+    // Edits never disturb the admin-arranged slider order.
+    await exec(
+      `UPDATE jerseys SET name = ?, note = ?, image_url = ?, link = ?, price = ?,
+        is_active = ?, is_featured = ? WHERE id = ?`,
+      [nameValue, noteValue, imageValue, linkValue, priceValue, isActiveValue, featuredValue, id],
+    );
+  }
+  return fetchJerseys();
+}
+
+/** Persist the admin-arranged slider order (first id = first slide). */
+export async function reorderJerseys(orderedIds: string[]): Promise<JerseyItem[]> {
+  await ensureJerseysTable();
+  const ids = orderedIds.filter((id) => typeof id === "string" && id.trim());
+  if (ids.length === 0) throw new Error("No jersey order provided.");
+  for (let index = 0; index < ids.length; index += 1) {
+    await exec(`UPDATE jerseys SET sort_order = ? WHERE id = ?`, [index, ids[index]]);
+  }
   return fetchJerseys();
 }
 
