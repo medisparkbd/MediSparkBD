@@ -7,10 +7,10 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind, package manager: **p
 ## Language
 User communicates in Bengali/Banglish — reply in the same style.
 
-## Infrastructure (current, as of 2026-08)
+## Infrastructure (current, as of 2026-09)
 - **Hosting:** Vercel — production project `medisparkbd` (account `eduall2005pass-8109s-projects`),
-  connected to GitHub repo `eduall2005pass/medisparkbd`. Mirror repo: `medispark`. Legacy Vercel project `medispark`
-  (repo `eduall2005pass/clinic`) still holds the old deployment.
+  connected to GitHub repo `medisparkbd/MediSparkBD` (single working repo).
+  Live at bloodarenabd.tech + medisparkbd-ecru.vercel.app.
 - **Domain:** bloodarenabd.tech → Vercel DNS (ns1/ns2.vercel-dns.com)
 - **MySQL:** Azure Database for MySQL Flexible Server (managed PaaS)
   - Host: `eduall2005pass.mysql.database.azure.com` port **3306**, TLS required
@@ -29,39 +29,28 @@ User communicates in Bengali/Banglish — reply in the same style.
 - **Secrets:** all credentials live in `~/deploy.env` (never commit secrets).
   Vercel env vars are set in production (MYSQL_*, FIREBASE_*).
 
-## Collaboration rule (IMPORTANT — do this FIRST)
-Two people work on this repo independently and both commit/push, so local
-codebases drift apart. **Before starting ANY work, always sync first:**
+## Sync rule (IMPORTANT — do this FIRST)
+Single working repo: `medisparkbd/MediSparkBD` (remote `medisparkbd`).
+The old repos (`eduall2005pass/clinic`, old `medisparkbd` mirror) are deleted —
+ignore any `origin`/`clinic` remotes; never push to them.
+**Before starting ANY work, always sync first:**
 
 ```bash
-git pull medispark main
+git pull medisparkbd main
 ```
 
 - If there are local uncommitted changes, stash or commit them before pulling.
 - Prefer fast-forward pulls; if diverged, rebase local commits on top:
-  `git pull --rebase medispark main`
+  `git pull --rebase medisparkbd main`
 - Never force-push. If a push is rejected, pull --rebase first, then push again.
-- After finishing any change: commit + `git push medispark main` immediately so
-  the other person gets it and Vercel auto-deploys.
+- After finishing any change: commit + `git push medisparkbd main` immediately
+  so Vercel auto-deploys.
 
-## Deploy flow (IMPORTANT — two-track setup)
-- **Collaborator track:** remote `clinic` (eduall2005pass/clinic) → Vercel
-  project `medispark` → live at bloodarenabd.tech (still on old VM MariaDB).
-  Collaborator works HERE.
-- **Verify track:** remote `medisparkbd` (eduall2005pass/medisparkbd) → Vercel
-  project `medisparkbd` → medisparkbd-ecru.vercel.app (Azure MySQL +
-  medispark.duckdns.org media).
-- **Manual sync flow (no automation):** when collaborator pushes to clinic,
-  pull from clinic, verify the changes work with Azure MySQL + new media
-  server, then push to `medisparkbd` (auto-deploys) and verify there.
-  ```bash
-  git pull clinic main
-  # ...check/adjust if needed...
-  git push clinic main && git push medisparkbd main
-  ```
-- Code must stay compatible with BOTH databases (see mysql.ts SSL logic).
+## Deploy flow (single track)
+- Remote `medisparkbd` (`medisparkbd/MediSparkBD`) → Vercel project
+  `medisparkbd` → live at bloodarenabd.tech + medisparkbd-ecru.vercel.app
+  (Azure MySQL + medispark.duckdns.org media). Push to `main` auto-deploys.
 - Manual alternative: `vercel --prod`.
-- Remote `origin` (siyammd553-gif/MediSparklatest) has no push access — ignore.
 
 ## Database rules
 - ALL data lives in Azure MySQL. Never use Firestore/Supabase/local disk for data.
@@ -101,8 +90,8 @@ git pull medispark main
 - Logo/banner/settings state flows through MySQL-backed store libs in `src/lib/*-store.ts`.
 
 ## Termux (Android phone) setup
-A collaborator runs opencode from Termux. Secret files live in phone storage,
-NOT in the repo. Paths on the phone:
+Work can also run from Termux on an Android phone. Secret files live in
+phone storage, NOT in the repo. Paths on the phone:
 
 - `/sdcard/Download/deploy.env`   → all credentials (MySQL/Firebase/Vercel/GitHub)
 - `/sdcard/Download/kali_key.pem` → Azure VM SSH key
