@@ -8,17 +8,17 @@
 /* Dark Mode is the default theme — premium Deep Red + Black. */
 :root,
 :root[data-theme="dark"] {
-  --background: #120a0c;
+  --background: #0d0709;
   --foreground: #d4d4d8;
   --font-geist-sans: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
   --font-geist-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --surface-600: #3d2b30;
-  --surface-700: #2e1d22;
-  --surface-800: #221318;
-  --surface-850: #1b0e12;
-  --surface-900: #170c0f;
-  --surface-950: #120a0c;
+  --surface-600: #473239;
+  --surface-700: #37232b;
+  --surface-800: #2c1a21;
+  --surface-850: #241419;
+  --surface-900: #1e1216;
+  --surface-950: #0d0709;
 
   --text-muted-strong: #d4d4d8;
   --text-muted: #a1a1aa;
