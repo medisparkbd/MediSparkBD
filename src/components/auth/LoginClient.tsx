@@ -38,6 +38,16 @@ export default function LoginClient() {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    try {
+      const redirectErr = sessionStorage.getItem("medispark:auth-redirect-error");
+      if (redirectErr) {
+        setError(redirectErr);
+        sessionStorage.removeItem("medispark:auth-redirect-error");
+      }
+    } catch {}
+  }, []);
+
   const registerHref = next
     ? `/register?next=${encodeURIComponent(next)}`
     : "/register";

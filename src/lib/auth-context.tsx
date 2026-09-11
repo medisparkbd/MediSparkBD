@@ -127,6 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.error("[auth] getRedirectResult failed:", err);
+        // Surface redirect errors to the UI instead of silent fail
+        const msg =
+          err instanceof Error ? err.message : String(err ?? "Unknown error");
+        // Store for LoginClient to show — use sessionStorage to survive the redirect
+        try {
+          sessionStorage.setItem("medispark:auth-redirect-error", msg);
+        } catch {}
       });
 
     return unsubscribe;
