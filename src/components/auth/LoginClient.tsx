@@ -43,6 +43,18 @@ export default function LoginClient() {
     : "/register";
 
   useEffect(() => {
+    try {
+      const redirectError = sessionStorage.getItem(
+        "medispark:auth-redirect-error",
+      );
+      if (redirectError) {
+        setError(redirectError);
+        sessionStorage.removeItem("medispark:auth-redirect-error");
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     if (authLoading || !configured) return;
     if (user && !profileLoading) {
       router.replace(profile ? next || "/dashboard" : registerHref);

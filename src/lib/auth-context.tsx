@@ -163,12 +163,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       throw new Error("Firebase authentication is not configured.");
     }
-    // Always use popup new window (as requested). Never silently redirect.
-    const result = await signInWithPopup(auth, googleProvider);
-    setUser(result.user);
-    setAuthLoading(false);
-    await loadUserData(result.user);
-    return null;
+    // Try a popup first (fast, no page reload). If the browser blocks the
+    // popup (auth/popup-blocked) or popups aren't supported in this
+    // environment, fall back to full-page redirect so login still works
+    // without any popup. Redirect completion is handled by
+    // getRedirectResult + onAuthStateChanged on mount above.
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      setUser(result.user);
+      setAuthLoading(false);
+      await loadUserData(result.user);
+      const studentProfile = await fetchProfile(result.user);
+      return studentProfile;
+    } catch (err) {
+      const code =
+        typeof err === "object" && err !== null && "code" in err
+          ? String((err as { code?: unknown }).code ?? "")
+          : "";
+      if (
+        code === "auth/popup-blocked" ||
+        code === "auth/operation-not-supported-in-this-environment" ||
+        code === "auth/web-storage-unsupported"
+      ) {
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+      if (code === "auth/popup-closed-by-user") {
+        throw new Error("Login popup closed before completing. Please try again.");
+      }
+      throw err;
+    }
   }, [loadUserData]);
 
   const logout = useCallback(async () => {
