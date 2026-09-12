@@ -33,7 +33,7 @@ export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
-  const { user, profile, authLoading, profileLoading, configured, signInWithGoogle } =
+  const { user, profile, authLoading, profileLoading, configured, signInWithGoogle, authError } =
     useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,13 +70,18 @@ export default function LoginClient() {
       if (studentProfile) {
         router.replace(studentProfile ? next || "/dashboard" : registerHref);
       }
+      // null return = redirect flow started, page navigates away to Google —
+      // completion + errors are handled on mount (authError state).
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Google sign-in failed. Please try again.",
       );
+    } finally {
       setSigningIn(false);
     }
   };
+
+  const visibleError = error ?? authError;
 
   return (
     <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-dark-950 px-4 py-16">
@@ -118,9 +123,9 @@ export default function LoginClient() {
               {signingIn ? "Signing in..." : "Continue with Google"}
             </button>
 
-            {error && (
+            {visibleError && (
               <p className="mt-4 rounded-xl border border-primary-500/30 bg-primary-500/10 p-3 text-center text-sm text-primary-300">
-                {error}
+                {visibleError}
               </p>
             )}
 

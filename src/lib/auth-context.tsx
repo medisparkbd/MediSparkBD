@@ -54,6 +54,8 @@ type AuthContextValue = {
   authLoading: boolean;
   profileLoading: boolean;
   configured: boolean;
+  /** Redirect-flow error (reactive state — survives the getRedirectResult race). */
+  authError: string | null;
   signInWithGoogle: () => Promise<StudentProfile | null>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -61,6 +63,25 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const REDIRECT_PENDING_KEY = "medispark:auth-redirect-pending";
+const REDIRECT_ERROR_KEY = "medispark:auth-redirect-error";
+
+function friendlyRedirectError(code: string, fallback: string): string {
+  switch (code) {
+    case "auth/unauthorized-domain":
+      return "This website domain is not authorized for Google login. Please contact support (Firebase authorized-domains check needed).";
+    case "auth/network-request-failed":
+      return "Network error during Google login. Adblocker thakle off kore, connection check kore abar try koro.";
+    case "auth/web-storage-unsupported":
+      return "Browser cookies/site-storage block kore rekheche, tai login complete hocche na. Cookies allow kore abar try koro.";
+    case "auth/cancelled-popup-request":
+    case "auth/user-cancelled":
+      return "Google login cancelled. Please try again.";
+    default:
+      return fallback;
+  }
+}
 
 async function fetchProfile(user: User): Promise<StudentProfile | null> {
   try {
@@ -83,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const loadUserData = useCallback(async (firebaseUser: User) => {
     setProfileLoading(true);
@@ -118,22 +140,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Process a completed redirect sign-in. The page reloads after Google
     // returns, so this must run on mount (not only from the button handler)
     // to complete the sign-in.
+    // NOTE: getRedirectResult settles ASYNC — LoginClient may already have
+    // mounted before it finishes, so errors go into reactive `authError`
+    // state (a sessionStorage-only handoff races and stays invisible).
+    let hadPendingRedirect = false;
+    try {
+      hadPendingRedirect =
+        sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
+    } catch {}
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
+          try {
+            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+            sessionStorage.removeItem(REDIRECT_ERROR_KEY);
+          } catch {}
+          setAuthError(null);
           setUser(result.user);
           setAuthLoading(false);
           void loadUserData(result.user);
+          return;
+        }
+        // Redirect was started (pending flag set) but we came back with no
+        // user — e.g. back button pressed at Google, or the browser dropped
+        // the pending state. Show a visible error instead of silent fail.
+        if (hadPendingRedirect) {
+          try {
+            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+          } catch {}
+          setAuthError(
+            "Google login could not be completed — no account was returned. Please try again; problem thakle onno browser diye try koro.",
+          );
         }
       })
       .catch((err) => {
         console.error("[auth] getRedirectResult failed:", err);
-        // Surface redirect errors to the UI instead of silent fail
-        const msg =
-          err instanceof Error ? err.message : String(err ?? "Unknown error");
-        // Store for LoginClient to show — use sessionStorage to survive the redirect
         try {
-          sessionStorage.setItem("medispark:auth-redirect-error", msg);
+          sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+        } catch {}
+        const code =
+          typeof err === "object" && err !== null && "code" in err
+            ? String((err as { code?: unknown }).code ?? "")
+            : "";
+        const rawMsg =
+          err instanceof Error ? err.message : String(err ?? "Unknown error");
+        const msg = friendlyRedirectError(code, rawMsg);
+        setAuthError(msg);
+        // Backup for LoginClient to show — use sessionStorage to survive the redirect
+        try {
+          sessionStorage.setItem(REDIRECT_ERROR_KEY, msg);
         } catch {}
       });
 
@@ -171,7 +226,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // falls back to full-page redirect, which uses top-level navigation and
     // works even with third-party cookies blocked. Redirect completion is
     // handled by getRedirectResult + onAuthStateChanged on mount above.
-    const POPUP_TIMEOUT_MS = 60_000;
+    // 15s is enough for account-picking; longer just keeps desktop users
+    // staring at a stuck spinner.
+    const POPUP_TIMEOUT_MS = 15_000;
     let popupTimer: ReturnType<typeof setTimeout> | null = null;
     const popupTimeout = new Promise<never>((_, reject) => {
       popupTimer = setTimeout(
@@ -202,11 +259,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         code === "auth/network-request-failed" ||
         code === "auth/popup-timeout"
       ) {
+        // Remember that a redirect was started, so if we come back with no
+        // user the UI can show an error instead of failing silently.
+        try {
+          sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+        } catch {}
         await signInWithRedirect(auth, googleProvider);
         return null;
       }
       if (code === "auth/popup-closed-by-user") {
         throw new Error("Login popup closed before completing. Please try again.");
+      }
+      if (code === "auth/unauthorized-domain") {
+        throw new Error(
+          "This site's domain is not authorized for Google login. Please contact support.",
+        );
       }
       throw err;
     } finally {
@@ -243,6 +310,7 @@ const access = useMemo<StudentAccess>(() => {
       authLoading,
       profileLoading,
       configured: isFirebaseConfigured,
+      authError,
       signInWithGoogle,
       logout,
       refreshProfile,
@@ -255,6 +323,7 @@ const access = useMemo<StudentAccess>(() => {
       access,
       authLoading,
       profileLoading,
+      authError,
       signInWithGoogle,
       logout,
       refreshProfile,
