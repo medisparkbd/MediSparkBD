@@ -10,8 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  browserLocalPersistence,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -169,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             sessionStorage.removeItem(REDIRECT_PENDING_KEY);
           } catch {}
           setAuthError(
-            "Google login could not be completed — no account was returned. Please try again; problem thakle onno browser diye try koro.",
+            "Google login could not be completed — no account was returned. Google page-e account select na kore back kore thakle abar try koro. Bar bar hole browser cookies allow + adblocker off kore try koro.",
           );
         }
       })
@@ -219,6 +221,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       throw new Error("Firebase authentication is not configured.");
     }
+    // Fail fast when the browser blocks Firebase's storage (desktop privacy
+    // modes / cookie blockers). Otherwise BOTH popup (hangs forever) and
+    // redirect (silently returns no user) fail with no visible reason.
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+    } catch (err) {
+      const code =
+        typeof err === "object" && err !== null && "code" in err
+          ? String((err as { code?: unknown }).code ?? "")
+          : "";
+      if (code === "auth/web-storage-unsupported") {
+        throw new Error(
+          "Browser cookies/site-storage block kore rekheche, tai login hocche na. Cookies allow + adblocker off kore abar try koro.",
+        );
+      }
+      throw err;
+    }
     // Try a popup first (fast, no page reload). Some desktop browsers block
     // the popup's third-party storage/cookies, in which case the popup
     // promise NEVER settles (no resolve, no reject) and the UI would hang
@@ -264,7 +283,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
         } catch {}
-        await signInWithRedirect(auth, googleProvider);
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectErr) {
+          // Redirect never started (e.g. unauthorized domain) — clear the
+          // flag so a later reload doesn't show a stale "not completed" error.
+          try {
+            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+          } catch {}
+          throw redirectErr;
+        }
         return null;
       }
       if (code === "auth/popup-closed-by-user") {
