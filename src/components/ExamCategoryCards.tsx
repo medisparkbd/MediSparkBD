@@ -123,15 +123,14 @@ export default function ExamCategoryCards({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="mb-10 text-center">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
-          Public Exams
-        </p>
-        <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
-          Choose Your Exam
+      <div className="relative mb-10 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-6 py-8 text-center shadow-lg shadow-black/20 sm:px-10 sm:py-10">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
+        <h2 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
+          Explore Public Exams
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-neutral-400">
-          Choose your exam category to see live, upcoming and previous exams.
+        <p className="relative mx-auto mt-3 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
+          তোমার পছন্দের পরীক্ষার ক্যাটাগরি নির্বাচন করো
         </p>
       </div>
 
