@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import SectionHeader from "@/components/SectionHeader";
+import SectionHeading, { ShirtIcon } from "@/components/home/SectionHeading";
 import type { JerseyItem } from "@/lib/content-admin";
 
 const AUTO_SLIDE_MS = 4000;
@@ -11,12 +11,8 @@ const RESUME_AFTER_INTERACTION_MS = 3500;
 
 export default function JerseyGallery({
   jerseys,
-  title,
-  description,
 }: {
   jerseys: JerseyItem[];
-  title?: string;
-  description?: string;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -87,133 +83,129 @@ export default function JerseyGallery({
     >
       <div className="pointer-events-none absolute left-1/2 top-24 h-80 w-80 -translate-x-1/2 rounded-full bg-primary-600/10 blur-3xl" />
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <SectionHeader
-          label="Premium Jersey"
-          title={title ?? "Jersey of MediSpark"}
-          description={description ?? "Wear the spirit of MediSpark — our premium jersey, designed for champions."}
-        />
+        <SectionHeading icon={ShirtIcon}>Premium Jersey of MediSpark</SectionHeading>
 
-        {/* Portrait product showcase — centered, compact, never full-width. */}
-        <div className="mx-auto mt-12 w-full max-w-[300px] sm:max-w-[340px]">
-          <div className="rounded-3xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5">
+        {/* Premium showcase — single outer frame → full jersey image. */}
+        <div className="mx-auto mt-12 w-full max-w-[360px] sm:max-w-[400px]">
+          <div className="relative">
+          <div
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="Jersey of MediSpark gallery"
+            className="relative select-none overflow-hidden rounded-3xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20"
+            onMouseEnter={() => hasMultiple && setPaused(true)}
+            onMouseLeave={() => hasMultiple && setPaused(false)}
+            onFocus={() => hasMultiple && setPaused(true)}
+            onBlur={() => hasMultiple && setPaused(false)}
+            onTouchStart={(event) => {
+              touchStartX.current = event.touches[0].clientX;
+              if (hasMultiple) setPaused(true);
+            }}
+            onTouchEnd={(event) => {
+              if (touchStartX.current === null) return;
+              const deltaX = event.changedTouches[0].clientX - touchStartX.current;
+              touchStartX.current = null;
+              if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) {
+                if (hasMultiple) pauseTemporarily();
+                return;
+              }
+              touchSwiped.current = true;
+              goTo(activeIndex + (deltaX < 0 ? 1 : -1));
+              pauseTemporarily();
+            }}
+            onClickCapture={(event) => {
+              if (touchSwiped.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                touchSwiped.current = false;
+              }
+            }}
+          >
+            {/* Slides — one full-bleed portrait image area, images fill the frame. */}
             <div
-              role="region"
-              aria-roledescription="carousel"
-              aria-label="Jersey of MediSpark gallery"
-              className="relative select-none overflow-hidden rounded-2xl bg-gradient-to-b from-dark-850 to-dark-950"
-              onMouseEnter={() => hasMultiple && setPaused(true)}
-              onMouseLeave={() => hasMultiple && setPaused(false)}
-              onFocus={() => hasMultiple && setPaused(true)}
-              onBlur={() => hasMultiple && setPaused(false)}
-              onTouchStart={(event) => {
-                touchStartX.current = event.touches[0].clientX;
-                if (hasMultiple) setPaused(true);
-              }}
-              onTouchEnd={(event) => {
-                if (touchStartX.current === null) return;
-                const deltaX = event.changedTouches[0].clientX - touchStartX.current;
-                touchStartX.current = null;
-                if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) {
-                  if (hasMultiple) pauseTemporarily();
-                  return;
-                }
-                touchSwiped.current = true;
-                goTo(activeIndex + (deltaX < 0 ? 1 : -1));
-                pauseTemporarily();
-              }}
-              onClickCapture={(event) => {
-                if (touchSwiped.current) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  touchSwiped.current = false;
-                }
-              }}
+              className="flex aspect-[3/4] touch-pan-y transition-transform duration-700 ease-out"
+              style={{ transform: `translateX(-${activeIndex * 100}%)` }}
             >
-              {/* Slides — tall portrait frame, images never distorted. */}
-              <div
-                className="flex aspect-[3/4] touch-pan-y transition-transform duration-700 ease-out"
-                style={{ transform: `translateX(-${activeIndex * 100}%)` }}
-              >
-                {slides.map((jersey, index) => (
-                  <div
-                    key={jersey.id}
-                    role="group"
-                    aria-roledescription="slide"
-                    aria-label={`${index + 1} of ${slideCount}: ${jersey.name}`}
-                    aria-hidden={index !== activeIndex}
-                    className="relative aspect-[3/4] w-full shrink-0"
-                  >
-                    {jersey.image ? (
-                      <button
-                        type="button"
-                        tabIndex={index === activeIndex ? 0 : -1}
-                        onClick={() => {
-                          if (index === activeIndex) setLightboxOpen(true);
-                        }}
-                        aria-label={`View the ${jersey.name} in larger size`}
-                        className="block h-full w-full cursor-zoom-in p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 sm:p-5"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={jersey.image}
-                          alt={jersey.name}
-                          draggable={false}
-                          loading={index === 0 ? "eager" : "lazy"}
-                          className="h-full w-full object-contain drop-shadow-[0_20px_40px_rgba(229,9,20,0.3)]"
-                        />
-                      </button>
-                    ) : null}
-                    {jersey.price > 0 && (
-                      <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary-600/40 bg-dark-950/80 px-3 py-1 text-xs font-semibold text-primary-400 backdrop-blur">
-                        ৳ {jersey.price.toLocaleString("en-IN")}
-                      </span>
-                    )}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-4 pt-10">
-                      <p className="truncate text-center text-sm font-bold text-white drop-shadow">
-                        {jersey.name}
+              {slides.map((jersey, index) => (
+                <div
+                  key={jersey.id}
+                  role="group"
+                  aria-roledescription="slide"
+                  aria-label={`${index + 1} of ${slideCount}: ${jersey.name}`}
+                  aria-hidden={index !== activeIndex}
+                  className="relative aspect-[3/4] w-full shrink-0"
+                >
+                  {jersey.image ? (
+                    <button
+                      type="button"
+                      tabIndex={index === activeIndex ? 0 : -1}
+                      onClick={() => {
+                        if (index === activeIndex) setLightboxOpen(true);
+                      }}
+                      aria-label={`View the ${jersey.name} in larger size`}
+                      className="block h-full w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={jersey.image}
+                        alt={jersey.name}
+                        draggable={false}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ) : null}
+                  {jersey.price > 0 && (
+                    <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary-600/40 bg-dark-950/80 px-3 py-1 text-xs font-semibold text-primary-400 backdrop-blur">
+                      ৳ {jersey.price.toLocaleString("en-IN")}
+                    </span>
+                  )}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-4 pt-10">
+                    <p className="truncate text-center text-sm font-bold text-white drop-shadow">
+                      {jersey.name}
+                    </p>
+                    {jersey.note && (
+                      <p className="mt-0.5 truncate text-center text-xs text-neutral-300">
+                        {jersey.note}
                       </p>
-                      {jersey.note && (
-                        <p className="mt-0.5 truncate text-center text-xs text-neutral-300">
-                          {jersey.note}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-
-              {/* Previous / Next controls */}
-              {hasMultiple && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      goTo(activeIndex - 1);
-                      pauseTemporarily();
-                    }}
-                    aria-label="Previous jersey"
-                    className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/70 text-heading backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M15 18l-6-6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      goTo(activeIndex + 1);
-                      pauseTemporarily();
-                    }}
-                    aria-label="Next jersey"
-                    className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/70 text-heading backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                  </button>
-                </>
-              )}
+                </div>
+              ))}
             </div>
+          </div>
+
+          {/* Previous / Next — attached to the outer frame sides, straddling the border. */}
+          {hasMultiple && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  goTo(activeIndex - 1);
+                  pauseTemporarily();
+                }}
+                aria-label="Previous jersey"
+                className="absolute left-0 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  goTo(activeIndex + 1);
+                  pauseTemporarily();
+                }}
+                aria-label="Next jersey"
+                className="absolute right-0 top-1/2 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </button>
+            </>
+          )}
 
             {/* Slide indicators */}
             {hasMultiple && (
@@ -261,7 +253,6 @@ export default function JerseyGallery({
                 </svg>
               </a>
             )}
-          </div>
         </div>
       </div>
 

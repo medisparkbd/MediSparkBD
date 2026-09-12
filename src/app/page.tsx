@@ -115,8 +115,6 @@ export default async function HomePage() {
     <JerseyGallery
       key="jersey"
       jerseys={activeJerseys}
-      title={jerseySection?.title ?? undefined}
-      description={jerseySection?.description ?? undefined}
     />
   );
 

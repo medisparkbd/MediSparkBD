@@ -154,8 +154,6 @@ export default async function HomeControlPage() {
   const jerseyNode: ReactNode = (
     <JerseyGallery
       jerseys={activeJerseys}
-      title={jerseySection?.title ?? undefined}
-      description={jerseySection?.description ?? undefined}
     />
   );
 

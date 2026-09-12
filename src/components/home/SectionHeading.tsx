@@ -84,3 +84,10 @@ export function TrophyIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function ShirtIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 4 4.5 6.5 3 10l2.5 1.5L7 9.5V20h10V9.5l1.5 2L21 10l-1.5-3.5L15 4a3 3 0 01-6 0z" />
+    </svg>
+  );
+}
