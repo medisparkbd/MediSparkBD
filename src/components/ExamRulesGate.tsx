@@ -24,57 +24,91 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
   const [secondTimerDeduction, setSecondTimerDeduction] = useState<number>(3);
   const [alreadyAttempted, setAlreadyAttempted] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      // Strict one-attempt check: if already completed, block start and show View Result
-      if (user) {
-        try {
-          const token = await user.getIdToken();
-          const priorRes = await fetch(`/api/exams/${encodeURIComponent(examId)}/prior-attempt`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            cache: "no-store",
-          });
-          const priorData = (await priorRes.json().catch(() => null)) as { hasPriorAttempt?: boolean } | null;
-          if (priorRes.ok && priorData?.hasPriorAttempt) {
-            setAlreadyAttempted(true);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // ignore prior check failure
-        }
-      }
-      const response = await fetch(`/api/exams/${examId}/rules`, {
-        cache: "no-store",
-      });
-      const data = (await response.json().catch(() => null)) as {
-        rules?: Rule[];
-        secondTimerEnabled?: boolean;
-        secondTimerDeduction?: number;
-      } | null;
-      if (!response.ok || !data) {
-        throw new Error("Failed to load rules.");
-      }
-      setRules(data.rules ?? []);
-      setSecondTimerEnabled(Boolean(data.secondTimerEnabled));
-      setSecondTimerDeduction(
-        typeof data.secondTimerDeduction === "number" && Number.isFinite(data.secondTimerDeduction) && data.secondTimerDeduction > 0
-          ? Number(data.secondTimerDeduction)
-          : 3,
-      );
-    } catch {
-      setError("Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  // Rules need no login — load them immediately on mount so the page never
+  // waits for Firebase auth / ID token before showing content.
   useEffect(() => {
-    void Promise.resolve().then(load);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on exam/user change
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/exams/${examId}/rules`, {
+          cache: "no-store",
+        });
+        const data = (await response.json().catch(() => null)) as {
+          rules?: Rule[];
+          secondTimerEnabled?: boolean;
+          secondTimerDeduction?: number;
+        } | null;
+        if (!response.ok || !data) {
+          throw new Error("Failed to load rules.");
+        }
+        if (cancelled) return;
+        setRules(data.rules ?? []);
+        setSecondTimerEnabled(Boolean(data.secondTimerEnabled));
+        setSecondTimerDeduction(
+          typeof data.secondTimerDeduction === "number" && Number.isFinite(data.secondTimerDeduction) && data.secondTimerDeduction > 0
+            ? Number(data.secondTimerDeduction)
+            : 3,
+        );
+      } catch {
+        if (!cancelled) setError("Something went wrong.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [examId]);
+
+  // Strict one-attempt check runs separately once the user is known — it
+  // never blocks the rules list above.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const priorRes = await fetch(`/api/exams/${encodeURIComponent(examId)}/prior-attempt`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: "no-store",
+        });
+        const priorData = (await priorRes.json().catch(() => null)) as { hasPriorAttempt?: boolean } | null;
+        if (!cancelled && priorRes.ok && priorData?.hasPriorAttempt) {
+          setAlreadyAttempted(true);
+        }
+      } catch {
+        // ignore prior check failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [examId, user]);
+
+  function retry() {
+    setError(null);
+    setLoading(true);
+    void fetch(`/api/exams/${examId}/rules`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json().catch(() => null)) as {
+          rules?: Rule[];
+          secondTimerEnabled?: boolean;
+          secondTimerDeduction?: number;
+        } | null;
+        if (!response.ok || !data) throw new Error("Failed to load rules.");
+        setRules(data.rules ?? []);
+        setSecondTimerEnabled(Boolean(data.secondTimerEnabled));
+        setSecondTimerDeduction(
+          typeof data.secondTimerDeduction === "number" && Number.isFinite(data.secondTimerDeduction) && data.secondTimerDeduction > 0
+            ? Number(data.secondTimerDeduction)
+            : 3,
+        );
+      })
+      .catch(() => setError("Something went wrong."))
+      .finally(() => setLoading(false));
+  }
 
   return (
     <div className="mt-8 rounded-2xl border border-ink/10 bg-dark-900 p-5 shadow-lg shadow-black/20 sm:p-6">
@@ -95,7 +129,7 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
           <p className="text-sm font-semibold text-red-400">{error}</p>
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() => void retry()}
             className="mt-4 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-primary-700"
           >
             Try Again

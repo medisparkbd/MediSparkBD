@@ -4,6 +4,7 @@ import {
   type Exam,
 } from "@/lib/exams-admin";
 import { fetchActiveCourseCategories } from "@/lib/course-categories-store";
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import type { Eligibility } from "@/lib/eligibility";
 import {
@@ -108,8 +109,14 @@ export async function fetchPublicExamById(
  * page renders. Actual access (course enrollment) is enforced server-side by
  * /api/exams/[id] when the student tries to participate.
  * Uses single-row fetch to avoid N+1 live-totals cost on rules page.
+ *
+ * Cached two ways for speed:
+ * - React `cache()` dedups the generateMetadata + page-component calls that
+ *   Next.js makes for the SAME request (was 2 heavy DB hits, now 1).
+ * - `unstable_cache` (30s, same as the public list) shares the row across
+ *   the back-to-back /rules + /prior-attempt API calls of one page load.
  */
-export async function fetchExamPageById(
+async function fetchExamPageUncached(
   id: string,
 ): Promise<PublicExam | null> {
   const { fetchExamById } = await import("@/lib/exams-admin");
@@ -117,6 +124,15 @@ export async function fetchExamPageById(
   if (!found || found.status === "draft") return null;
   return toPublicExam(found);
 }
+
+const fetchExamPageCached = unstable_cache(fetchExamPageUncached, ["examPageById"], {
+  revalidate: 30,
+  tags: ["exams"],
+});
+
+export const fetchExamPageById = cache((id: string): Promise<PublicExam | null> =>
+  fetchExamPageCached(id),
+);
 
 /**
  * Admin variant — same shape as the public catalog but includes drafts

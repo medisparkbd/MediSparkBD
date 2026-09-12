@@ -14,8 +14,12 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  // Use direct ID lookup — same unique Exam ID throughout the flow.
-  const exam = await fetchExamPageById(id);
+  // Exam meta + rule rows are independent DB reads — run them together
+  // instead of sequentially so the rules page loads ~2x faster.
+  const [exam, stored] = await Promise.all([
+    fetchExamPageById(id),
+    fetchExamRules(id),
+  ]);
   if (!exam) {
     // Distinguish missing ID vs draft to avoid false "No exam found" on status mismatches
     const { fetchExamById } = await import("@/lib/exams-admin");
@@ -28,7 +32,6 @@ export async function GET(
     }
     return NextResponse.json({ error: "Exam not found or not available." }, { status: 404 });
   }
-  const stored = await fetchExamRules(id);
   const rules = stored.length > 0 ? stored : buildDefaultExamRules(id);
   return NextResponse.json(
     {

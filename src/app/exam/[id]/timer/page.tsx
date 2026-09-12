@@ -36,11 +36,19 @@ export default function TimerSelectionPage({
     (async () => {
       try {
         const token = await user.getIdToken();
-        // Fetch exam details by exact Exam ID — the primary identifier throughout the flow
-        const examRes = await fetch(`/api/exams/${encodeURIComponent(examId)}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          cache: "no-store",
-        });
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+        // Exam details + prior-attempt are independent — fetch together
+        // instead of sequentially.
+        const [examRes, priorRes] = await Promise.all([
+          fetch(`/api/exams/${encodeURIComponent(examId)}`, {
+            headers,
+            cache: "no-store",
+          }),
+          fetch(`/api/exams/${encodeURIComponent(examId)}/prior-attempt`, {
+            headers,
+            cache: "no-store",
+          }),
+        ]);
         const examData = (await examRes.json().catch(() => ({}))) as {
           exam?: { id: string; title: string };
           error?: string;
@@ -53,13 +61,6 @@ export default function TimerSelectionPage({
         }
 
         // Check prior attempt — use dedicated prior-attempt endpoint (exam ID is the primary identifier)
-        const priorRes = await fetch(
-          `/api/exams/${encodeURIComponent(examId)}/prior-attempt`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            cache: "no-store",
-          },
-        );
         const priorData = (await priorRes.json().catch(() => ({}))) as {
           hasPriorAttempt?: boolean;
           exam?: {

@@ -190,10 +190,19 @@ export default function ExamParticipationArea({
     (async () => {
       try {
         const token = await user.getIdToken();
-        const response = await fetch(`/api/exams/${encodeURIComponent(examId)}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          cache: "no-store",
-        });
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+        // Exam meta + prior-attempt are independent — fetch together so the
+        // page waits for one round trip instead of two.
+        const [response, priorRes] = await Promise.all([
+          fetch(`/api/exams/${encodeURIComponent(examId)}`, {
+            headers,
+            cache: "no-store",
+          }),
+          fetch(`/api/exams/${encodeURIComponent(examId)}/prior-attempt`, {
+            headers,
+            cache: "no-store",
+          }),
+        ]);
         const data = (await response.json().catch(() => ({}))) as {
           exam?: TakingExam;
           questions?: TakingQuestion[];
@@ -208,10 +217,6 @@ export default function ExamParticipationArea({
         setQuestions(data.questions ?? []);
         // Strict one-attempt: check if already has completed attempt for this public exam
         try {
-          const priorRes = await fetch(`/api/exams/${encodeURIComponent(examId)}/prior-attempt`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            cache: "no-store",
-          });
           const priorData = (await priorRes.json().catch(() => ({}))) as { hasPriorAttempt?: boolean };
           if (!cancelled && priorRes.ok && priorData.hasPriorAttempt) {
             // Already appeared — fetch existing result and show View Result instead of Start Exam
