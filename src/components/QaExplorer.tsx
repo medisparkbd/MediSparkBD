@@ -256,9 +256,22 @@ export default function QaExplorer({
 
   return (
     <div>
+      {!selectedSubject && (
+        <div className="relative mb-8 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-6 py-8 text-center shadow-lg shadow-black/20 sm:px-10 sm:py-10">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
+          <h2 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
+            Choose a Subject to View Questions
+          </h2>
+          <p className="relative mx-auto mt-3 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
+            নিচের বিষয়গুলোতে ক্লিক করে বিভিন্ন প্রশ্ন ও তাদের উত্তর দেখতে পারো।
+          </p>
+        </div>
+      )}
+
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          {selectedSubject ? (
+          {selectedSubject && (
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-extrabold text-heading">
                 {selectedSubject.name}
@@ -271,29 +284,30 @@ export default function QaExplorer({
                 Change Subject
               </button>
             </div>
-          ) : (
-            <p className="text-sm font-medium text-neutral-400">
-              Select a subject to browse its questions.
-            </p>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => void openAsk()}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
-        >
-          <svg
-            className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <p className="text-sm font-medium text-neutral-400">
+            তোমার যেকোনো প্রশ্ন এখানে করতে পারো
+          </p>
+          <button
+            type="button"
+            onClick={() => void openAsk()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Ask a Question
-        </button>
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Ask a Question
+          </button>
+        </div>
       </div>
 
       {askGuidance && (

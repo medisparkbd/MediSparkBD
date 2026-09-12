@@ -21,6 +21,12 @@ const ENROLLMENT_FREE_SECTIONS = new Set([
   "/dashboard/exam-result",
 ]);
 
+/** Full-row cards at the top of My Dashboard, in this exact order. */
+const FULL_ROW_HREFS = [
+  "/dashboard/enrolled-courses",
+  "/dashboard/exam-result",
+];
+
 function cardToSection(card: DashboardCard): DashboardSection {
   return {
     title: card.title,
@@ -80,10 +86,21 @@ export default function DashboardHome({
   // Access Permission Card instead of its page. The user stays logged in.
   const hasEnrollment = access.hasEnrollment;
 
-  const sections: DashboardSection[] =
+  const sections: DashboardSection[] = (
     cards.length > 0
       ? cards.map(cardToSection)
-      : dashboardSections;
+      : dashboardSections
+  )
+    .slice()
+    // Stable sort: My Enrolled Courses first, Exam Result second, the
+    // remaining cards keep their existing relative order.
+    .sort((a, b) => {
+      const rank = (href: string) => {
+        const index = FULL_ROW_HREFS.indexOf(href);
+        return index === -1 ? FULL_ROW_HREFS.length : index;
+      };
+      return rank(a.href) - rank(b.href);
+    });
 
   return (
     <main className="flex-1 bg-dark-950">
@@ -108,7 +125,7 @@ export default function DashboardHome({
               <DashboardSectionCard
                 key={section.href}
                 section={section}
-                wide={section.href === "/dashboard/enrolled-courses"}
+                wide={FULL_ROW_HREFS.includes(section.href)}
                 locked={locked}
                 onLockedClick={() => setPermissionOpen(true)}
               />
