@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import type { StudentExamResultDetail } from "@/lib/my-exam-results";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type LoadState = "loading" | "error" | "missing" | "ready";
 
@@ -136,15 +137,7 @@ export default function ExamResultDetailView({ examId }: { examId: string }) {
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-      <Link
-        href="/dashboard/exam-result"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Exam Results
-      </Link>
+      <SmartBackButton href="/dashboard/exam-result" label="Exam Results" />
 
       {/* Header */}
       <header className="mt-5 text-center">

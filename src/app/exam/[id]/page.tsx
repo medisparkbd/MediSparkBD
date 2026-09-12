@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
 import { fetchExamPageById } from "@/lib/public-exams-server";
 import { categoryLabels, type ExamCategory } from "@/lib/public-exams";
 import ExamParticipationArea from "@/components/auth/ExamParticipationArea";
 import ExamDetailInfo from "@/components/ExamDetailInfo";
 import HideDuringExam from "@/components/exam/HideDuringExam";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const revalidate = 300;
 
@@ -45,12 +45,7 @@ export default async function ExamDetailPage({ params }: ExamPageProps) {
       <section className="exam-page-section mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <HideDuringExam>
           {/* Back link */}
-          <Link
-            href="/exam"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-          >
-            ← All Categories
-          </Link>
+          <SmartBackButton href="/exam" label="All Categories" />
 
           {/* Exam banner */}
           <div className="mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 import type {
   StudentExamResultGroup,
   StudentExamResultRow,
@@ -284,15 +285,7 @@ export default function ExamResultsView() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Dashboard
-      </Link>
+      <SmartBackButton href="/dashboard" label="Back to Dashboard" />
 
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">

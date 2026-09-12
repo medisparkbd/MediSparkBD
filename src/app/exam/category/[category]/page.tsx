@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicExamList from "@/components/PublicExamList";
 import {
@@ -11,6 +10,7 @@ import {
   fetchPublicExams,
   resolveExamCategoryId,
 } from "@/lib/public-exams-server";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const revalidate = 300;
 
@@ -70,12 +70,7 @@ export default async function ExamCategoryPage({ params }: CategoryPageProps) {
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
-        <Link
-          href="/exam"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-        >
-          ← All Categories
-        </Link>
+        <SmartBackButton href="/exam" label="All Categories" />
         <h1 className="mt-3 text-2xl font-extrabold text-heading sm:text-3xl">
           {valid.label}
         </h1>

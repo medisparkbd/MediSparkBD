@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import PermissionGate from "@/components/auth/PermissionGate";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 import { recordRecentView } from "@/components/dashboard/CourseLevels";
 import {
   FLOW5_FORMATS,
@@ -34,12 +35,7 @@ export function examFlowSubjectHref(slug: string, subjectKey: Flow5SubjectKey) {
 }
 
 function BackLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link href={href} className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-      {label}
-    </Link>
-  );
+  return <SmartBackButton href={href} label={label} />;
 }
 
 function LoadingView({ label }: { label: string }) {

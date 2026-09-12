@@ -13,6 +13,7 @@ import { getLiveCourse } from "@/lib/course-catalog";
 import { getCourseKind } from "@/lib/enrollments";
 import CourseEnrollFlow from "@/components/auth/CourseEnrollFlow";
 import CourseRoutineViewer from "@/components/CourseRoutineViewer";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 // Cached at the edge; admin changes appear within 60s.
 export const revalidate = 300;
@@ -57,24 +58,7 @@ export default async function CourseDetailsPage({
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <Link
-          href="/courses"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            viewBox="0 0 24 24"
-          >
-            <path d="M19 12H5" />
-            <path d="m12 19-7-7 7-7" />
-          </svg>
-          All Courses
-        </Link>
+        <SmartBackButton href="/courses" label="All Courses" />
 
         {/* ── Course Card (student-facing card view) ── */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">

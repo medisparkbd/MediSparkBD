@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import ExamParticipationArea from "@/components/auth/ExamParticipationArea";
 import HideDuringExam from "@/components/exam/HideDuringExam";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type ExamMeta = {
   id: string;
@@ -89,12 +90,10 @@ export default function CourseExamPage() {
       <section className="exam-page-section mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <HideDuringExam>
           {/* Back link */}
-          <Link
+          <SmartBackButton
             href={`/dashboard/enrolled-courses/${slug}`}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-          >
-            ← Back to Course
-          </Link>
+            label="Back to Course"
+          />
 
           {/* Course exam header */}
           {exam && (

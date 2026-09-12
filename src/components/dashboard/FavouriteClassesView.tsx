@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessGate } from "@/components/auth/AccessGuard";
+import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type FavClass = {
   item_id: string;
@@ -66,10 +67,7 @@ export default function FavouriteClassesView() {
   return (
     <AccessGate requirement="enrolled" loadingLabel="Loading favourite classes...">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        <Link href="/dashboard/favourites" className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-          Favourite
-        </Link>
+        <SmartBackButton href="/dashboard/favourites" label="Favourite" />
         <header className="mt-4">
           <h1 className="text-2xl font-extrabold text-heading sm:text-3xl">Favourite Classes</h1>
           <p className="mt-1 text-sm text-neutral-400">Classes you marked as favourite — only yours, no one else&apos;s.</p>

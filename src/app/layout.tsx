@@ -8,6 +8,7 @@ import { WebsiteSettingsProvider } from "@/components/WebsiteSettingsProvider";
 import { AuthProvider } from "@/lib/auth-context";
 import HideOnAdmin from "@/components/admin/HideOnAdmin";
 import { ExamLockProvider } from "@/components/exam/ExamLockContext";
+import { NavHistoryProvider } from "@/components/navigation/NavHistoryContext";
 import AnnouncementBar from "@/components/home/AnnouncementBar";
 import { getActiveLogo, fetchThemeLogos } from "@/lib/logo-store";
 import { getWebsiteSettingsWithFallback } from "@/lib/website-settings";
@@ -132,6 +133,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             >
               <AuthProvider>
                 <ExamLockProvider>
+                  <NavHistoryProvider>
                   <HideOnAdmin>
                     <AnnouncementBar />
                     <Navbar config={navbarConfig} />
@@ -141,6 +143,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <Footer />
                     <BottomNav />
                   </HideOnAdmin>
+                  </NavHistoryProvider>
                 </ExamLockProvider>
               </AuthProvider>
             </LogoProvider>
