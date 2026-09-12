@@ -1,14 +1,14 @@
 # MediSpark — Project Memory & Workflow
 
 ## What this project is
-MediSpark (bloodarenabd.tech) — HSC academic & medical admission preparation platform.
+MediSparkBD HSC academic & medical admission preparation platform.
 Next.js 16 (App Router) + React 19 + TypeScript + Tailwind, package manager: **pnpm**.
 
 ## Language
 User communicates in Bengali/Banglish — reply in the same style.
 
 ## Infrastructure (current, as of 2026-09)
-- **Hosting:** Vercel — production project `medisparkbd` (account `eduall2005pass-8109s-projects`),
+- **Hosting:** Vercel — production project `medisparkbd` (account `medisparkbd-5969-projects`),
   connected to GitHub repo `medisparkbd/MediSparkBD` (single working repo).
   Live at bloodarenabd.tech + medisparkbd-ecru.vercel.app.
 - **Domain:** bloodarenabd.tech → Vercel DNS (ns1/ns2.vercel-dns.com)
@@ -31,8 +31,6 @@ User communicates in Bengali/Banglish — reply in the same style.
 
 ## Sync rule (IMPORTANT — do this FIRST)
 Single working repo: `medisparkbd/MediSparkBD` (remote `medisparkbd`).
-The old repos (`eduall2005pass/clinic`, old `medisparkbd` mirror) are deleted —
-ignore any `origin`/`clinic` remotes; never push to them.
 **Before starting ANY work, always sync first:**
 
 ```bash
