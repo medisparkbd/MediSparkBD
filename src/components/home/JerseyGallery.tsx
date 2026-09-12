@@ -88,11 +88,11 @@ export default function JerseyGallery({
         {/* Premium showcase — single outer frame → full jersey image. */}
         <div className="mx-auto mt-12 w-full max-w-[360px] sm:max-w-[400px]">
           <div className="relative">
-          <div
-            role="region"
-            aria-roledescription="carousel"
-            aria-label="Jersey of MediSpark gallery"
-            className="relative select-none overflow-hidden rounded-3xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20"
+            <div
+              role="region"
+              aria-roledescription="carousel"
+              aria-label="Jersey of MediSpark gallery"
+              className="relative select-none overflow-hidden rounded-3xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20"
             onMouseEnter={() => hasMultiple && setPaused(true)}
             onMouseLeave={() => hasMultiple && setPaused(false)}
             onFocus={() => hasMultiple && setPaused(true)}
@@ -185,7 +185,7 @@ export default function JerseyGallery({
                   pauseTemporarily();
                 }}
                 aria-label="Previous jersey"
-                className="absolute left-0 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
+                className="absolute left-0 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400 sm:h-9 sm:w-9"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                   <path d="M15 18l-6-6 6-6" />
@@ -198,14 +198,15 @@ export default function JerseyGallery({
                   pauseTemporarily();
                 }}
                 aria-label="Next jersey"
-                className="absolute right-0 top-1/2 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400"
+                className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-ink/10 bg-dark-950/90 text-heading shadow-md shadow-black/30 backdrop-blur transition hover:border-primary-600/60 hover:text-primary-400 sm:h-9 sm:w-9"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                   <path d="M9 6l6 6-6 6" />
                 </svg>
               </button>
-            </>
-          )}
+              </>
+            )}
+          </div>
 
             {/* Slide indicators */}
             {hasMultiple && (
