@@ -27,6 +27,20 @@ export type ExamKind = "public" | "practice" | "enrolled";
 export type ExamStatus = "draft" | "published" | "closed";
 export type ExamMode = "live" | "practice";
 
+/** Flow 5 exam category. NULL/undefined = legacy exam (never listed in Flow 5). */
+export type Flow5ExamFormat = "topic-wise" | "paper-final" | "subject-final" | "final-model";
+
+export const FLOW5_EXAM_FORMATS: Flow5ExamFormat[] = [
+  "topic-wise",
+  "paper-final",
+  "subject-final",
+  "final-model",
+];
+
+export function normalizeFlow5ExamFormat(value: unknown): Flow5ExamFormat | null {
+  return (FLOW5_EXAM_FORMATS as string[]).includes(String(value)) ? (value as Flow5ExamFormat) : null;
+}
+
 export const EXAM_KINDS: ExamKind[] = ["public", "practice", "enrolled"];
 export const EXAM_MODES: ExamMode[] = ["live", "practice"];
 
@@ -73,6 +87,10 @@ export type Exam = {
   ruleTemplate?: string | null;
   /** Marks per question (auto-calculates totalMarks). */
   marksPerQuestion?: number | null;
+  /** Flow 5 exam category (NULL = legacy exam, never listed in Flow 5). */
+  examFormat?: Flow5ExamFormat | null;
+  /** Flow 5 topic-wise subject key (one of the 8 fixed subjects). */
+  topicSubject?: string | null;
 };
 
 export type ExamQuestion = {
@@ -145,6 +163,8 @@ type ExamRow = {
   category_id?: string | null;
   rule_template?: string | null;
   marks_per_question?: string | number | null;
+  exam_format?: string | null;
+  topic_subject?: string | null;
 };
 
 type QuestionRow = {
@@ -232,6 +252,8 @@ function rowToExam(row: ExamRow): Exam {
       row.marks_per_question === undefined || row.marks_per_question === null
         ? null
         : toNumber(row.marks_per_question as string | number),
+    examFormat: normalizeFlow5ExamFormat(row.exam_format),
+    topicSubject: typeof row.topic_subject === "string" && row.topic_subject ? row.topic_subject : null,
   };
 }
 
@@ -513,6 +535,22 @@ async function ensureTables(): Promise<void> {
   } catch {
     // Best effort — column may already exist.
   }
+  // ── Flow 5 exam categories (additive; legacy rows keep NULL = old Exam flow) ──
+  try {
+    await ensureColumn(
+      "exams",
+      "exam_format",
+      "`exam_format` ENUM('topic-wise','paper-final','subject-final','final-model') NULL DEFAULT NULL AFTER course_type",
+    );
+    await ensureColumn("exams", "topic_subject", "`topic_subject` VARCHAR(64) NULL DEFAULT NULL AFTER exam_format");
+  } catch {
+    // Best effort — columns may already exist.
+  }
+  try {
+    await exec(`CREATE INDEX idx_exams_flow5_format ON exams(exam_format, topic_subject, status)`);
+  } catch {
+    // Best effort — index may already exist.
+  }
   await exec(`CREATE TABLE IF NOT EXISTS exam_courses (
     exam_id VARCHAR(64) NOT NULL,
     course_id VARCHAR(191) NOT NULL,
@@ -592,7 +630,7 @@ async function ensureTables(): Promise<void> {
 }
 
 const EXAM_COLUMNS = `id, title, description, banner_url, kind, exam_mode, batch_id,
-  subject, chapter_id, sort_order, course_type, duration_minutes,
+  subject, chapter_id, sort_order, course_type, exam_format, topic_subject, duration_minutes,
   total_marks, marks_per_question, negative_marks, negative_enabled, negative_per_wrong,
   second_timer_enabled, second_timer_deduction, question_count, status,
   featured, scheduled_at, ends_at, answer_key, category_id, rule_template`;
@@ -910,15 +948,49 @@ export async function saveExam(
     [id],
   );
   const isNew = existing.length === 0;
+  // ── Flow 5 exam category (additive; NULL keeps the legacy Exam flow) ──
+  // Topic-wise exams must carry one subject; other formats never keep one
+  // (prevents mixing categories). When the caller does not send these keys
+  // (e.g. the Public Exam Control payload), preserve the stored values so an
+  // unrelated edit never wipes or leaks a Flow-5 category.
+  const carriesFormatKey =
+    Object.prototype.hasOwnProperty.call(input, "examFormat") ||
+    Object.prototype.hasOwnProperty.call(input, "exam_format");
+  const carriesSubjectKey =
+    Object.prototype.hasOwnProperty.call(input, "topicSubject") ||
+    Object.prototype.hasOwnProperty.call(input, "topic_subject");
+  let examFormat = carriesFormatKey
+    ? normalizeFlow5ExamFormat(input.examFormat ?? (input as Record<string, unknown>).exam_format)
+    : null;
+  let topicSubject: string | null = null;
+  if (!isNew && (!carriesFormatKey || !carriesSubjectKey)) {
+    try {
+      const prev = await query<{ exam_format: string | null; topic_subject: string | null }[]>(
+        `SELECT exam_format, topic_subject FROM exams WHERE id = ? LIMIT 1`,
+        [id],
+      );
+      if (!carriesFormatKey) examFormat = normalizeFlow5ExamFormat(prev[0]?.exam_format);
+      if (!carriesSubjectKey) topicSubject = prev[0]?.topic_subject ?? null;
+    } catch {
+      // Best effort — fall through to input-derived values.
+    }
+  }
+  if (carriesSubjectKey) {
+    const rawTopicSubject = asString(input.topicSubject ?? (input as Record<string, unknown>).topic_subject);
+    topicSubject = examFormat === "topic-wise" && rawTopicSubject ? rawTopicSubject.slice(0, 64) : null;
+  } else if (examFormat !== "topic-wise") {
+    topicSubject = null;
+  }
   await exec(
     `INSERT INTO exams (${EXAM_COLUMNS}, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE title = VALUES(title), description = VALUES(description),
        banner_url = VALUES(banner_url),
        kind = VALUES(kind), exam_mode = VALUES(exam_mode), batch_id = VALUES(batch_id),
        subject = VALUES(subject), chapter_id = VALUES(chapter_id), sort_order = VALUES(sort_order),
        category_id = VALUES(category_id), rule_template = VALUES(rule_template),
        course_type = VALUES(course_type),
+       exam_format = VALUES(exam_format), topic_subject = VALUES(topic_subject),
        duration_minutes = VALUES(duration_minutes),
        total_marks = VALUES(total_marks), marks_per_question = VALUES(marks_per_question), negative_marks = VALUES(negative_marks),
        negative_enabled = VALUES(negative_enabled),
@@ -941,6 +1013,8 @@ export async function saveExam(
       chapterId,
       sortOrder,
       input.courseType === "Admission" ? "Admission" : "Academic",
+      examFormat,
+      topicSubject,
       Math.max(1, Number(input.durationMinutes) || 30),
       totalMarks,
       marksPerQuestion,
@@ -1333,7 +1407,7 @@ export async function duplicateExam(sourceId: string, adminUid: string): Promise
   const maxRows = await query<{ m: number | null }[]>(`SELECT MAX(sort_order) AS m FROM exams`);
   const nextOrder = (maxRows[0]?.m ?? 0) + 1;
   await exec(
-    `INSERT INTO exams (${EXAM_COLUMNS}, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO exams (${EXAM_COLUMNS}, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       newId,
       newTitle,
@@ -1346,6 +1420,8 @@ export async function duplicateExam(sourceId: string, adminUid: string): Promise
       src.chapter_id,
       nextOrder,
       src.course_type,
+      src.exam_format ?? null,
+      src.topic_subject ?? null,
       src.duration_minutes,
       0,
       (src as unknown as { marks_per_question?: string | number | null }).marks_per_question ?? 1,

@@ -62,7 +62,7 @@ const EMPTY_FORM = {
   status: "unpublished" as "published" | "unpublished",
   couponEnabled: false,
   featured: false,
-  contentLayout: "flow-1" as "flow-1" | "flow-2" | "flow-3" | "flow-4",
+  contentLayout: "flow-1" as "flow-1" | "flow-2" | "flow-3" | "flow-4" | "flow-5",
   totalClasses: "",
   totalExams: "",
   courseDuration: "",
@@ -106,7 +106,7 @@ function toForm(course: CatalogCourse): FormState {
     status: course.status,
     couponEnabled: course.couponEnabled,
     featured: course.featured,
-    contentLayout: (course.contentLayout === "flow-1" || course.contentLayout === "flow-2" || course.contentLayout === "flow-3" || course.contentLayout === "flow-4"
+    contentLayout: (course.contentLayout === "flow-1" || course.contentLayout === "flow-2" || course.contentLayout === "flow-3" || course.contentLayout === "flow-4" || course.contentLayout === "flow-5"
       ? course.contentLayout
       : course.contentLayout === "paper" ? "flow-2" : course.contentLayout === "subject" ? "flow-3" : "flow-1"),
     totalClasses: course.totalClasses != null ? String(course.totalClasses) : "",
@@ -671,7 +671,7 @@ export default function CourseManager({
                 <p className="mb-3 text-xs text-neutral-500">
                   Choose how content is organized for students. This cannot be changed later without affecting existing content.
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   {/* Flow 1 — Direct */}
                   <button
                     type="button"
@@ -843,6 +843,51 @@ export default function CourseManager({
                     </div>
                     <p className="mt-2 text-[10px] leading-tight text-neutral-500">Biology, Chemistry, Physics etc. → video/PDF/note/image/audio/quiz</p>
                     {form.contentLayout === "flow-4" && (
+                      <div className="absolute right-2 top-2">
+                        <svg className="h-5 w-5 text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Flow 5 — Exam Flow (NEW: Course → 4 Exam Cards) */}
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, contentLayout: "flow-5" })}
+                    className={`group relative flex flex-col items-start rounded-xl border p-4 text-left transition ${
+                      form.contentLayout === "flow-5"
+                        ? "border-primary-500/60 bg-primary-600/10 shadow-md shadow-primary-900/20"
+                        : "border-ink/15 bg-dark-900 hover:border-primary-500/30"
+                    }`}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <span className={`text-sm font-bold ${form.contentLayout === "flow-5" ? "text-primary-300" : "text-heading"}`}>
+                        Flow 5
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        form.contentLayout === "flow-5"
+                          ? "bg-primary-500/20 text-primary-300"
+                          : "bg-ink/10 text-neutral-500"
+                      }`}>
+                        Exam Flow
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-neutral-400">Course → 4 exam cards (topic-wise + finals)</p>
+                    {/* Hierarchy preview */}
+                    <div className="mt-3 w-full rounded-lg border border-ink/10 bg-dark-950 p-2.5">
+                      <div className="flex flex-col gap-1 text-[10px]">
+                        <div className="rounded bg-primary-500/15 px-2 py-1 text-center font-bold text-primary-300">Course</div>
+                        <div className="ml-2 text-center text-neutral-600">↓</div>
+                        <div className="rounded bg-ink/10 px-2 py-1 text-center font-semibold text-neutral-300">Topic-wise / Paper / Subject / Model</div>
+                        <div className="ml-2 text-center text-neutral-600">↓</div>
+                        <div className="rounded bg-ink/10 px-2 py-1 text-center font-semibold text-neutral-300">Subject (topic-wise only)</div>
+                        <div className="ml-2 text-center text-neutral-600">↓</div>
+                        <div className="rounded bg-ink/10 px-2 py-1 text-center font-semibold text-neutral-300">Exam</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[10px] leading-tight text-neutral-500">Topic-wise → 8 subjects; finals list exams directly</p>
+                    {form.contentLayout === "flow-5" && (
                       <div className="absolute right-2 top-2">
                         <svg className="h-5 w-5 text-primary-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

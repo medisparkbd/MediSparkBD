@@ -50,6 +50,10 @@ export type Exam = {
   categoryId?: string | null;
   /** Featured public exams auto-appear in the homepage slider. */
   featured?: boolean;
+  /** Flow 5 exam category (null/"" = legacy exam, old Exam flow). */
+  examFormat?: "topic-wise" | "paper-final" | "subject-final" | "final-model" | "" | null;
+  /** Flow 5 topic-wise subject key (one of the 8 fixed subjects). */
+  topicSubject?: string | null;
 };
 
 /** When set, the manager is scoped to one Course Control category. */
@@ -81,6 +85,8 @@ const EMPTY = {
   ruleTemplate: "academic" as string,
   questionCount: "30",
   marksPerQuestion: "1",
+  examFormat: "" as "" | "topic-wise" | "paper-final" | "subject-final" | "final-model",
+  topicSubject: "",
 };
 
 function generateExamId(title?: string): string {
@@ -289,6 +295,8 @@ export default function ExamManager({
       ruleTemplate: tpl || "academic",
       questionCount: String(qc || 30),
       marksPerQuestion: String(mpq ?? 1),
+      examFormat: (exam.examFormat ?? "") as typeof EMPTY.examFormat,
+      topicSubject: exam.topicSubject ?? "",
     });
     setCourseIds(exam.courseIds ?? []);
     setFormCategoryId(exam.categoryId ?? "");
@@ -307,6 +315,12 @@ export default function ExamManager({
     // Title required in all modes.
     if (!form.title.trim()) {
       setNotice({ kind: "error", text: "Exam Title is required." });
+      return;
+    }
+    // Flow 5: topic-wise enrolled exams must belong to exactly one subject
+    // so the Topic-wise → Subject → Exams branch never mixes subjects.
+    if (!fixedCategory && form.kind === "enrolled" && (form as unknown as { examFormat?: string }).examFormat === "topic-wise" && !(form as unknown as { topicSubject?: string }).topicSubject?.trim()) {
+      setNotice({ kind: "error", text: "Select a subject for this Topic-wise exam." });
       return;
     }
     // Keep the exam's category stable: fixed inside a category page.
@@ -673,6 +687,14 @@ export default function ExamManager({
                     ★ Featured
                   </span>
                 )}
+                {exam.examFormat && (
+                  <span
+                    title={exam.examFormat === "topic-wise" && exam.topicSubject ? `Topic-wise · ${exam.topicSubject}` : "Flow 5 exam category"}
+                    className="shrink-0 rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-500/20 admin-dark:bg-indigo-500/10 admin-dark:text-indigo-300"
+                  >
+                    {exam.examFormat === "topic-wise" ? "Topic-wise" : exam.examFormat === "paper-final" ? "Paper Final" : exam.examFormat === "subject-final" ? "Subject Final" : "Final Model"}
+                  </span>
+                )}
               </div>
               {/* Second line: ONLY Subject · Mark · Minute · Start · End — clean subtle style */}
               <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium leading-relaxed text-slate-500 admin-dark:text-slate-400">
@@ -1006,6 +1028,53 @@ export default function ExamManager({
                         </div>
                       )}
                     </div>
+                  )}
+                  {allowEnrolled && form.kind === "enrolled" && (
+                    <>
+                      <div>
+                        <label className={labelClass} htmlFor="ex-format">Flow 5 exam category</label>
+                        <select
+                          id="ex-format"
+                          className={inputClass}
+                          value={((form as unknown as { examFormat?: string }).examFormat ?? "") as "" | "topic-wise" | "paper-final" | "subject-final" | "final-model"}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              examFormat: event.target.value as "" | "topic-wise" | "paper-final" | "subject-final" | "final-model",
+                              topicSubject: event.target.value === "topic-wise" ? form.topicSubject : "",
+                            })
+                          }
+                        >
+                          <option value="">None (legacy Exam flow)</option>
+                          <option value="topic-wise">Topic-wise Exam</option>
+                          <option value="paper-final">Paper Final Exam</option>
+                          <option value="subject-final">Subject Final Exam</option>
+                          <option value="final-model">Final Model Test</option>
+                        </select>
+                        <p className="mt-1 text-[11px] text-slate-500">Only categorized exams appear in Flow 5 courses — one category per exam, never mixed.</p>
+                      </div>
+                      {(form as unknown as { examFormat?: string }).examFormat === "topic-wise" && (
+                        <div>
+                          <label className={labelClass} htmlFor="ex-topic-subject">Topic subject (1 of 8)</label>
+                          <select
+                            id="ex-topic-subject"
+                            className={inputClass}
+                            value={form.topicSubject ?? ""}
+                            onChange={(event) => setForm({ ...form, topicSubject: event.target.value })}
+                          >
+                            <option value="">Select a subject…</option>
+                            <option value="bio1-botany">Biology 1st Paper — Botany</option>
+                            <option value="bio2-zoology">Biology 2nd Paper — Zoology</option>
+                            <option value="chem1">Chemistry 1st Paper</option>
+                            <option value="chem2">Chemistry 2nd Paper</option>
+                            <option value="phy1">Physics 1st Paper</option>
+                            <option value="phy2">Physics 2nd Paper</option>
+                            <option value="english">English</option>
+                            <option value="gk">General Knowledge</option>
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="sm:col-span-2">
                     <MediaUploadField

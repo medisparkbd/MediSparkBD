@@ -37,11 +37,13 @@ export function normalizeCatalogCategory(value: unknown): CatalogCourseCategory 
  * Flow 2 (Paper):   Course → 1st Paper / 2nd Paper → Class / Exam / Materials / Archive → Chapter → Content
  * Flow 3 (Subject): Course → Subject → Class / Exam / Materials / Archive → Chapter → Content
  * Flow 4 (Direct Subject): Course Content → Subject → Content (no Chapter, no paper — direct per-subject contents)
+ * Flow 5 (Exam Flow): Course → Topic-wise / Paper Final / Subject Final / Final Model Test
+ *   (Topic-wise branches into 8 fixed subjects; other three list exams directly)
  *
  * Backward-compatible: old values 'auto'/'direct'/'paper'/'subject' are
  * mapped to the corresponding flow on read.
  */
-export type CourseContentLayout = "flow-1" | "flow-2" | "flow-3" | "flow-4";
+export type CourseContentLayout = "flow-1" | "flow-2" | "flow-3" | "flow-4" | "flow-5";
 
 /** Flow metadata for display and hierarchy preview. */
 export type FlowMeta = {
@@ -76,13 +78,19 @@ export const CONTENT_FLOWS: FlowMeta[] = [
     description: "Course Content → Subject → Content — direct per-subject contents (video, PDF, note, image, audio, quiz, etc.) without Chapter layer.",
     hierarchy: ["Course Content", "Subject", "Content"],
   },
+  {
+    id: "flow-5",
+    label: "Flow 5 — Exam Flow",
+    description: "Course → Topic-wise / Paper Final / Subject Final / Final Model Test. Topic-wise branches into 8 fixed subjects; the other three list exams directly.",
+    hierarchy: ["Course", "Topic-wise / Paper Final / Subject Final / Final Model", "Subject (topic-wise only)", "Exam"],
+  },
 ];
 
 /** Map legacy content_layout values to the new flow system. */
 function normalizeContentLayoutRaw(value: unknown): CourseContentLayout {
   const v = String(value ?? "").trim().toLowerCase();
-  // Direct mapping for new values.
-  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-4") return v;
+  // Direct mapping for new values (flow-5 = exam flow; existing flows untouched).
+  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-4" || v === "flow-5") return v;
   // Backward compatibility: map old values.
   if (v === "direct") return "flow-1";
   if (v === "paper") return "flow-2";
@@ -272,11 +280,11 @@ async function ensureTables(): Promise<void> {
   } catch {
     // Best effort — column may already exist.
   }
-  // Course-wise content structure (flow-1 / flow-2 / flow-3 / flow-4 selection).
+  // Course-wise content structure (flow-1 … flow-5 selection).
   // Widens the ENUM to accept both old and new values during migration,
   // then narrows to only the new flow values once legacy rows are converted.
   try {
-    await ensureColumn("catalog_courses", "content_layout", "`content_layout` ENUM('auto','direct','paper','subject','flow-1','flow-2','flow-3','flow-4') NOT NULL DEFAULT 'auto' AFTER availability");
+    await ensureColumn("catalog_courses", "content_layout", "`content_layout` ENUM('auto','direct','paper','subject','flow-1','flow-2','flow-3','flow-4','flow-5') NOT NULL DEFAULT 'auto' AFTER availability");
   } catch {
     // Best effort — column may already exist.
   }
@@ -294,17 +302,18 @@ async function ensureTables(): Promise<void> {
     await exec(`UPDATE catalog_courses SET content_layout = 'flow-1' WHERE content_layout IN ('auto','direct')`);
     await exec(`UPDATE catalog_courses SET content_layout = 'flow-2' WHERE content_layout = 'paper'`);
     await exec(`UPDATE catalog_courses SET content_layout = 'flow-3' WHERE content_layout = 'subject'`);
-    // Narrow the ENUM to only flow values (including flow-4 for the new Course Content → Subject → Content flow).
+    // Narrow the ENUM to only flow values (including flow-4 for the new Course Content → Subject → Content flow
+    // and flow-5 for the Exam Flow). Existing rows keep their current layout.
     await exec(
-      `ALTER TABLE catalog_courses MODIFY COLUMN content_layout ENUM('flow-1','flow-2','flow-3','flow-4') NOT NULL DEFAULT 'flow-1'`,
+      `ALTER TABLE catalog_courses MODIFY COLUMN content_layout ENUM('flow-1','flow-2','flow-3','flow-4','flow-5') NOT NULL DEFAULT 'flow-1'`,
     );
   } catch {
     // Best effort — migration may have already run.
   }
-  // Ensure flow-4 is accepted even if the ENUM was previously narrowed to 3 values.
+  // Ensure flow-4/flow-5 are accepted even if the ENUM was previously narrowed to fewer values.
   try {
     await exec(
-      `ALTER TABLE catalog_courses MODIFY COLUMN content_layout ENUM('flow-1','flow-2','flow-3','flow-4') NOT NULL DEFAULT 'flow-1'`,
+      `ALTER TABLE catalog_courses MODIFY COLUMN content_layout ENUM('flow-1','flow-2','flow-3','flow-4','flow-5') NOT NULL DEFAULT 'flow-1'`,
     );
   } catch {
     // Best effort.

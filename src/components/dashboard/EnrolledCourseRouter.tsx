@@ -6,6 +6,7 @@ import { isDirectContent } from "@/lib/course-content";
 import { CourseSubjectsView } from "@/components/dashboard/CourseLevels";
 import DirectContentView from "@/components/dashboard/CourseContentCards";
 import { Flow4DirectCourseView } from "@/components/dashboard/Flow4Student";
+import { Flow5CourseView } from "@/components/dashboard/Flow5Exams";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 
 type CourseMeta = { contentLayout?: string; name?: string; slug?: string };
@@ -51,6 +52,11 @@ export default function EnrolledCourseRouter({ slug }: { slug: string }) {
 
   if (authLoading || state === "loading" || layout === null) {
     return <AccessLoading label="Loading course…" />;
+  }
+
+  // Flow-5: NEW Exam Flow — Course → 4 Exam Cards (existing flows untouched)
+  if (layout === "flow-5") {
+    return <Flow5CourseView slug={slug} />;
   }
 
   // Flow-4: NEW spec Course Content → Subject → Content

@@ -1,0 +1,60 @@
+// Flow 5 shared constants — PURE logic only (no server imports) so client
+// components can use it too. Server data fetching lives in `@/lib/flow5`.
+
+export type Flow5Format = "topic-wise" | "paper-final" | "subject-final" | "final-model";
+
+export const FLOW5_FORMATS: Array<{ key: Flow5Format; title: string; subtitle: string }> = [
+  { key: "topic-wise", title: "Topic-wise Exam", subtitle: "Subject-wise topic exams" },
+  { key: "paper-final", title: "Paper Final Exam", subtitle: "Paper final exams" },
+  { key: "subject-final", title: "Subject Final Exam", subtitle: "Subject final exams" },
+  { key: "final-model", title: "Final Model Test", subtitle: "Final model tests" },
+];
+
+export function isFlow5Format(value: unknown): value is Flow5Format {
+  return (
+    value === "topic-wise" ||
+    value === "paper-final" ||
+    value === "subject-final" ||
+    value === "final-model"
+  );
+}
+
+// The complete 8 subjects for the Topic-wise branch (fixed, in order).
+export type Flow5SubjectKey =
+  | "bio1-botany"
+  | "bio2-zoology"
+  | "chem1"
+  | "chem2"
+  | "phy1"
+  | "phy2"
+  | "english"
+  | "gk";
+
+export const FLOW5_SUBJECTS: Array<{ key: Flow5SubjectKey; title: string }> = [
+  { key: "bio1-botany", title: "Biology 1st Paper — Botany" },
+  { key: "bio2-zoology", title: "Biology 2nd Paper — Zoology" },
+  { key: "chem1", title: "Chemistry 1st Paper" },
+  { key: "chem2", title: "Chemistry 2nd Paper" },
+  { key: "phy1", title: "Physics 1st Paper" },
+  { key: "phy2", title: "Physics 2nd Paper" },
+  { key: "english", title: "English" },
+  { key: "gk", title: "General Knowledge" },
+];
+
+export function isFlow5SubjectKey(value: unknown): value is Flow5SubjectKey {
+  return FLOW5_SUBJECTS.some((s) => s.key === value);
+}
+
+export function flow5SubjectTitle(key: string): string {
+  return FLOW5_SUBJECTS.find((s) => s.key === key)?.title ?? key;
+}
+
+export type Flow5ExamItem = {
+  id: string;
+  title: string;
+  format: Flow5Format;
+  topicSubject: Flow5SubjectKey | null;
+  durationMinutes: number;
+  totalMarks: number;
+  scheduledAt: string | null;
+};
