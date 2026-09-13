@@ -51,11 +51,14 @@ export async function GET(
   // 3. Load exam via the existing engine (handles published check, time window,
   //    question loading, attempt rules, session management)
   const startAttempt = request.nextUrl.searchParams.get("start") === "1";
+  const { normalizeVersion } = await import("@/lib/exam-variants");
   const payload = await getExamForTaking(
     examId,
     user.uid,
     user.name || user.email || "Student",
     startAttempt,
+    "first",
+    normalizeVersion(request.nextUrl.searchParams.get("version")) ?? "bangla",
   );
 
   if (!payload) {

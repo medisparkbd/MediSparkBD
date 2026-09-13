@@ -447,7 +447,7 @@ export default function SeoSettingsPage() {
                       "MediSpark is an HSC academic and medical admission preparation platform."}
                   </p>
                   <p className="mt-2 text-[10px] uppercase tracking-wide text-neutral-600">
-                    bloodarenabd.tech
+                    medisparkbd.com
                   </p>
                 </div>
               </div>

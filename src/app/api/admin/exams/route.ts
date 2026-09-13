@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
   // Filters are pushed into SQL — no full-table transfer.
   const categoryId = request.nextUrl.searchParams.get("categoryId")?.trim() || undefined;
   const chapterId = request.nextUrl.searchParams.get("chapterId")?.trim() || undefined;
+  const courseId = request.nextUrl.searchParams.get("courseId")?.trim() || undefined;
   const archivedParam = request.nextUrl.searchParams.get("archived");
   if (archivedParam === "0" || archivedParam === "false") {
     // Hide archived (closed) when explicitly requested, otherwise show all.
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
     kinds,
     categoryId,
     chapterId,
+    courseId,
   });
   return NextResponse.json(
     { exams },

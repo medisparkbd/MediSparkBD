@@ -689,6 +689,8 @@ export type ExamListFilters = {
   ids?: string[];
   categoryId?: string;
   chapterId?: string;
+  /** Flow 4 Exam Batch — exams assigned to this course via exam_courses. */
+  courseId?: string;
 };
 
 /** Normalize the fetchExams argument (legacy single-kind string or filters). */
@@ -704,7 +706,8 @@ function normalizeExamFilters(
     (!filters.kinds || filters.kinds.length === 0) &&
     (!filters.ids || filters.ids.length === 0) &&
     !filters.categoryId &&
-    !filters.chapterId;
+    !filters.chapterId &&
+    !filters.courseId;
   return { filters, cacheable };
 }
 
@@ -743,7 +746,16 @@ export async function fetchExams(
       where.push(`chapter_id = ?`);
       params.push(filters.chapterId);
     }
+    // Flow 4 course filter — join exam_courses (public flow untouched).
+    const needsCourseJoin = Boolean(filters.courseId);
+    if (filters.courseId) {
+      where.push(
+        `id IN (SELECT exam_id FROM exam_courses WHERE course_id = ?)`,
+      );
+      params.push(filters.courseId);
+    }
     const clause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    void needsCourseJoin;
     const rows = await query<ExamRow[]>(
       `SELECT ${EXAM_COLUMNS} FROM exams ${clause} ORDER BY sort_order ASC, created_at DESC`,
       params,

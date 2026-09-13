@@ -23,6 +23,11 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
   const [secondTimerEnabled, setSecondTimerEnabled] = useState(false);
   const [secondTimerDeduction, setSecondTimerDeduction] = useState<number>(3);
   const [alreadyAttempted, setAlreadyAttempted] = useState(false);
+  // Question Version — student must pick Bangla or English before starting.
+  // Locked after Agree & Continue; cannot be switched during the exam.
+  const [questionVersion, setQuestionVersion] = useState<"bangla" | "english" | null>(null);
+  const [versionCoverage, setVersionCoverage] = useState<Record<string, number> | null>(null);
+  const [versionTotal, setVersionTotal] = useState<number | null>(null);
 
   // Rules need no login — load them immediately on mount so the page never
   // waits for Firebase auth / ID token before showing content.
@@ -39,12 +44,15 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
           rules?: Rule[];
           secondTimerEnabled?: boolean;
           secondTimerDeduction?: number;
+          versions?: { totalSlots?: number; coverage?: Record<string, number> } | null;
         } | null;
         if (!response.ok || !data) {
           throw new Error("Failed to load rules.");
         }
         if (cancelled) return;
         setRules(data.rules ?? []);
+        setVersionCoverage(data.versions?.coverage ?? null);
+        setVersionTotal(typeof data.versions?.totalSlots === "number" ? data.versions.totalSlots : null);
         setSecondTimerEnabled(Boolean(data.secondTimerEnabled));
         setSecondTimerDeduction(
           typeof data.secondTimerDeduction === "number" && Number.isFinite(data.secondTimerDeduction) && data.secondTimerDeduction > 0
@@ -96,9 +104,12 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
           rules?: Rule[];
           secondTimerEnabled?: boolean;
           secondTimerDeduction?: number;
+          versions?: { totalSlots?: number; coverage?: Record<string, number> } | null;
         } | null;
         if (!response.ok || !data) throw new Error("Failed to load rules.");
         setRules(data.rules ?? []);
+        setVersionCoverage(data.versions?.coverage ?? null);
+        setVersionTotal(typeof data.versions?.totalSlots === "number" ? data.versions.totalSlots : null);
         setSecondTimerEnabled(Boolean(data.secondTimerEnabled));
         setSecondTimerDeduction(
           typeof data.secondTimerDeduction === "number" && Number.isFinite(data.secondTimerDeduction) && data.secondTimerDeduction > 0
@@ -108,6 +119,74 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
       })
       .catch(() => setError("Something went wrong."))
       .finally(() => setLoading(false));
+  }
+
+  function versionCount(version: "bangla" | "english"): string | null {
+    if (versionCoverage === null || versionTotal === null) return null;
+    const filled = Math.max(
+      versionCoverage[`${version}:A`] ?? 0,
+      versionCoverage[`${version}:B`] ?? 0,
+    );
+    return `${filled}/${versionTotal} questions ready`;
+  }
+
+  function beginHref(): string {
+    const timer = secondTimerEnabled ? (timerType ?? "first") : "first";
+    const version = questionVersion ?? "bangla";
+    return `/exam/${examId}?begin=1&timer=${timer}&version=${version}`;
+  }
+
+  function renderVersionSelector() {
+    return (
+      <div className="mt-6 rounded-2xl border border-primary-600/30 bg-dark-850 p-4 sm:p-5">
+        <h3 className="flex items-center gap-2 text-sm font-extrabold text-heading">
+          Question Version
+          <span className="rounded-full bg-primary-600/15 px-2.5 py-0.5 text-[10px] font-bold text-primary-300">Required</span>
+        </h3>
+        <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+          Choose the language version for this exam. Your version is locked after you start — it cannot be changed during the exam.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {([
+            { key: "bangla", title: "Bangla Version", hint: "Bangla / English / mixed questions" },
+            { key: "english", title: "English Version", hint: "English questions" },
+          ] as const).map((option) => {
+            const selected = questionVersion === option.key;
+            const count = versionCount(option.key);
+            return (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setQuestionVersion(option.key)}
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition ${
+                  selected
+                    ? "border-primary-500/60 bg-primary-600/10 ring-1 ring-primary-500/30"
+                    : "border-ink/10 bg-dark-900 hover:border-primary-500/30"
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-extrabold ${
+                    selected ? "border-primary-500 bg-primary-600 text-white" : "border-ink/20 bg-dark-850 text-neutral-500"
+                  }`}
+                >
+                  {selected ? "●" : "○"}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-heading">{option.title}</p>
+                  <p className="text-xs text-neutral-400">
+                    {option.hint}
+                    {count ? <span className="ml-1 font-semibold text-neutral-500">· {count}</span> : null}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {!questionVersion && (
+          <p className="mt-2 text-xs font-semibold text-amber-400">Please select a Question Version to continue.</p>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -225,6 +304,7 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
               </div>
             </div>
           )}
+          {renderVersionSelector()}
           <label
             htmlFor="rules-agree-empty"
             className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-primary-500/30 bg-primary-600/5 p-4 transition hover:bg-primary-600/10"
@@ -248,10 +328,9 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             </button>
             <button
               type="button"
-              disabled={!agreed || (secondTimerEnabled && !timerType)}
+              disabled={!agreed || (secondTimerEnabled && !timerType) || !questionVersion}
               onClick={() => {
-                const timer = secondTimerEnabled ? (timerType ?? "first") : "first";
-                router.push(`/exam/${examId}?begin=1&timer=${timer}`);
+                router.push(beginHref());
               }}
               className="rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
             >
@@ -347,6 +426,7 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             </div>
           )}
 
+          {renderVersionSelector()}
           {/* Agreement — required before the exam can start */}
           <label
             htmlFor="rules-agree"
@@ -374,18 +454,19 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             </button>
             <button
               type="button"
-              disabled={!agreed || (secondTimerEnabled && !timerType)}
+              disabled={!agreed || (secondTimerEnabled && !timerType) || !questionVersion}
               onClick={() => {
-                const timer = secondTimerEnabled ? (timerType ?? "first") : "first";
-                // Directly start exam with selected Timer Type — stored to active attempt and locked.
-                router.push(`/exam/${examId}?begin=1&timer=${timer}`);
+                // Version + Timer are locked to the attempt at start — stored server-side.
+                router.push(beginHref());
               }}
               title={
                 !agreed
                   ? "Tick the agreement box first"
-                  : secondTimerEnabled && !timerType
-                    ? "Select a Timer Type first"
-                    : undefined
+                  : !questionVersion
+                    ? "Select a Question Version first"
+                    : secondTimerEnabled && !timerType
+                      ? "Select a Timer Type first"
+                      : undefined
               }
               className="rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
             >

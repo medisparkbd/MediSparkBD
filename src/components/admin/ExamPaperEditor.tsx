@@ -33,7 +33,16 @@ type ExamQuestion = {
   explanation: string | null;
   marks: number;
   isActive?: boolean;
+  /** True when this slot already has authored content for the active version/set. */
+  hasVariant?: boolean;
 };
+
+type LangVersion = "bangla" | "english";
+type SetLabel = "A" | "B";
+
+function tabKey(version: LangVersion, set: SetLabel): string {
+  return `${version}:${set}`;
+}
 
 const EMPTY_OPTIONS = ["", "", "", ""];
 
@@ -67,7 +76,18 @@ export default function ExamPaperEditor({
   const [questions, setQuestions] = useState<ExamQuestion[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [detectBusy, setDetectBusy] = useState(false);
-  const [bulkText, setBulkText] = useState("");
+  // Language Version (Bangla / English) × Set (A / B): four separate
+  // workspaces sharing the same permanent Question IDs and slot order.
+  // Each workspace has its own paste area — no auto-translation between them.
+  const [langVersion, setLangVersion] = useState<LangVersion>("bangla");
+  const [setLabel, setSetLabel] = useState<SetLabel>("A");
+  const activeTab = tabKey(langVersion, setLabel);
+  const [bulkTexts, setBulkTexts] = useState<Record<string, string>>({});
+  const bulkText = bulkTexts[activeTab] ?? "";
+  const setBulkText = useCallback((value: string) => {
+    setBulkTexts((prev) => ({ ...prev, [activeTab]: value }));
+  }, [activeTab]);
+  const [coverage, setCoverage] = useState<{ totalSlots: number; coverage: Record<string, number>; hasAnyVariant: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState<number | null>(null);
@@ -78,7 +98,7 @@ export default function ExamPaperEditor({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}`, {
+      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${langVersion}&set=${setLabel}`, {
         cache: "no-store",
         headers: authHeaders,
       });
@@ -87,11 +107,40 @@ export default function ExamPaperEditor({
     } catch {
       setQuestions([]);
     }
+  }, [exam.id, authHeaders, langVersion, setLabel]);
+
+  const loadCoverage = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/exams/variants?examId=${encodeURIComponent(exam.id)}`, {
+        cache: "no-store",
+        headers: authHeaders,
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { totalSlots: number; coverage: Record<string, number>; hasAnyVariant: boolean };
+        setCoverage(data);
+      }
+    } catch {
+      // Coverage badges are best-effort.
+    }
   }, [exam.id, authHeaders]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadCoverage();
+  }, [loadCoverage]);
+
+  // Switching version/set workspace resets local drafts so content from one
+  // workspace never leaks into another.
+  useEffect(() => {
+    setDrafts({});
+    setDetectWarnings({});
+    setError(null);
+    setNotice(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const totalSlots = useMemo(() => {
     const qCount = Number(exam.questionCount ?? exam.totalQuestions ?? 0);
@@ -196,12 +245,14 @@ export default function ExamPaperEditor({
 
     setSavingSlot(slotIndex);
     setError(null);
-    try {
-      const order = slotIndex + 1;
+    try {      const order = slotIndex + 1;
       const marksPerQ = Number((exam.marksPerQuestion ?? 1) as number) || 1;
       const body: Record<string, unknown> = {
         ...(existing && existing.id !== null ? { id: existing.id } : {}),
         examId: exam.id,
+        // Version/Set cell — the permanent slot ID stays the same.
+        version: langVersion,
+        set: setLabel,
         subject: existing?.subject || exam.subject || "",
         question: qText || " ",
         questionImage: existing?.questionImage || null,
@@ -230,6 +281,7 @@ export default function ExamPaperEditor({
         return;
       }
       await load();
+      void loadCoverage();
       onChanged?.();
     } finally {
       setSavingSlot(null);
@@ -309,7 +361,8 @@ export default function ExamPaperEditor({
       }
       await load();
       onChanged?.();
-      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)}.`;
+      void loadCoverage();
+      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${langVersion} Set ${setLabel}.`;
       if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not saved).`;
       if (skippedDueToMissingAnswer > 0) msg += ` ${skippedDueToMissingAnswer} question${skippedDueToMissingAnswer === 1 ? "" : "s"} have no confident answer — please verify.`;
       const reviewCount = Object.keys(warnings).length;
@@ -333,6 +386,8 @@ export default function ExamPaperEditor({
     const body: Record<string, unknown> = {
       ...(existing && existing.id !== null ? { id: existing.id } : {}),
       examId: exam.id,
+      version: langVersion,
+      set: setLabel,
       subject: existing?.subject || exam.subject || "",
       question: draft.question.trim(),
       questionImage: existing?.questionImage || null,
@@ -371,6 +426,7 @@ export default function ExamPaperEditor({
         const cur = curr[slotIndex];
         if (cur) void persistSlotWithData(slotIndex, cur).then(() => {
           void load();
+          void loadCoverage();
           onChanged?.();
         }).catch(() => setError("Failed to update correct answer."));
         return curr;
@@ -404,6 +460,8 @@ export default function ExamPaperEditor({
       const body: Record<string, unknown> = {
         ...(q && q.id !== null ? { id: q.id } : {}),
         examId: exam.id,
+        version: langVersion,
+        set: setLabel,
         subject: q?.subject || exam.subject || "",
         question: draft?.question?.trim() || q?.question || `Question ${pad(slotIndex + 1)}`,
         questionImage: data.url,
@@ -438,6 +496,7 @@ export default function ExamPaperEditor({
       const saveData = (await saveRes.json().catch(() => null)) as { error?: string } | null;
       if (!saveRes.ok) throw new Error(saveData?.error || "Failed to save image.");
       await load();
+      void loadCoverage();
       onChanged?.();
       setNotice("Image uploaded.");
       setTimeout(() => setNotice(null), 2000);
@@ -462,13 +521,61 @@ export default function ExamPaperEditor({
           </div>
         )}
 
-        {/* Paste area — at the very top, only this */}
+        {/* Language Version × Set workspaces — same permanent IDs and slot order in all four */}
+        <div className="space-y-2 rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3 admin-dark:border-[#1e3a65] admin-dark:bg-[#0b1e3a]/40">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-[#0b1e3a] admin-dark:text-white">Question Version</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["bangla", "english"] as LangVersion[]).map((v) => {
+              const count = coverage?.coverage[`${v}:${setLabel}`];
+              const active = langVersion === v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setLangVersion(v)}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition ${active ? "border-[#1a3a78] bg-[#1a3a78] text-white shadow-md" : "border-[#dbeafe] bg-white text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"}`}
+                >
+                  <span className="block text-sm font-extrabold capitalize">{v} Version</span>
+                  <span className={`mt-0.5 block text-[11px] font-semibold ${active ? "text-white/80" : "text-slate-500"}`}>
+                    {v === "bangla" ? "Bangla / English / mixed content" : "English content only"}
+                    {typeof count === "number" && coverage ? ` · ${count}/${coverage.totalSlots} filled` : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs font-extrabold uppercase tracking-widest text-[#0b1e3a] admin-dark:text-white">Set</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["A", "B"] as SetLabel[]).map((s) => {
+              const count = coverage?.coverage[`${langVersion}:${s}`];
+              const active = setLabel === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSetLabel(s)}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition ${active ? "border-emerald-600 bg-emerald-600 text-white shadow-md" : "border-[#dbeafe] bg-white text-[#0b1e3a] hover:border-emerald-400 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"}`}
+                >
+                  <span className="block text-sm font-extrabold">Set {s}</span>
+                  <span className={`mt-0.5 block text-[11px] font-semibold ${active ? "text-white/80" : "text-slate-500"}`}>
+                    {typeof count === "number" && coverage ? `${count}/${coverage.totalSlots} filled` : "Separate question source"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] leading-relaxed text-slate-500 admin-dark:text-slate-400">
+            Editing <span className="font-extrabold capitalize">{langVersion} Version · Set {setLabel}</span> — same permanent Question IDs (Q01..Q{String(totalSlots).padStart(2, "0")}) and order in all four workspaces. No auto-translation between versions. Students are auto-assigned Set A or B server-side and see a randomized order.
+          </p>
+        </div>
+
+        {/* Paste area — separate per version/set workspace */}
         <div className="space-y-2">
-          <p className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">Paste your questions</p>
+          <p className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">Paste your questions — <span className="capitalize">{langVersion} Version · Set {setLabel}</span></p>
           <textarea
             value={bulkText}
             onChange={(e) => setBulkText(e.target.value)}
-            placeholder="Paste your questions"
+            placeholder={`Paste ${langVersion === "bangla" ? "Bangla / English / mixed" : "English"} questions for Set ${setLabel}`}
             rows={6}
             className="min-h-[140px] w-full resize-y rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3.5 text-sm leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 focus:border-[#93c5fd] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500"
           />
@@ -478,13 +585,13 @@ export default function ExamPaperEditor({
             onClick={() => void handleDetect()}
             className={`${buttonPrimaryClass} w-full sm:w-auto`}
           >
-            {detectBusy ? "Detecting…" : "Detect Questions"}
+            {detectBusy ? "Detecting…" : `Detect Questions → ${langVersion === "bangla" ? "Bangla" : "English"} Set ${setLabel}`}
           </button>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-[#eef4ff] pt-3 admin-dark:border-[#1e3a65]/60">
-          <p className="text-xs font-extrabold text-slate-600 admin-dark:text-slate-300">{progressText}</p>
-          <button type="button" disabled={busy} onClick={() => void load()} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
+          <p className="text-xs font-extrabold text-slate-600 admin-dark:text-slate-300">{progressText} <span className="font-semibold capitalize">({langVersion} Set {setLabel})</span></p>
+          <button type="button" disabled={busy} onClick={() => { void load(); void loadCoverage(); }} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
         </div>
 
         {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
@@ -520,7 +627,14 @@ export default function ExamPaperEditor({
                   className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${warnings && warnings.length > 0 ? "border-amber-300 admin-dark:border-amber-700" : "border-[#dbeafe] admin-dark:border-[#1e3a65]"} admin-dark:bg-[#112544]`}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">Q{pad(slotNumber)}</p>
+                    <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">
+                      Q{pad(slotNumber)}
+                      {q?.id !== null && q?.id !== undefined && (
+                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold tracking-normal text-slate-500 admin-dark:bg-[#0f2547] admin-dark:text-slate-400" title="Permanent Question ID — identical across versions, sets and students">
+                          ID {q.id}
+                        </span>
+                      )}
+                    </p>
                     {warnings && warnings.length > 0 && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
                     )}

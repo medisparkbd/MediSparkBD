@@ -62,6 +62,9 @@ export type FixedCategory = { id: string; name: string };
 /** When set, the manager is scoped to one chapter/subject context. */
 export type FixedChapter = { id: string; name: string };
 
+/** When set, the manager is scoped to one course (Flow 4 Exam Batch). */
+export type FixedCourse = { slug: string; name: string };
+
 const EMPTY = {
   id: "",
   title: "",
@@ -113,6 +116,25 @@ function formatExamTime(iso: string | null): string {
   }
 }
 
+function flow4Phase(exam: { scheduledAt: string | null; endsAt: string | null }): "upcoming" | "live" | "practice" | "no-window" {
+  const now = Date.now();
+  const s = exam.scheduledAt ? new Date(exam.scheduledAt).getTime() : NaN;
+  const e = exam.endsAt ? new Date(exam.endsAt).getTime() : NaN;
+  const hasS = Number.isFinite(s);
+  const hasE = Number.isFinite(e);
+  if (!hasS && !hasE) return "no-window";
+  if (hasS && now < s) return "upcoming";
+  if (hasE && now > e) return "practice";
+  return "live";
+}
+
+function flow4PhaseBadge(phase: ReturnType<typeof flow4Phase>): { label: string; className: string } {
+  if (phase === "upcoming") return { label: "Upcoming", className: "bg-amber-500/10 text-amber-700 ring-amber-500/20 admin-dark:bg-amber-500/10 admin-dark:text-amber-400" };
+  if (phase === "live") return { label: "Live", className: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400" };
+  if (phase === "practice") return { label: "Practice", className: "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400" };
+  return { label: "Live", className: "bg-sky-500/10 text-sky-700 ring-sky-500/20" };
+}
+
 function detectTemplateForCategory(cat: FixedCategory | null | undefined): string {
   if (!cat) return "academic";
   const token = `${cat.name}`.toLowerCase();
@@ -135,6 +157,7 @@ export default function ExamManager({
   allowEnrolled = false,
   fixedCategory,
   fixedChapter,
+  fixedCourse,
 }: {
   title: string;
   description: string;
@@ -146,6 +169,8 @@ export default function ExamManager({
   fixedCategory?: FixedCategory;
   /** Course Content Control mode — only this chapter's exams. */
   fixedChapter?: FixedChapter;
+  /** Flow 4 Exam Batch mode — only this course's enrolled exams. */
+  fixedCourse?: FixedCourse;
 }) {
   const gate = useAdminGate();
   const router = useRouter();
@@ -164,6 +189,7 @@ export default function ExamManager({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [questionsExam, setQuestionsExam] = useState<Exam | null>(null);
   const [modeFilter, setModeFilter] = useState<"all" | "live" | "practice">("all");
+  const [phaseFilter, setPhaseFilter] = useState<"all" | "upcoming" | "live" | "practice">("all");
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -174,6 +200,10 @@ export default function ExamManager({
         params.set("kind", "public");
         params.set("categoryId", fixedCategory.id);
         if (fixedChapter) params.set("chapterId", fixedChapter.id);
+      } else if (fixedCourse) {
+        // Flow 4 Exam Batch — enrolled exams assigned to this course.
+        params.set("kind", "enrolled");
+        params.set("courseId", fixedCourse.slug);
       } else if (fixedChapter) {
         params.set("chapterId", fixedChapter.id);
         const kinds = Array.isArray(kindFilter) ? kindFilter : kindFilter ? [kindFilter] : [];
@@ -194,7 +224,7 @@ export default function ExamManager({
       setLoadError(true);
       setExams([]);
     }
-  }, [kindFilter, fixedCategory, fixedChapter, gate.headers]);
+  }, [kindFilter, fixedCategory, fixedChapter, fixedCourse, gate.headers]);
 
   useEffect(() => {
     if (gate.ready) void Promise.resolve().then(load);
@@ -255,10 +285,13 @@ export default function ExamManager({
         secondTimerEnabled: isSecond,
         secondTimerDeduction: isSecond ? "3" : "0",
       });
+    } else if (fixedCourse) {
+      // Flow 4 Exam Batch — always enrolled, auto-assigned to this course.
+      setForm({ ...EMPTY, kind: "enrolled" });
     } else {
       setForm(EMPTY);
     }
-    setCourseIds([]);
+    setCourseIds(fixedCourse ? [fixedCourse.slug] : []);
     setFormCategoryId("");
     setEditingId(null);
     setEditingSortOrder(null);
@@ -307,8 +340,11 @@ export default function ExamManager({
   }
 
   async function save() {
+    // Flow 4 Exam Batch — force enrolled + this course (admin never picks).
+    const effectiveKind = fixedCourse ? "enrolled" : form.kind;
+    const effectiveCourseIds = fixedCourse ? [fixedCourse.slug] : courseIds;
     // Public Exam Control has its own validation — skip enrolled kind check when fixedCategory.
-    if (!fixedCategory && form.kind === "enrolled" && courseIds.length === 0) {
+    if (!fixedCategory && !fixedCourse && form.kind === "enrolled" && courseIds.length === 0) {
       setNotice({ kind: "error", text: "Assign at least one course to an enrolled exam." });
       return;
     }
@@ -402,10 +438,11 @@ export default function ExamManager({
       } else {
         payload = {
           ...form,
+          kind: effectiveKind,
           id: examId,
           ...(editingSortOrder !== null ? { sortOrder: editingSortOrder } : {}),
           chapterId,
-          courseIds: form.kind === "enrolled" ? courseIds : [],
+          courseIds: effectiveKind === "enrolled" ? effectiveCourseIds : [],
           categoryId,
           bannerUrl: form.bannerUrl,
           negativeEnabled: form.negativeEnabled,
@@ -593,9 +630,21 @@ export default function ExamManager({
     }
   }
 
-  const filteredByMode = exams
-    ? exams.filter((e) => modeFilter === "all" || (e.examMode ?? "live") === modeFilter)
-    : null;
+  // Flow 4 uses LIVE→PRACTICE temporal lifecycle (phase), Public uses static examMode.
+  // When fixedChapter is set (Course Content Flow 4 exam batch), filter by
+  // derived phase (Upcoming/Live/Practice) instead of static Live/Practice.
+  const filteredByMode = (() => {
+    if (!exams) return null;
+    if (fixedChapter) {
+      return exams.filter((e) => {
+        if (phaseFilter === "all") return true;
+        return flow4Phase(e) === phaseFilter;
+      });
+    }
+    return exams.filter((e) => modeFilter === "all" || (e.examMode ?? "live") === modeFilter);
+  })();
+
+  const filteredCount = filteredByMode?.length ?? 0;
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
@@ -607,6 +656,7 @@ export default function ExamManager({
         <button type="button" onClick={startCreate} className={buttonPrimaryClass}>+ New Exam</button>
       </header>
 
+      {/* Public Exam Control: filter by static Live/Practice examMode */}
       {fixedCategory && exams !== null && !loadError && (
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
           {(["all", "live", "practice"] as const).map((m) => {
@@ -617,6 +667,33 @@ export default function ExamManager({
                 key={m}
                 type="button"
                 onClick={() => setModeFilter(m)}
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+                  active
+                    ? "bg-[#0b1e3a] text-white shadow admin-dark:bg-white admin-dark:text-[#0b1e3a]"
+                    : "bg-white text-slate-600 ring-1 ring-[#dbeafe] hover:bg-[#f1f5f9] admin-dark:bg-[#112544] admin-dark:text-slate-300 admin-dark:ring-[#1e3a65]"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <span className="ml-2 self-center whitespace-nowrap text-xs font-semibold text-slate-400">
+            {filteredByMode ? `${filteredByMode.length} exam${filteredByMode.length === 1 ? "" : "s"}` : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Course Content Flow 4 (fixedChapter): show Upcoming / Live / Practice phase tabs */}
+      {fixedChapter && exams !== null && !loadError && (
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          {(["all", "upcoming", "live", "practice"] as const).map((ph) => {
+            const label = ph === "all" ? "All Exams" : ph === "upcoming" ? "Upcoming" : ph === "live" ? "Live" : "Practice";
+            const active = phaseFilter === ph;
+            return (
+              <button
+                key={ph}
+                type="button"
+                onClick={() => setPhaseFilter(ph)}
                 className={`shrink-0 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
                   active
                     ? "bg-[#0b1e3a] text-white shadow admin-dark:bg-white admin-dark:text-[#0b1e3a]"
@@ -650,16 +727,24 @@ export default function ExamManager({
         <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
       ) : (filteredByMode?.length ?? 0) === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
-          {exams.length === 0 ? "No exams yet." : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
+          {exams.length === 0 ? "No exams yet." : fixedChapter ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
         </p>
       ) : (
         <ul className="mt-5 space-y-3">
-          {filteredByMode!.map((exam, examIndex) => (
+          {filteredByMode!.map((exam) => {
+            const phase = fixedChapter ? flow4Phase(exam) : null;
+            const phaseBadge = phase ? flow4PhaseBadge(phase) : null;
+            return (
             <li key={exam.id} className={`${cardClass} flex flex-col gap-3 p-4 sm:p-5`}>
               {/* Top row: Exam Name + Published badge — same row when width allows, wraps cleanly on mobile */}
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-base font-bold leading-tight text-[#0b1e3a] admin-dark:text-zinc-100">{exam.title}</h3>
-                <span
+                {phaseBadge && (
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${phaseBadge.className}`}>
+                    {phaseBadge.label}
+                  </span>
+                )}
+                 <span
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${
                     exam.status === "published"
                       ? "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400"
@@ -756,7 +841,8 @@ export default function ExamManager({
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

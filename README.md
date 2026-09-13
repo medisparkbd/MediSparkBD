@@ -1,4 +1,4 @@
-# MediSpark (bloodarenabd.tech)
+# MediSpark (medisparkbd.com)
 
 HSC academic & medical admission preparation platform.
 Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS.

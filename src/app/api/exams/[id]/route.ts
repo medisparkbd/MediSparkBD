@@ -31,6 +31,8 @@ export async function GET(
   // after the student accepts the exam rules on the client.
   const startAttempt = request.nextUrl.searchParams.get("start") === "1";
   const timerType = request.nextUrl.searchParams.get("timer") ?? "first";
+  // Question Version chosen on the Rules page (bangla/english). Locked after start.
+  const questionVersion = request.nextUrl.searchParams.get("version") ?? "bangla";
 
   // Server-side access validation before creating an attempt.
   if (startAttempt) {
@@ -57,11 +59,49 @@ export async function GET(
       );
     }
 
-    if (examMeta.status === "Completed" || examMeta.status === "Expired") {
-      return NextResponse.json(
-        { error: "This exam has ended. You can no longer start it." },
-        { status: 403 },
-      );
+    // Flow-4 separation: Public exams keep deriveStatus-based Expired check.
+    // Course Content Flow 4 (Exam Batch) uses LIVE → PRACTICE — after End Time
+    // the exam is still startable as Practice for enrolled students.
+    // For Flow-4 Practice, Expired / Completed must NOT block start.
+    let isFlow4 = false;
+    try {
+      const { isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
+      isFlow4 = await isFlow4Exam(id);
+    } catch {
+      isFlow4 = false;
+    }
+    if (!isFlow4) {
+      if (examMeta.status === "Completed" || examMeta.status === "Expired") {
+        return NextResponse.json(
+          { error: "This exam has ended. You can no longer start it." },
+          { status: 403 },
+        );
+      }
+    } else {
+      // Flow-4: only UPCOMING blocks start; PRACTICE is allowed for practice.
+      try {
+        const { getFlow4Phase } = await import("@/lib/flow4-exam-lifecycle");
+        const { fetchExamById } = await import("@/lib/exams-admin");
+        const raw = await fetchExamById(id);
+        if (raw) {
+          const phase = getFlow4Phase(raw);
+          if (phase === "upcoming") {
+            return NextResponse.json(
+              { error: "This exam has not started yet." },
+              { status: 403 },
+            );
+          }
+          // Live and Practice both allow start — Practice via enrolled path.
+        }
+      } catch {
+        // Fallback to original check if Flow-4 lookup fails
+        if (examMeta.status === "Completed" || examMeta.status === "Expired") {
+          return NextResponse.json(
+            { error: "This exam has ended. You can no longer start it." },
+            { status: 403 },
+          );
+        }
+      }
     }
 
     // Timer type validation — must be "first" or "second".
@@ -71,16 +111,28 @@ export async function GET(
         { status: 400 },
       );
     }
+
+    // Question Version validation — normalized server-side on start;
+    // unknown values fall back to Bangla (legacy links without ?version=).
+    const { normalizeVersion: normalizeStartVersion } = await import("@/lib/exam-variants");
+    if (!normalizeStartVersion(questionVersion)) {
+      return NextResponse.json(
+        { error: "Invalid question version. Must be 'bangla' or 'english'." },
+        { status: 400 },
+      );
+    }
   }
 
   let payload: Awaited<ReturnType<typeof getExamForTaking>> = null;
   try {
+    const { normalizeVersion } = await import("@/lib/exam-variants");
     payload = await getExamForTaking(
       id,
       user.uid,
       user.name || user.email || "Student",
       startAttempt,
       timerType as "first" | "second",
+      normalizeVersion(questionVersion) ?? "bangla",
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start exam.";

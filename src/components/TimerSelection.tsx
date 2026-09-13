@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 type TimerChoice = "first" | "second";
@@ -17,6 +17,7 @@ export default function TimerSelection({
   hasPriorAttempt: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<TimerChoice | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +26,10 @@ export default function TimerSelection({
     setLoading(true);
     // Navigate to exam with timer type param — the ExamParticipationArea
     // reads this and passes it to the server when starting the attempt.
-    router.push(`/exam/${examId}?begin=1&timer=${selected}`);
+    // Forward a pre-selected Question Version when present (?version=).
+    const version = searchParams.get("version");
+    const versionSuffix = version === "bangla" || version === "english" ? `&version=${version}` : "";
+    router.push(`/exam/${examId}?begin=1&timer=${selected}${versionSuffix}`);
   };
 
   // Show Timer Type selection whenever Second Timer Penalty is enabled — student must choose First vs Second Timer.

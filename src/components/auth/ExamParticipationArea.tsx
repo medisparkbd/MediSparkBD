@@ -93,6 +93,9 @@ export default function ExamParticipationArea({
   const searchParams = useSearchParams();
   const autoBegin = propAutoBegin ?? searchParams.get("begin") === "1";
   const timerType = propTimerType ?? (searchParams.get("timer") === "second" ? "second" : "first");
+  const versionParamRaw = searchParams.get("version");
+  const versionFromUrl: "bangla" | "english" | null =
+    versionParamRaw === "english" ? "english" : versionParamRaw === "bangla" ? "bangla" : null;
   const examHref = `/exam/${examId}`;
   const loginHref = `/login?next=${encodeURIComponent(examHref)}`;
   const { user, profile, authLoading, profileLoading } = useAuth();
@@ -115,6 +118,10 @@ export default function ExamParticipationArea({
   const [alreadyAttempted, setAlreadyAttempted] = useState(false);
   // Rules accepted → the actual attempt has begun.
   const [begun, setBegun] = useState(false);
+  // Question Version — preselected from the Rules page (?version=); the
+  // in-exam rules gate below also requires an explicit choice. Locked
+  // server-side at start; never switchable during the active exam.
+  const [questionVersion, setQuestionVersion] = useState<"bangla" | "english" | null>(versionFromUrl);
   const [beginning, setBeginning] = useState(false);
   const [script, setScript] = useState<ResultScript | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
@@ -154,11 +161,14 @@ export default function ExamParticipationArea({
    */
   const beginExam = useCallback(async () => {
     if (!user || beginning || begun || !exam) return;
+    // Version defaults to the Rules-page choice, then the in-exam gate
+    // choice, then Bangla (legacy links without ?version=).
+    const version = questionVersion ?? versionFromUrl ?? "bangla";
     setBeginning(true);
     try {
       const authToken = await user.getIdToken();
       const response = await fetch(
-        `/api/exams/${encodeURIComponent(examId)}?start=1&timer=${timerType}`,
+        `/api/exams/${encodeURIComponent(examId)}?start=1&timer=${timerType}&version=${version}`,
         {
           headers: authToken
             ? { Authorization: `Bearer ${authToken}` }
@@ -169,11 +179,23 @@ export default function ExamParticipationArea({
       const data = (await response.json().catch(() => ({}))) as {
         sessionToken?: string | null;
         secondsLeft?: number | null;
+        questions?: TakingQuestion[];
+        questionVersion?: "bangla" | "english" | null;
         error?: string;
       };
       if (!response.ok) {
         setLoadError(data.error ?? "Could not start the exam. Please retry.");
         return;
+      }
+      // Locked server order — replace the preview list with the student's
+      // assigned Version/Set questions in randomized display order.
+      if (Array.isArray(data.questions) && data.questions.length > 0) {
+        setQuestions(data.questions);
+      }
+      if (data.questionVersion === "bangla" || data.questionVersion === "english") {
+        setQuestionVersion(data.questionVersion);
+      } else {
+        setQuestionVersion(version);
       }
       activateSession(data.sessionToken ?? null, exam.durationMinutes, data.secondsLeft ?? null);
     } catch {
@@ -181,7 +203,7 @@ export default function ExamParticipationArea({
     } finally {
       setBeginning(false);
     }
-  }, [beginning, begun, exam, examId, user, activateSession, timerType]);
+  }, [beginning, begun, exam, examId, user, activateSession, timerType, questionVersion, versionFromUrl]);
 
   // Load the exam meta + sanitized questions first (no answers, no attempt).
   useEffect(() => {
@@ -253,8 +275,9 @@ export default function ExamParticipationArea({
         if (autoBegin && (data.questions?.length ?? 0) > 0) {
           try {
             const authToken = await user.getIdToken();
+            const startVersion = versionFromUrl ?? "bangla";
             const startResponse = await fetch(
-              `/api/exams/${encodeURIComponent(examId)}?start=1&timer=${timerType}`,
+              `/api/exams/${encodeURIComponent(examId)}?start=1&timer=${timerType}&version=${startVersion}`,
               {
                 headers: authToken
                   ? { Authorization: `Bearer ${authToken}` }
@@ -264,9 +287,18 @@ export default function ExamParticipationArea({
             );
             const startData = (await startResponse
               .json()
-              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; error?: string; alreadyAttempted?: boolean };
+              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; questions?: TakingQuestion[]; questionVersion?: "bangla" | "english" | null; error?: string; alreadyAttempted?: boolean };
             if (cancelled) return;
             if (startResponse.ok && data.exam) {
+              // Locked server order replaces the preview list.
+              if (Array.isArray(startData.questions) && startData.questions.length > 0) {
+                if (!cancelled) setQuestions(startData.questions);
+              }
+              if (startData.questionVersion === "bangla" || startData.questionVersion === "english") {
+                if (!cancelled) setQuestionVersion(startData.questionVersion);
+              } else if (!cancelled) {
+                setQuestionVersion(startVersion);
+              }
               activateSession(
                 startData.sessionToken ?? null,
                 data.exam.durationMinutes,
@@ -303,7 +335,7 @@ export default function ExamParticipationArea({
     return () => {
       cancelled = true;
     };
-  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType]);
+  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl]);
 
   const submit = useCallback(async () => {
     if (submittedRef.current || !user) return;
@@ -869,10 +901,57 @@ export default function ExamParticipationArea({
           <ExamRulesList exam={exam} />
         </div>
 
+        {/* Question Version — required; locked server-side once the exam starts */}
+        <div className="mt-5 rounded-2xl border border-primary-600/30 bg-dark-850 p-4 sm:p-5">
+          <h3 className="flex items-center gap-2 text-sm font-extrabold text-heading">
+            Question Version
+            <span className="rounded-full bg-primary-600/15 px-2.5 py-0.5 text-[10px] font-bold text-primary-300">Required</span>
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+            Choose the language version for this exam. Your version is locked after you start — it cannot be changed during the exam.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {([
+              { key: "bangla", title: "Bangla Version", hint: "Bangla / English / mixed" },
+              { key: "english", title: "English Version", hint: "English" },
+            ] as const).map((option) => {
+              const selected = (questionVersion ?? versionFromUrl) === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setQuestionVersion(option.key)}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition ${
+                    selected
+                      ? "border-primary-500/60 bg-primary-600/10 ring-1 ring-primary-500/30"
+                      : "border-ink/10 bg-dark-900 hover:border-primary-500/30"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-extrabold ${
+                      selected ? "border-primary-500 bg-primary-600 text-white" : "border-ink/20 bg-dark-850 text-neutral-500"
+                    }`}
+                  >
+                    {selected ? "●" : "○"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-heading">{option.title}</p>
+                    <p className="text-xs text-neutral-400">{option.hint}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {!(questionVersion ?? versionFromUrl) && (
+            <p className="mt-2 text-xs font-semibold text-amber-400">Please select a Question Version to continue.</p>
+          )}
+        </div>
+
         <button
           type="button"
-          disabled={beginning}
+          disabled={beginning || !(questionVersion ?? versionFromUrl)}
           onClick={() => void beginExam()}
+          title={!(questionVersion ?? versionFromUrl) ? "Select a Question Version first" : undefined}
           className="mt-6 w-full rounded-xl bg-primary-600 px-6 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {beginning ? "Starting…" : "I Understand & Start Exam"}
@@ -915,8 +994,15 @@ export default function ExamParticipationArea({
         aria-label="Exam progress and timer"
       >
         <div className="flex items-center justify-between gap-2 sm:gap-3">
-          <span className="shrink-0 whitespace-nowrap text-sm font-bold text-heading sm:text-[15px]">
-            Answered {answeredCount}/{totalQuestions}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 whitespace-nowrap text-sm font-bold text-heading sm:text-[15px]">
+              Answered {answeredCount}/{totalQuestions}
+            </span>
+            {questionVersion && (
+              <span className="hidden shrink-0 whitespace-nowrap rounded-full border border-primary-500/20 bg-primary-600/10 px-2 py-0.5 text-[10px] font-extrabold capitalize text-primary-300 sm:inline-block">
+                {questionVersion} Version · Locked
+              </span>
+            )}
           </span>
           <span
             className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 font-mono text-sm font-extrabold tabular-nums sm:px-4 sm:text-base ${

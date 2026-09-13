@@ -53,13 +53,57 @@ export async function checkCourseExamAccess(
     return { allowed: false, reason };
   }
 
-  // Live window — same canonical check as the public path and the engine.
-  const status = deriveStatus(exam);
-  if (status !== "Live") {
-    if (status === "Upcoming") {
+  // ── Flow 4 Exam Batch — LIVE → PRACTICE lifecycle ───────────────
+  // Public Exam keeps deriveStatus() unchanged. Flow-4 enrolled exams use
+  // UPCOMING → LIVE → PRACTICE based on server time (getFlow4Phase).
+  // After End Time, the exam remains visible for Practice but Live
+  // leaderboard is frozen.
+  let isFlow4 = false;
+  try {
+    const { isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
+    isFlow4 = await isFlow4Exam(normalizedId);
+  } catch {
+    isFlow4 = false;
+  }
+
+  if (isFlow4) {
+    const { getFlow4Phase } = await import("@/lib/flow4-exam-lifecycle");
+    const phase = getFlow4Phase(exam);
+    if (phase === "upcoming") {
       return { allowed: false, reason: "This exam has not started yet." };
     }
-    return { allowed: false, reason: "This exam has ended." };
+    if (phase === "no-window") {
+      // No schedule set — treat as always Live (legacy) — fall through.
+    } else if (phase === "practice") {
+      // Practice after Live ends: require enrollment but allow entry
+      // regardless of prior Live attempt. Practice does NOT block on
+      // maxAttempts — spec §6: "enrolled students can still open and attempt
+      // it as a Practice Exam. The same question paper remains available."
+      const enrolled = await hasEnrolledExamAccess(normalizedId, cleanUid);
+      if (!enrolled) {
+        return {
+          allowed: false,
+          reason: "You are not enrolled in the course for this exam.",
+        };
+      }
+      // Strict one-live-attempt check does NOT apply to practice.
+      // Practice can be retaken according to course-exam rules — do not
+      // enforce maxAttempts here; startExamAttempt handles practice bypass.
+      return { allowed: true };
+    }
+    // phase === "live" — fall through to Live gates below (published +
+    // enrollment + attempt-limit for live).
+  } else {
+    // Non-Flow4 course exams — keep existing deriveStatus lifecycle (Live
+    // only within window; Expired remains ended). This preserves Flows 1-3
+    // and Public Exam behavior exactly.
+    const status = deriveStatus(exam);
+    if (status !== "Live") {
+      if (status === "Upcoming") {
+        return { allowed: false, reason: "This exam has not started yet." };
+      }
+      return { allowed: false, reason: "This exam has ended." };
+    }
   }
 
   // Course-enrollment gate — delegates to the shared helper which checks
@@ -73,9 +117,9 @@ export async function checkCourseExamAccess(
     };
   }
 
-  // Attempt limits — same guard as the engine's startExamAttempt and the
-  // public path. Limit is exam_settings.max_attempts counting prior
-  // exam_results; exam_attempts holds the in-flight session token.
+  // Attempt limits — same guard as the engine's startExamAttempt.
+  // For Flow-4 Practice this block is never reached (returned above).
+  // For Flow-4 Live and non-Flow4 exams, enforce maxAttempts.
   try {
     const settingsRows = await query<
       { max_attempts: number | string | null }[]
@@ -88,11 +132,32 @@ export async function checkCourseExamAccess(
       Number.isFinite(maxAttempts) &&
       maxAttempts > 0
     ) {
-      const countRows = await query<{ n: number }[]>(
-        `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,
-        [normalizedId, cleanUid],
-      );
-      if ((countRows[0]?.n ?? 0) >= maxAttempts) {
+      // For Flow-4 Live, count only live attempts so a prior practice does
+      // not block a Live entry, and vice versa. For non-Flow4, count all.
+      let count = 0;
+      if (isFlow4) {
+        try {
+          // Count live attempts only when checking Live access.
+          const liveRows = await query<{ n: number }[]>(
+            `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ? AND (attempt_type = 'live' OR attempt_type IS NULL)`,
+            [normalizedId, cleanUid],
+          );
+          count = liveRows[0]?.n ?? 0;
+        } catch {
+          const fallback = await query<{ n: number }[]>(
+            `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,
+            [normalizedId, cleanUid],
+          );
+          count = fallback[0]?.n ?? 0;
+        }
+      } else {
+        const countRows = await query<{ n: number }[]>(
+          `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,
+          [normalizedId, cleanUid],
+        );
+        count = countRows[0]?.n ?? 0;
+      }
+      if (count >= maxAttempts) {
         return {
           allowed: false,
           reason: `Maximum attempts (${maxAttempts}) reached for this exam.`,

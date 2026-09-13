@@ -45,6 +45,7 @@ export type CatalogCourse = {
   totalExams?: number;
   courseDetails?: CourseDetails;
   routineUrls?: string[];
+  mentorIds?: string[];
 };
 
 const EMPTY_FORM = {
@@ -67,6 +68,7 @@ const EMPTY_FORM = {
   totalExams: "",
   courseDuration: "",
   courseDescription: "",
+  courseFeatures: "",
   courseTopics: "",
   chapterOverview: "",
   teachersJson: "[]",
@@ -74,6 +76,8 @@ const EMPTY_FORM = {
 };
 
 type FormState = typeof EMPTY_FORM;
+
+type MentorOption = { id: string; name: string };
 
 /** Sensible default batch id per course category for the pre-filled form. */
 function defaultBatchFor(category: CatalogCourseCategory): string {
@@ -113,6 +117,7 @@ function toForm(course: CatalogCourse): FormState {
     totalExams: course.totalExams != null ? String(course.totalExams) : "",
     courseDuration: details?.duration ?? "",
     courseDescription: details?.description ?? "",
+    courseFeatures: (course.features ?? []).join("\n"),
     courseTopics: (details?.topics ?? []).join("\n"),
     chapterOverview: (details?.chapterOverview ?? []).join("\n"),
     teachersJson: JSON.stringify(details?.teachers ?? []),
@@ -139,6 +144,8 @@ export default function CourseManager({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [search, setSearch] = useState("");
+  const [mentorIds, setMentorIds] = useState<string[]>([]);
+  const [mentorOptions, setMentorOptions] = useState<MentorOption[]>([]);
   const [routineUploading, setRoutineUploading] = useState(false);
   const [routineError, setRoutineError] = useState<string | null>(null);
   const [routinePreview, setRoutinePreview] = useState<string | null>(null);
@@ -170,6 +177,7 @@ export default function CourseManager({
         const target = list.find((course) => course.slug === requestedEditSlug);
         if (target) {
           setForm(toForm(target));
+          setMentorIds(target.mentorIds ?? []);
           setEditingSlug(target.slug);
           setShowForm(true);
           setNotice(null);
@@ -200,6 +208,22 @@ export default function CourseManager({
     if (gate.ready) void Promise.resolve().then(load);
   }, [gate.ready, load]);
 
+  // Mentor options for per-course assignment (Admin → Mentors is the source).
+  useEffect(() => {
+    if (!gate.ready) return;
+    fetch("/api/mentors", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { mentors?: MentorOption[] } | null) =>
+        setMentorOptions(
+          (data?.mentors ?? []).map((mentor) => ({
+            id: mentor.id,
+            name: mentor.name,
+          })),
+        ),
+      )
+      .catch(() => setMentorOptions([]));
+  }, [gate.ready]);
+
   if (!gate.ready) {
     return gate.denied ? (
       <AccessMessage
@@ -215,6 +239,7 @@ export default function CourseManager({
 
   function startCreate() {
     setForm(EMPTY_FORM);
+    setMentorIds([]);
     setEditingSlug(null);
     setShowForm(true);
     setNotice(null);
@@ -222,6 +247,20 @@ export default function CourseManager({
 
   function startEdit(course: CatalogCourse) {
     setForm(toForm(course));
+    // Mentor assignments are per-course — always read the fresh list so an
+    // edit never wipes assignments made elsewhere.
+    setMentorIds(course.mentorIds ?? []);
+    if (!course.mentorIds) {
+      fetch(`/api/admin/courses?slug=${encodeURIComponent(course.slug)}`, {
+        cache: "no-store",
+        headers: gate.headers,
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { course?: CatalogCourse } | null) =>
+          setMentorIds(data?.course?.mentorIds ?? []),
+        )
+        .catch(() => undefined);
+    }
     setEditingSlug(course.slug);
     setShowForm(true);
     setNotice(null);
@@ -253,6 +292,8 @@ export default function CourseManager({
             form.discountFee.trim() === "" ? null : Number(form.discountFee),
           totalClasses: form.totalClasses.trim() === "" ? null : Number(form.totalClasses),
           totalExams: form.totalExams.trim() === "" ? null : Number(form.totalExams),
+          features: form.courseFeatures.split("\n").map((s) => s.trim()).filter(Boolean),
+          mentorIds,
           courseDetails,
           routineUrls: form.routineUrls,
         }),
@@ -907,6 +948,41 @@ export default function CourseManager({
                 <textarea id="cm-cd-desc" rows={4} className={inputClass} value={form.courseDescription}
                   placeholder="Detailed description for the course details page..."
                   onChange={(e) => setForm({ ...form, courseDescription: e.target.value })} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass} htmlFor="cm-features">Course Features (one per line)</label>
+                <textarea id="cm-features" rows={4} className={inputClass} value={form.courseFeatures}
+                  placeholder={"Structured live classes\nRegular examinations\nStudy materials\nExpert guidance"}
+                  onChange={(e) => setForm({ ...form, courseFeatures: e.target.value })} />
+                <p className="mt-1 text-[11px] text-slate-500">Shown on the Course Details page as “Course Features”. Reorder by moving lines.</p>
+              </div>
+              {/* Mentors assignment — specific to THIS course. */}
+              <div className="sm:col-span-2">
+                <span className={labelClass}>Mentors (this course)</span>
+                {mentorOptions.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    No mentors available — add them in Admin → Mentors first.
+                  </p>
+                ) : (
+                  <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto rounded-xl border border-neutral-200 p-3 admin-dark:border-zinc-700">
+                    {mentorOptions.map((mentor) => (
+                      <label key={mentor.id} className="flex items-center gap-2 text-sm text-slate-700 admin-dark:text-zinc-200">
+                        <input
+                          type="checkbox"
+                          checked={mentorIds.includes(mentor.id)}
+                          onChange={(event) =>
+                            setMentorIds(
+                              event.target.checked
+                                ? [...mentorIds, mentor.id]
+                                : mentorIds.filter((id) => id !== mentor.id),
+                            )
+                          }
+                        />
+                        <span className="truncate">{mentor.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass} htmlFor="cm-topics">Course Topics (one per line)</label>

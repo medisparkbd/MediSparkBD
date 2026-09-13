@@ -33,6 +33,16 @@ export async function GET(
     return NextResponse.json({ error: "Exam not found or not available." }, { status: 404 });
   }
   const rules = stored.length > 0 ? stored : buildDefaultExamRules(id);
+  // Language versions available for this exam (coverage per version/set).
+  // Students must pick one version; legacy exams without variants serve the
+  // same base paper for both versions.
+  let versions: { totalSlots: number; coverage: Record<string, number>; hasAnyVariant: boolean } | null = null;
+  try {
+    const { variantCoverage } = await import("@/lib/exam-variants");
+    versions = await variantCoverage(id);
+  } catch {
+    versions = null;
+  }
   return NextResponse.json(
     {
       examId: id,
@@ -41,6 +51,7 @@ export async function GET(
       customizable: stored.length > 0,
       secondTimerEnabled: exam.secondTimerEnabled,
       secondTimerDeduction: exam.secondTimerDeduction,
+      versions,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

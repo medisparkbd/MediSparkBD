@@ -15,6 +15,8 @@ type ExamMeta = {
   durationMinutes: number;
   totalMarks: number;
   negativeMarks: number;
+  phase?: "upcoming" | "live" | "practice" | "no-window" | null;
+  isFlow4?: boolean;
 };
 
 /**
@@ -99,9 +101,31 @@ export default function CourseExamPage() {
           {exam && (
             <div className="mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">
               <div className="p-5 sm:p-6">
-                <span className="inline-block rounded-md border border-violet-500/40 bg-dark-950/80 px-2.5 py-1 text-xs font-bold text-violet-400">
-                  Course Exam
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block rounded-md border border-violet-500/40 bg-dark-950/80 px-2.5 py-1 text-xs font-bold text-violet-400">
+                    Course Exam
+                  </span>
+                  {exam.isFlow4 && exam.phase === "practice" && (
+                    <span className="inline-block rounded-md border border-violet-500/40 bg-violet-600 px-2.5 py-1 text-xs font-bold text-white">
+                      Practice Exam
+                    </span>
+                  )}
+                  {exam.isFlow4 && exam.phase === "live" && (
+                    <span className="inline-block rounded-md border border-emerald-500/40 bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
+                      Live Exam
+                    </span>
+                  )}
+                  {exam.isFlow4 && exam.phase === "upcoming" && (
+                    <span className="inline-block rounded-md border border-amber-500/40 bg-amber-600 px-2.5 py-1 text-xs font-bold text-white">
+                      Upcoming
+                    </span>
+                  )}
                 </span>
+                {exam.isFlow4 && exam.phase === "practice" && (
+                  <p className="mt-2 text-xs font-semibold text-violet-300">
+                    Live period has ended — this exam is now available as Practice. Your practice attempts will not affect the Live Leaderboard.
+                  </p>
+                )}
                 <h1 className="mt-2 text-xl font-extrabold leading-snug text-heading sm:text-2xl">
                   {exam.title}
                 </h1>

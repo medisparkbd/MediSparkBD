@@ -46,6 +46,7 @@ const EMPTY_FORM = {
   totalExams: "",
   courseDuration: "",
   courseDescription: "",
+  courseFeatures: "",
   courseTopics: "",
   chapterOverview: "",
   teachersJson: "[]",
@@ -201,11 +202,25 @@ export default function CategoryCourseManager({
       totalExams: course.totalExams != null ? String(course.totalExams) : "",
       courseDuration: details?.duration ?? "",
       courseDescription: details?.description ?? "",
+      courseFeatures: (course.features ?? []).join("\n"),
       courseTopics: (details?.topics ?? []).join("\n"),
       chapterOverview: (details?.chapterOverview ?? []).join("\n"),
       teachersJson: JSON.stringify(details?.teachers ?? []),
     });
     setMentorIds(course.mentorIds ?? []);
+    // Mentor assignments are per-course — refresh from the server so an
+    // edit never wipes assignments made elsewhere.
+    if (!course.mentorIds) {
+      fetch(`/api/admin/courses?slug=${encodeURIComponent(course.slug)}`, {
+        cache: "no-store",
+        headers: gate.headers,
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { course?: CategoryCourse } | null) =>
+          setMentorIds(data?.course?.mentorIds ?? []),
+        )
+        .catch(() => undefined);
+    }
     setEditingSlug(course.slug);
     setShowForm(true);
     setNotice(null);
@@ -234,6 +249,7 @@ export default function CategoryCourseManager({
           ...form,
           // Mandatory relationship — the open category owns this course.
           categoryId: category.id,
+          features: form.courseFeatures.split("\n").map((s) => s.trim()).filter(Boolean),
           mentorIds,
           fee: Number(form.fee) || 0,
           discountFee:
@@ -860,6 +876,13 @@ export default function CategoryCourseManager({
                 <textarea id="ccm-cd-desc" rows={4} className={inputClass} value={form.courseDescription}
                   placeholder="Detailed description for the course details page..."
                   onChange={(e) => setForm({ ...form, courseDescription: e.target.value })} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass} htmlFor="ccm-features">Course Features (one per line)</label>
+                <textarea id="ccm-features" rows={4} className={inputClass} value={form.courseFeatures}
+                  placeholder={"Structured live classes\nRegular examinations\nStudy materials\nExpert guidance"}
+                  onChange={(e) => setForm({ ...form, courseFeatures: e.target.value })} />
+                <p className="mt-1 text-[11px] text-slate-500">Shown on the Course Details page as “Course Features”. Reorder by moving lines.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass} htmlFor="ccm-topics">Course Topics (one per line)</label>
