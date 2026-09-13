@@ -148,19 +148,6 @@ function CoursesViewInner({
         <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <BackToAllCourses />
 
-          <header className="mb-6">
-            <p className="mt-4 text-xs font-bold uppercase tracking-widest text-primary-500">
-              Courses
-            </p>
-            <h1 className="mt-2 text-3xl font-extrabold text-heading sm:text-4xl">
-              Paid Courses
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-neutral-400">
-              Browse our premium paid programs — enroll to unlock full classes,
-              exams, materials and Q&amp;A support.
-            </p>
-          </header>
-
           <BatchCourseList options={batchOptions} courses={paidCourses} />
         </section>
       </main>
@@ -176,19 +163,6 @@ function CoursesViewInner({
         <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <BackToAllCourses />
 
-          <header className="mb-6">
-            <p className="mt-4 text-xs font-bold uppercase tracking-widest text-primary-500">
-              Courses
-            </p>
-            <h1 className="mt-2 text-3xl font-extrabold text-heading sm:text-4xl">
-              {courseType} Courses
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-neutral-400">
-              Select your batch to see the relevant {courseType} course lineup.
-            </p>
-          </header>
-
-          {/* Same 4-option batch filters as the dedicated category pages. */}
           <BatchCourseList
             options={category === "ssc" ? optionsFor("ssc") : optionsFor("hsc")}
             courses={typeCourses}
@@ -212,13 +186,13 @@ function DefaultGrid({
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-        <header className="relative mb-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-3 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-4">
+        <header className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-2 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-3">
           <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
           <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
           <h1 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
             Explore Our Programs
           </h1>
-          <p className="relative mx-auto mt-2 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
+          <p className="relative mx-auto mt-1 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
             তোমার পছন্দের কোর্স ক্যাটাগরিটি নির্বাচন করো
           </p>
         </header>
