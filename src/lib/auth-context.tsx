@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const loadUserData = useCallback(async (firebaseUser: User) => {
