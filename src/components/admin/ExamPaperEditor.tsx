@@ -93,6 +93,8 @@ export default function ExamPaperEditor({
   const [savingSlot, setSavingSlot] = useState<number | null>(null);
   const [imageUploadingSlot, setImageUploadingSlot] = useState<number | null>(null);
   const [detectWarnings, setDetectWarnings] = useState<Record<number, string[]>>({});
+  const [detectExistingMap, setDetectExistingMap] = useState<Record<number, boolean>>({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bearer = useMemo(() => authHeaders["Authorization"] || authHeaders["authorization"] || "", [authHeaders]);
   // Staleness guard: increments on every workspace switch so in-flight fetches
@@ -146,6 +148,7 @@ export default function ExamPaperEditor({
     setQuestions(null);
     setDrafts({});
     setDetectWarnings({});
+    setDetectExistingMap({});
     setSavingSlot(null);
     setError(null);
     setNotice(null);
@@ -302,6 +305,7 @@ export default function ExamPaperEditor({
     setError(null);
     setNotice(null);
     setDetectWarnings({});
+    setDetectExistingMap({});
     // Capture workspace at call time — if user switches tabs mid-detect,
     // the final load() still refreshes the correct workspace.
     const detectVersion = langVersion;
@@ -327,6 +331,17 @@ export default function ExamPaperEditor({
     try {
       const count = Math.min(useParsed.length, totalSlots);
       const extra = useParsed.length - totalSlots;
+
+      // Track which slots already had content (questions added before detection)
+      const existingMap: Record<number, boolean> = {};
+      for (let i = 0; i < count; i++) {
+        const slot = displaySlots[i];
+        const hadContent = slot?.q?.id !== null && slot?.q?.id !== undefined &&
+          (slot?.q?.question?.trim().length ?? 0) >= 3;
+        if (hadContent) existingMap[i] = true;
+      }
+      setDetectExistingMap(existingMap);
+
       // Build warnings per slot (for those with issues)
       const warnings: Record<number, string[]> = {};
       for (let i = 0; i < count; i++) {
@@ -381,8 +396,12 @@ export default function ExamPaperEditor({
       if (skippedDueToMissingAnswer > 0) msg += ` ${skippedDueToMissingAnswer} question${skippedDueToMissingAnswer === 1 ? "" : "s"} have no confident answer — please verify.`;
       const reviewCount = Object.keys(warnings).length;
       if (reviewCount > 0) msg += ` ${reviewCount} need review.`;
+      const existingCount = Object.keys(existingMap).length;
+      if (existingCount > 0) msg += ` ${existingCount} already had content — overwritten.`;
       setNotice(msg);
-      setTimeout(() => setNotice(null), 5000);
+      setTimeout(() => setNotice(null), 8000);
+      // Auto-scroll question list to top so detected questions are visible
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Detection failed.");
     } finally {
@@ -610,15 +629,24 @@ export default function ExamPaperEditor({
           <p className="text-xs font-extrabold text-slate-600 admin-dark:text-slate-300">{progressText} <span className="font-semibold capitalize">({langVersion} Set {setLabel})</span></p>
           <button type="button" disabled={busy} onClick={() => { void load(); void loadCoverage(); }} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
         </div>
-
-        {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
-        {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{notice}</p>}
       </div>
     </div>
   );
 
   const innerPaper = (
-    <div className={embedded ? "mt-4" : "flex-1 overflow-y-auto"}>
+    <div ref={scrollContainerRef} className={embedded ? "mt-4" : "flex-1 overflow-y-auto"}>
+      {/* Sticky detection banner — stays visible while scrolling questions */}
+      {!embedded && (error || notice) && (
+        <div className="sticky top-0 z-20 space-y-2 bg-[#f1f5f9] px-3 pt-3 sm:px-6 admin-dark:bg-[#0b1628]">
+          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-md admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
+          {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 shadow-md admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{notice}</p>}
+          {Object.keys(detectExistingMap).length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-tight text-amber-700 shadow-md admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20 admin-dark:text-amber-300">
+              ⚠ Already-added questions overwritten: {Object.keys(detectExistingMap).map((k) => `Q${pad(Number(k) + 1)}`).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
       <div className={embedded ? "" : "mx-auto max-w-4xl px-3 py-6 sm:px-6"}>
         {questions === null ? (
           <p className={`${cardClass} p-6 text-center text-sm text-slate-500`}>Loading paper…</p>
