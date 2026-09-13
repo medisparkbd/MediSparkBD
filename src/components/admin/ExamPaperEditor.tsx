@@ -509,8 +509,8 @@ export default function ExamPaperEditor({
   }
 
   const headerBlock = (
-    <div className={embedded ? "rounded-2xl border border-[#dbeafe] bg-white p-4 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] sm:p-5" : "shrink-0 border-b border-[#dbeafe] bg-white shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"}>
-      <div className={embedded ? "flex flex-col gap-3" : "mx-auto flex max-w-4xl flex-col gap-3 px-4 py-4 sm:px-6 sm:py-5"}>
+    <div className={embedded ? "rounded-2xl border border-[#dbeafe] bg-white p-4 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] sm:p-5" : "shrink-0 border-b border-[#dbeafe] bg-white shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] sticky top-0 z-10"}>
+      <div className={embedded ? "flex flex-col gap-3" : "mx-auto max-w-4xl flex-col gap-3 px-4 py-4 sm:px-6 sm:py-5"}>
         {!embedded && (
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -577,7 +577,7 @@ export default function ExamPaperEditor({
             onChange={(e) => setBulkText(e.target.value)}
             placeholder={`Paste ${langVersion === "bangla" ? "Bangla / English / mixed" : "English"} questions for Set ${setLabel}`}
             rows={6}
-            className="min-h-[140px] w-full resize-y rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3.5 text-sm leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 focus:border-[#93c5fd] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500"
+            className="max-h-[40vh] min-h-[100px] w-full resize-y rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3.5 text-sm leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 focus:border-[#93c5fd] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500"
           />
           <button
             type="button"
@@ -757,12 +757,14 @@ export default function ExamPaperEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#f1f5f9] admin-dark:bg-[#0b1628]" role="dialog" aria-modal="true">
-      {hiddenFileInput}
-      {headerBlock}
-      {innerPaper}
-      <div className="shrink-0 border-t border-[#dbeafe] bg-white p-3 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
-        <button type="button" onClick={onClose} className={buttonSecondaryClass}>Close</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4" role="dialog" aria-modal="true">
+      <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#f1f5f9] shadow-2xl admin-dark:bg-[#0b1628]">
+        {hiddenFileInput}
+        {headerBlock}
+        {innerPaper}
+        <div className="shrink-0 border-t border-[#dbeafe] bg-white p-3 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+          <button type="button" onClick={onClose} className={buttonSecondaryClass}>Close</button>
+        </div>
       </div>
     </div>
   );
