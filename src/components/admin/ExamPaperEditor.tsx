@@ -95,17 +95,24 @@ export default function ExamPaperEditor({
   const [detectWarnings, setDetectWarnings] = useState<Record<number, string[]>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bearer = useMemo(() => authHeaders["Authorization"] || authHeaders["authorization"] || "", [authHeaders]);
+  // Staleness guard: increments on every workspace switch so in-flight fetches
+  // from a previous workspace discard their results instead of overwriting the
+  // current workspace's questions state.
+  const loadVersionRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forVersion?: LangVersion, forSet?: SetLabel) => {
+    const v = forVersion ?? langVersion;
+    const s = forSet ?? setLabel;
+    const version = ++loadVersionRef.current;
     try {
-      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${langVersion}&set=${setLabel}`, {
+      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${v}&set=${s}`, {
         cache: "no-store",
         headers: authHeaders,
       });
       const data = (await res.json()) as { questions?: ExamQuestion[] };
-      setQuestions(data.questions ?? []);
+      if (version === loadVersionRef.current) setQuestions(data.questions ?? []);
     } catch {
-      setQuestions([]);
+      if (version === loadVersionRef.current) setQuestions([]);
     }
   }, [exam.id, authHeaders, langVersion, setLabel]);
 
@@ -132,11 +139,14 @@ export default function ExamPaperEditor({
     void loadCoverage();
   }, [loadCoverage]);
 
-  // Switching version/set workspace resets local drafts so content from one
-  // workspace never leaks into another.
+  // Switching version/set workspace resets local state so content from one
+  // workspace never leaks into another. questions must be nulled so the UI
+  // shows "Loading…" while the new workspace data is fetched.
   useEffect(() => {
+    setQuestions(null);
     setDrafts({});
     setDetectWarnings({});
+    setSavingSlot(null);
     setError(null);
     setNotice(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,6 +302,10 @@ export default function ExamPaperEditor({
     setError(null);
     setNotice(null);
     setDetectWarnings({});
+    // Capture workspace at call time — if user switches tabs mid-detect,
+    // the final load() still refreshes the correct workspace.
+    const detectVersion = langVersion;
+    const detectSet = setLabel;
     if (!bulkText.trim()) {
       setError("Paste your questions first.");
       return;
@@ -359,10 +373,10 @@ export default function ExamPaperEditor({
         await persistSlotWithData(i, draft);
         persisted += 1;
       }
-      await load();
+      await load(detectVersion, detectSet);
       onChanged?.();
       void loadCoverage();
-      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${langVersion} Set ${setLabel}.`;
+      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${detectVersion} Set ${detectSet}.`;
       if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not saved).`;
       if (skippedDueToMissingAnswer > 0) msg += ` ${skippedDueToMissingAnswer} question${skippedDueToMissingAnswer === 1 ? "" : "s"} have no confident answer — please verify.`;
       const reviewCount = Object.keys(warnings).length;
@@ -420,12 +434,15 @@ export default function ExamPaperEditor({
     if (!draft) return;
     const updated = { ...draft, correctIndex: newIdx };
     setDrafts((prev) => ({ ...prev, [slotIndex]: updated }));
+    // Capture workspace — setTimeout runs async, user may have switched tabs
+    const cv = langVersion;
+    const cs = setLabel;
     // slight delay to ensure state, then persist
     setTimeout(() => {
       setDrafts((curr) => {
         const cur = curr[slotIndex];
         if (cur) void persistSlotWithData(slotIndex, cur).then(() => {
-          void load();
+          void load(cv, cs);
           void loadCoverage();
           onChanged?.();
         }).catch(() => setError("Failed to update correct answer."));
