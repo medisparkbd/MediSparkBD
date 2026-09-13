@@ -601,7 +601,7 @@ export default function ExamPaperEditor({
   );
 
   const innerPaper = (
-    <div className={embedded ? "mt-4" : ""}>
+    <div className={embedded ? "mt-4" : "flex-1 overflow-y-auto"}>
       <div className={embedded ? "" : "mx-auto max-w-4xl px-3 py-6 sm:px-6"}>
         {questions === null ? (
           <p className={`${cardClass} p-6 text-center text-sm text-slate-500`}>Loading paper…</p>
@@ -757,16 +757,14 @@ export default function ExamPaperEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4" role="dialog" aria-modal="true">
-      <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#f1f5f9] shadow-2xl admin-dark:bg-[#0b1628]">
-        <div className="flex-1 overflow-y-auto">
-          {hiddenFileInput}
-          {headerBlock}
-          {innerPaper}
-        </div>
-        <div className="shrink-0 border-t border-[#dbeafe] bg-white p-3 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
-          <button type="button" onClick={onClose} className={buttonSecondaryClass}>Close</button>
-        </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#f1f5f9] admin-dark:bg-[#0b1628]" role="dialog" aria-modal="true">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {hiddenFileInput}
+        {headerBlock}
+        {innerPaper}
+      </div>
+      <div className="shrink-0 border-t border-[#dbeafe] bg-white p-3 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+        <button type="button" onClick={onClose} className={buttonSecondaryClass}>Close</button>
       </div>
     </div>
   );
