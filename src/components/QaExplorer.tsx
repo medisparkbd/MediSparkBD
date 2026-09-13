@@ -256,45 +256,34 @@ export default function QaExplorer({
 
   return (
     <div>
-      {!selectedSubject && (
-        <div className="relative mb-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-3 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-4">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
-          <h2 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
-            Choose a Subject to View Questions
-          </h2>
-          <p className="relative mx-auto mt-2 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-            নিচের বিষয়গুলোতে ক্লিক করে বিভিন্ন প্রশ্ন ও তাদের উত্তর দেখতে পারো।
-          </p>
+      {selectedSubject && (
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-extrabold text-heading">
+              {selectedSubject.name}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setSelectedSubjectId(null)}
+              className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
+            >
+              Change Subject
+            </button>
+          </div>
         </div>
       )}
 
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          {selectedSubject && (
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-extrabold text-heading">
-                {selectedSubject.name}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setSelectedSubjectId(null)}
-                className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
-              >
-                Change Subject
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <p className="text-sm font-medium text-neutral-400">
-            তোমার যেকোনো প্রশ্ন এখানে করতে পারো
+      {!selectedSubject && (
+        <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-4 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-5">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
+          <p className="relative mx-auto max-w-md text-sm leading-relaxed text-neutral-300 sm:text-base">
+            তোমার প্রশ্নটি করতে নিচের &ldquo;Ask Question&rdquo; বাটনে ক্লিক করো।
           </p>
           <button
             type="button"
             onClick={() => void openAsk()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
+            className="relative mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
           >
             <svg
               className="h-4 w-4"
@@ -305,10 +294,23 @@ export default function QaExplorer({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Ask a Question
+            Ask Question
           </button>
         </div>
-      </div>
+      )}
+
+      {!selectedSubject && (
+        <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-2 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-3">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
+          <h2 className="relative text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            Choose a Subject to View Questions
+          </h2>
+          <p className="relative mx-auto mt-1 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
+            নিচের বিষয়গুলোতে ক্লিক করে বিভিন্ন প্রশ্ন ও তাদের উত্তর দেখতে পারো।
+          </p>
+        </div>
+      )}
 
       {askGuidance && (
         <PermissionGuidanceCard guidance={askGuidance} />
