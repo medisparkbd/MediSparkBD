@@ -18,6 +18,7 @@ export type ExamStatus =
   | "Available"
   | "Completed"
   | "Expired"
+  | "Practice"
   | "Inactive"
   | "Unpublished";
 

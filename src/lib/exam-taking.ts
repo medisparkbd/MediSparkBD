@@ -142,14 +142,14 @@ type ResultDetail = {
 /** Best score achieved by any student on this exam (null when no results). */
 async function highestMarkFor(examId: string): Promise<number | null> {
   try {
-    // For Flow-4 exams, highest live mark is frozen — practice scores must NOT
+    // For enrolled exams, highest live mark is frozen — practice scores must NOT
     // become the new highest for the Live leaderboard (spec §7).
-    let isFlow4 = false;
+    let isEnrolled = false;
     try {
-      const { isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
-      isFlow4 = await isFlow4Exam(examId);
+      const { isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+      isEnrolled = await isEnrolledExam(examId);
     } catch {}
-    if (isFlow4) {
+    if (isEnrolled) {
       try {
         const liveRows = await query<{ best: string | number | null }[]>(
           `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'live' OR attempt_type IS NULL)`,
@@ -393,15 +393,15 @@ async function startExamAttempt(
     // If exam lookup fails, fall through to normal handling
   }
   // Max attempts enforcement: check exam_settings.maxAttempts if the table exists (for enrolled / fallback)
-  // Flow 4 Practice is exempt — after Live ends, enrolled students may
+  // Enrolled Exam Practice is exempt — after Live ends, enrolled students may
   // retake for practice even when maxAttempts would otherwise block (spec §6).
   let bypassMaxAttempts = false;
   try {
-    const { getFlow4Phase, isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
+    const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
     const { fetchExamById } = await import("@/lib/exams-admin");
     const examForPhase = await fetchExamById(examId);
-    if (examForPhase && (await isFlow4Exam(examId))) {
-      if (getFlow4Phase(examForPhase) === "practice") bypassMaxAttempts = true;
+    if (examForPhase && (await isEnrolledExam(examId))) {
+      if (getEnrolledExamPhase(examForPhase) === "practice") bypassMaxAttempts = true;
     }
   } catch {
     // Best-effort — keep default enforcement.
@@ -770,15 +770,15 @@ async function finalizeAttempt(
      ON DUPLICATE KEY UPDATE student_name = VALUES(student_name)`,
     [examId, uid, studentName],
   );
-  // Flow 4 lifecycle — determine live vs practice at submission time (server time).
-  // Public exams keep existing behavior (always live). Flow-4 exams use
+  // Enrolled exam lifecycle — determine live vs practice at submission time (server time).
+  // Public exams keep existing behavior (always live). Enrolled exams use
   // UPCOMING → LIVE → PRACTICE based on scheduledAt/endsAt.
   let attemptType: "live" | "practice" = "live";
   try {
-    const { getFlow4Phase, isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
-    const isFlow4 = await isFlow4Exam(examId);
-    if (isFlow4) {
-      const phase = getFlow4Phase(found);
+    const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+    const isEnrolled = await isEnrolledExam(examId);
+    if (isEnrolled) {
+      const phase = getEnrolledExamPhase(found);
       if (phase === "practice") attemptType = "practice";
     }
   } catch {
@@ -1235,13 +1235,13 @@ export async function getExamForTaking(
     }
   }
 
-  // Flow-4 phase for labeling (Live vs Practice after End Time). Computed server-side.
+  // Enrolled exam phase for labeling (Live vs Practice after End Time). Computed server-side.
   let phase: TakingExam["phase"] = null;
-  let isFlow4 = false;
+  let isEnrolled = false;
   try {
-    const { getFlow4Phase, isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
-    isFlow4 = await isFlow4Exam(examId);
-    if (isFlow4) phase = getFlow4Phase(found);
+    const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+    isEnrolled = await isEnrolledExam(examId);
+    if (isEnrolled) phase = getEnrolledExamPhase(found);
     else phase = null;
   } catch {
     phase = null;
@@ -1259,7 +1259,7 @@ export async function getExamForTaking(
       negativeMarks: negativePerWrongFor(found),
       startedAt,
       phase,
-      isFlow4,
+      isFlow4: isEnrolled,
     },
     questions,
     sessionToken,

@@ -39,6 +39,12 @@ const statusMeta: Record<
     badge: "bg-red-500/10 text-red-400 border border-red-500/30",
     dot: "bg-red-400",
   },
+  Practice: {
+    label: "PRACTICE",
+    badge:
+      "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
+    dot: "bg-white",
+  },
   Inactive: {
     label: "INACTIVE",
     badge: "bg-dark-800 text-neutral-500 border border-ink/10",
@@ -100,6 +106,7 @@ const actionMeta: Record<ExamStatus, { label: string }> = {
   Upcoming: { label: "View Details" },
   Completed: { label: "View Result" },
   Expired: { label: "View Details" },
+  Practice: { label: "Start Practice" },
   Inactive: { label: "Not Available" },
   Unpublished: { label: "View Details" },
 };
@@ -109,9 +116,11 @@ function dateInfo(exam: PublicExam): string {
   const prefix =
     exam.status === "Live" || exam.status === "Available"
       ? "Started"
-      : exam.status === "Completed" || exam.status === "Expired"
+      : exam.status === "Practice"
         ? "Ended"
-        : "Scheduled";
+        : exam.status === "Completed" || exam.status === "Expired"
+          ? "Ended"
+          : "Scheduled";
   return exam.examTime
     ? `${prefix} ${exam.examDate} · ${exam.examTime}`
     : `${prefix} ${exam.examDate}`;
@@ -139,7 +148,8 @@ export default function ExamCard({
   const CategoryIcon = categoryMeta[category].icon;
   const isLive = exam.status === "Live";
   const isAvailable = exam.status === "Available";
-  const canStart = !hasCompleted && (isLive || isAvailable);
+  const isPractice = exam.status === "Practice";
+  const canStart = !hasCompleted && (isLive || isAvailable || isPractice);
   const isInactive = exam.status === "Inactive";
   const isUnpublished = exam.status === "Unpublished";
   const href = detailsHref ?? `/exam/${exam.id}`;
@@ -148,7 +158,9 @@ export default function ExamCard({
   const effectiveAction = hasCompleted ? { label: "View Result" } : actionMeta[exam.status];
 
   const cardClasses = canStart
-    ? "border-primary-600/60 ring-1 ring-primary-600/40 shadow-xl shadow-primary-900/40 hover:border-primary-500 hover:shadow-primary-800/50"
+    ? isPractice
+      ? "border-violet-600/60 ring-1 ring-violet-600/40 shadow-xl shadow-violet-900/40 hover:border-violet-500 hover:shadow-violet-800/50"
+      : "border-primary-600/60 ring-1 ring-primary-600/40 shadow-xl shadow-primary-900/40 hover:border-primary-500 hover:shadow-primary-800/50"
     : exam.status === "Upcoming"
       ? "border-primary-500/30 shadow-lg shadow-black/20 hover:border-primary-600/50"
       : "border-ink/10 shadow-lg shadow-black/20 hover:border-primary-600/50";

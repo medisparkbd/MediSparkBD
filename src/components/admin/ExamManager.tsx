@@ -630,12 +630,15 @@ export default function ExamManager({
     }
   }
 
-  // Flow 4 uses LIVE→PRACTICE temporal lifecycle (phase), Public uses static examMode.
-  // When fixedChapter is set (Course Content Flow 4 exam batch), filter by
-  // derived phase (Upcoming/Live/Practice) instead of static Live/Practice.
+  // ALL enrolled (private/course) exams use LIVE→PRACTICE temporal lifecycle.
+  // Public exams use static examMode. When showing enrolled exams, filter
+  // by derived phase (Upcoming/Live/Practice) instead of static Live/Practice.
+  const hasEnrolledExams = Array.isArray(kindFilter)
+    ? kindFilter.includes("enrolled")
+    : kindFilter === "enrolled";
   const filteredByMode = (() => {
     if (!exams) return null;
-    if (fixedChapter) {
+    if (hasEnrolledExams) {
       return exams.filter((e) => {
         if (phaseFilter === "all") return true;
         return flow4Phase(e) === phaseFilter;
@@ -683,8 +686,8 @@ export default function ExamManager({
         </div>
       )}
 
-      {/* Course Content Flow 4 (fixedChapter): show Upcoming / Live / Practice phase tabs */}
-      {fixedChapter && exams !== null && !loadError && (
+      {/* Enrolled exams: show Upcoming / Live / Practice phase tabs */}
+      {hasEnrolledExams && exams !== null && !loadError && (
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
           {(["all", "upcoming", "live", "practice"] as const).map((ph) => {
             const label = ph === "all" ? "All Exams" : ph === "upcoming" ? "Upcoming" : ph === "live" ? "Live" : "Practice";
@@ -727,12 +730,12 @@ export default function ExamManager({
         <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
       ) : (filteredByMode?.length ?? 0) === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
-          {exams.length === 0 ? "No exams yet." : fixedChapter ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
+          {exams.length === 0 ? "No exams yet." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
         </p>
       ) : (
         <ul className="mt-5 space-y-3">
           {filteredByMode!.map((exam) => {
-            const phase = fixedChapter ? flow4Phase(exam) : null;
+            const phase = hasEnrolledExams ? flow4Phase(exam) : null;
             const phaseBadge = phase ? flow4PhaseBadge(phase) : null;
             return (
             <li key={exam.id} className={`${cardClass} flex flex-col gap-3 p-4 sm:p-5`}>

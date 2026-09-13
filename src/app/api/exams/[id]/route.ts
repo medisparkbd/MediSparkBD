@@ -59,32 +59,25 @@ export async function GET(
       );
     }
 
-    // Flow-4 separation: Public exams keep deriveStatus-based Expired check.
-    // Course Content Flow 4 (Exam Batch) uses LIVE → PRACTICE — after End Time
-    // the exam is still startable as Practice for enrolled students.
-    // For Flow-4 Practice, Expired / Completed must NOT block start.
-    let isFlow4 = false;
+    // Enrolled exam lifecycle: ALL enrolled (private/course) exams use
+    // UPCOMING → LIVE → PRACTICE based on server time.
+    // After End Time the exam is still startable as Practice for enrolled students.
+    // Public exams keep the existing deriveStatus-based Expired check.
+    let isEnrolled = false;
     try {
-      const { isFlow4Exam } = await import("@/lib/flow4-exam-lifecycle");
-      isFlow4 = await isFlow4Exam(id);
+      const { isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+      isEnrolled = await isEnrolledExam(id);
     } catch {
-      isFlow4 = false;
+      isEnrolled = false;
     }
-    if (!isFlow4) {
-      if (examMeta.status === "Completed" || examMeta.status === "Expired") {
-        return NextResponse.json(
-          { error: "This exam has ended. You can no longer start it." },
-          { status: 403 },
-        );
-      }
-    } else {
-      // Flow-4: only UPCOMING blocks start; PRACTICE is allowed for practice.
+    if (isEnrolled) {
+      // Enrolled: only UPCOMING blocks start; PRACTICE is allowed for practice.
       try {
-        const { getFlow4Phase } = await import("@/lib/flow4-exam-lifecycle");
+        const { getEnrolledExamPhase } = await import("@/lib/enrolled-exam-lifecycle");
         const { fetchExamById } = await import("@/lib/exams-admin");
         const raw = await fetchExamById(id);
         if (raw) {
-          const phase = getFlow4Phase(raw);
+          const phase = getEnrolledExamPhase(raw);
           if (phase === "upcoming") {
             return NextResponse.json(
               { error: "This exam has not started yet." },
@@ -94,13 +87,21 @@ export async function GET(
           // Live and Practice both allow start — Practice via enrolled path.
         }
       } catch {
-        // Fallback to original check if Flow-4 lookup fails
+        // Fallback to original check if lookup fails
         if (examMeta.status === "Completed" || examMeta.status === "Expired") {
           return NextResponse.json(
             { error: "This exam has ended. You can no longer start it." },
             { status: 403 },
           );
         }
+      }
+    } else {
+      // Public exams keep existing lifecycle — Expired/Completed blocks start.
+      if (examMeta.status === "Completed" || examMeta.status === "Expired") {
+        return NextResponse.json(
+          { error: "This exam has ended. You can no longer start it." },
+          { status: 403 },
+        );
       }
     }
 

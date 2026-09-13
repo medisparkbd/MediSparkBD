@@ -14,6 +14,7 @@ const examSections: { key: PublicExam["status"]; label: string }[] = [
   { key: "Live", label: "Live Exams" },
   { key: "Available", label: "Available Exams" },
   { key: "Upcoming", label: "Upcoming Exams" },
+  { key: "Practice", label: "Practice Exams" },
   { key: "Completed", label: "Previous Exams" },
   { key: "Expired", label: "Expired Exams" },
 ];
@@ -27,6 +28,7 @@ function emptyGroups(): CategoryGroups {
     Upcoming: [],
     Completed: [],
     Expired: [],
+    Practice: [],
     Inactive: [],
     Unpublished: [],
   };
