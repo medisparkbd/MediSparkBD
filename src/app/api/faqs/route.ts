@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin";
 import { fetchAllFaqs, fetchPublishedFaqs, saveFaqs } from "@/lib/faq-store";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
 export const revalidate = 300;
 
 export async function GET() {
   const faqs = await fetchPublishedFaqs();
-  return NextResponse.json(
-    { faqs },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return cachedJson({ faqs }, "API_LONG");
 }
 
 /** Replace the full FAQ list (add / edit / delete / toggle / reorder). */

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { HeroSettings } from "@/lib/hero-constants";
 import { DEFAULT_HERO_SETTINGS } from "@/lib/hero-constants";
 
@@ -11,11 +12,13 @@ export default function Hero({
     <section className="relative overflow-hidden bg-dark-950">
       {hero.backgroundImageUrl && (
         <div className="absolute inset-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={hero.backgroundImageUrl}
             alt=""
-            className="h-full w-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
+            priority
           />
           <div className="absolute inset-0 bg-dark-950/80" />
         </div>

@@ -1,15 +1,11 @@
-import { NextResponse } from "next/server";
 import { getPaymentCard } from "@/lib/payment-card";
+import { cachedJson } from "@/lib/api-cache";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Public read — the saved payment card for students. Only enabled methods
- * are returned; disabled numbers never leave the server.
- */
 export async function GET() {
   const config = await getPaymentCard();
-  return NextResponse.json(
+  return cachedJson(
     {
       bkash: config.bkashEnabled && config.bkashNumber
         ? { number: config.bkashNumber }
@@ -20,6 +16,6 @@ export async function GET() {
       instructions: config.instructions || null,
       note: config.note || null,
     },
-    { headers: { "Cache-Control": "no-store" } },
+    "API_MEDIUM",
   );
 }

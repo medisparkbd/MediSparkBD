@@ -10,16 +10,13 @@ import {
   updateCourseCategory,
   type CategoryPatch,
 } from "@/lib/course-categories-store";
+import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (60s revalidation).
 export const revalidate = 300;
 
 export async function GET() {
   const categories = await fetchActiveCourseCategories();
-  return NextResponse.json(
-    { categories },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return cachedJson({ categories }, "API_LONG");
 }
 
 /** Create a category (multipart, optional image). */

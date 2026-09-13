@@ -14,6 +14,7 @@ import { fetchHeroSettings } from "@/lib/hero-settings";
 import { fetchPublishedReviewRecords } from "@/lib/reviews-store";
 import { fetchPublishedFaqs } from "@/lib/faq-store";
 import { fetchActiveJerseys } from "@/lib/content-admin";
+import { fetchBannerSlides } from "@/lib/banner-slides";
 import type { StudentReview } from "@/lib/reviews";
 import type { HomepageSection } from "@/lib/homepage-sections-constants";
 import type { ReactNode } from "react";
@@ -30,8 +31,6 @@ function renderSection(section: HomepageSection) {
   };
 
   switch (section.key) {
-    case "banner":
-      return <BannerSlider key={section.key} />;
     case "hero":
       return <Hero key={section.key} />;
     case "featured-courses":
@@ -50,12 +49,13 @@ function renderSection(section: HomepageSection) {
 }
 
 export default async function HomePage() {
-  const [sections, heroSettings, reviewRecords, publishedFaqs, activeJerseys] = await Promise.all([
+  const [sections, heroSettings, reviewRecords, publishedFaqs, activeJerseys, bannerSlides] = await Promise.all([
     fetchHomepageSections(),
     fetchHeroSettings(),
     fetchPublishedReviewRecords(),
     fetchPublishedFaqs(),
     fetchActiveJerseys(),
+    fetchBannerSlides(),
   ]);
   const activeSections = sections.filter((section) => section.isActive);
 
@@ -83,6 +83,9 @@ export default async function HomePage() {
   const showJersey = Boolean(jerseySection?.isActive) && activeJerseys.length > 0;
 
   function renderHomeSection(section: HomepageSection): ReactNode {
+    if (section.key === "banner") {
+      return <BannerSlider key={section.key} initialSlides={bannerSlides} />;
+    }
     if (section.key === "hero") {
       // Hero visibility is controlled from Admin → Website → Hero Section.
       if (!heroSettings.isActive) return null;

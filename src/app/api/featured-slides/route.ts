@@ -6,8 +6,7 @@ import { fetchFeaturedPublicExams } from "@/lib/exams-admin";
 import { fetchFeaturedJerseys } from "@/lib/content-admin";
 import { cachedJson } from "@/lib/api-cache";
 
-// Public content: edge-cached for fast loads (5min revalidation).
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 /**
  * Auto-generated slides for the hero sliding banner:

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 type Slide = {
   id: string;
@@ -12,53 +13,15 @@ type Slide = {
   subtitle?: string;
 };
 
-type FeaturedSlideResponse = {
-  slides?:
-    | {
-        id: string;
-        image: string;
-        href: string;
-        title: string;
-        subtitle: string;
-      }[]
-    | null;
-};
-
 const AUTO_SLIDE_MS = 3000;
 const SWIPE_THRESHOLD_PX = 40;
 
-export default function BannerSlider() {
+export default function BannerSlider({ initialSlides = [] }: { initialSlides?: Slide[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [ready, setReady] = useState(false);
+  const [slides] = useState<Slide[]>(initialSlides);
   const [paused, setPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchSwiped = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/featured-slides", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: FeaturedSlideResponse | null) => {
-        if (cancelled || !data?.slides) return;
-        setSlides(
-          data.slides.map((slide) => ({
-            id: slide.id,
-            image: slide.image,
-            href: slide.href,
-            title: slide.title,
-            subtitle: slide.subtitle,
-          })),
-        );
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const goTo = useCallback(
     (index: number) => {
@@ -74,18 +37,6 @@ export default function BannerSlider() {
     }, AUTO_SLIDE_MS);
     return () => clearInterval(timer);
   }, [paused, activeIndex, goTo, slides.length]);
-
-  if (!ready && slides.length === 0) {
-    return (
-      <section
-        role="region"
-        aria-label="Featured banners"
-        className="relative w-full overflow-hidden bg-dark-950"
-      >
-        <div className="aspect-[64/35] w-full animate-pulse bg-dark-900 sm:aspect-[32/15]" />
-      </section>
-    );
-  }
 
   if (slides.length === 0) return null;
 
@@ -122,12 +73,14 @@ export default function BannerSlider() {
       >
         {slides.map((slide) => {
           const banner = (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={slide.image}
               alt={slide.alt ?? slide.title ?? ""}
+              fill
+              sizes="100vw"
               draggable={false}
-              className="h-full w-full object-cover"
+              className="object-cover"
+              priority
             />
           );
           const hashTarget = slide.href?.startsWith("#")

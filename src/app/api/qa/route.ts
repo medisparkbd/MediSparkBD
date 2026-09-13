@@ -8,10 +8,10 @@ import {
   matchCategoryId,
 } from "@/lib/qa-store";
 import { fetchActiveCourseCategories } from "@/lib/course-categories-store";
+import { cachedJson } from "@/lib/api-cache";
 
 export const dynamic = "force-dynamic";
 
-/** Public read: subjects + questions (per subject) for the website Q&A. */
 export async function GET(request: NextRequest) {
   const subjectId =
     request.nextUrl.searchParams.get("subject")?.trim() ?? "";
@@ -19,10 +19,7 @@ export async function GET(request: NextRequest) {
     fetchQaBrowseSubjects(),
     fetchQaQuestions(subjectId ? { subjectId } : {}),
   ]);
-  return NextResponse.json(
-    { subjects, questions },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return cachedJson({ subjects, questions }, "API_SHORT");
 }
 
 type AskBody = {
