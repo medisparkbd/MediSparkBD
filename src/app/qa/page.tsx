@@ -25,7 +25,7 @@ export default async function QaPage() {
 
   return (
     <main className="flex-1 bg-dark-950">
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
         <QaPageClient subjects={subjects} questions={questions} askCardSettings={askCardSettings} />
       </section>
     </main>

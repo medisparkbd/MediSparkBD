@@ -104,7 +104,7 @@ export default function DashboardHome({
 
   return (
     <main className="flex-1 bg-dark-950">
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
         <ProfileCard
           name={profile.fullName}
           studentId={profile.studentId}
@@ -118,7 +118,7 @@ export default function DashboardHome({
           </p>
         )}
 
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {sections.map((section) => {
             const locked = !hasEnrollment && !ENROLLMENT_FREE_SECTIONS.has(section.href);
             const cardNode = (

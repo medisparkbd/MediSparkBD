@@ -122,7 +122,7 @@ export default function PublicExamList({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <select
             aria-label="Filter by batch"
@@ -161,7 +161,7 @@ export default function PublicExamList({
       </div>
 
       {filtered.length === 0 && (
-        <div className="mb-10 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
+        <div className="mb-6 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
           <p className="font-semibold text-heading">No exams found</p>
           <p className="mt-1 text-sm text-neutral-400">
             Try changing the batch or exam mode filter.

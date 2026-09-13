@@ -315,7 +315,7 @@ export default function QaExplorer({
       )}
 
       {askOpen && (
-        <div className="mb-10">
+        <div className="mb-6">
           {askOptionsError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-sm font-semibold text-red-400">
               {askOptionsError}
