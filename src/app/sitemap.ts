@@ -2,10 +2,7 @@ import type { MetadataRoute } from "next";
 import { fetchCatalogCourses } from "@/lib/courses-admin";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "https://medisparkbd.com");
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://medisparkbd.com";
 
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"]; priority: number }[] = [
   { path: "/", changeFrequency: "daily", priority: 1.0 },

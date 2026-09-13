@@ -62,10 +62,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const description = seo.metaDescription || DEFAULT_META_DESCRIPTION;
   return {
     metadataBase: new URL(
-      process.env.NEXT_PUBLIC_SITE_URL ??
-        (process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "https://medisparkbd.com"),
+      process.env.NEXT_PUBLIC_SITE_URL ?? "https://medisparkbd.com",
     ),
     title: {
       default: siteTitle,
