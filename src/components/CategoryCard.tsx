@@ -131,8 +131,8 @@ export default function CategoryCard({
       </div>
 
       {/* Single rounded-square action button — text and arrow together. */}
-      <div className="relative mt-auto pt-6">
-        <span className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition duration-300 group-hover:bg-primary-700 group-hover:shadow-primary-900/60">
+      <div className="relative mt-4">
+        <span className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition duration-300 group-hover:bg-primary-700 group-hover:shadow-primary-900/60">
           Explore Course
           <svg
             className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
