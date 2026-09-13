@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useCourseAccess } from "@/lib/course-access";
-import { enrollInCourse, getCourseKind } from "@/lib/enrollments";
+import { enrollInCourse } from "@/lib/enrollments";
 import { formatFee, getPayableFee } from "@/lib/courses";
 import type { Course } from "@/lib/courses";
 
@@ -92,7 +92,6 @@ export default function EnrollModal({
     refreshEnrollments,
   } = useAuth();
   const { isActive, isPending, isCancelled, isCompleted } = useCourseAccess(course);
-  const isPaid = getCourseKind(course) === "paid";
   const payableFee = getPayableFee(course);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +106,10 @@ export default function EnrollModal({
   // Final system-derived payable amount (built-in discount already inside
   // payableFee, plus any valid coupon on top). The student can never edit it.
   const finalAmount = appliedCoupon?.finalFee ?? payableFee;
+  // CRITICAL: enrollment flow is determined by the FINAL PAYABLE AMOUNT,
+  // not by the course's original "Paid/Free" label. A paid course with
+  // ৳0 payable (after discount/coupon) MUST be treated as free enrollment.
+  const isPaid = finalAmount > 0;
   const [senderMobile, setSenderMobile] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // Live payment card from MySQL (Admin Payment Card manager) — shows
