@@ -545,7 +545,7 @@ export default function ExamPaperEditor({
   }
 
   const headerBlock = (
-    <div className={embedded ? "rounded-2xl border border-[#dbeafe] bg-white p-4 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] sm:p-5" : "shrink-0 border-b border-[#dbeafe] bg-white shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"}>
+    <div className={embedded ? "rounded-2xl border border-[#dbeafe] bg-white p-4 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] sm:p-5" : "border-b border-[#dbeafe] bg-white shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"}>
       <div className={embedded ? "flex flex-col gap-3" : "mx-auto max-w-4xl flex-col gap-3 px-4 py-4 sm:px-6 sm:py-5"}>
         {!embedded && (
           <div className="flex items-start justify-between gap-3">
@@ -634,14 +634,14 @@ export default function ExamPaperEditor({
   );
 
   const innerPaper = (
-    <div ref={scrollContainerRef} className={embedded ? "mt-4" : "flex-1 overflow-y-auto"}>
-      {/* Sticky detection banner — stays visible while scrolling questions */}
-      {!embedded && (error || notice) && (
-        <div className="sticky top-0 z-20 space-y-2 bg-[#f1f5f9] px-3 pt-3 sm:px-6 admin-dark:bg-[#0b1628]">
-          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-md admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
-          {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 shadow-md admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{notice}</p>}
+    <div className="mt-4">
+      {/* Detection banner for embedded mode */}
+      {(error || notice) && (
+        <div className="mb-4 space-y-2">
+          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
+          {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{notice}</p>}
           {Object.keys(detectExistingMap).length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-tight text-amber-700 shadow-md admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20 admin-dark:text-amber-300">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-tight text-amber-700 admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20 admin-dark:text-amber-300">
               ⚠ Already-added questions overwritten: {Object.keys(detectExistingMap).map((k) => `Q${pad(Number(k) + 1)}`).join(", ")}
             </div>
           )}
@@ -803,10 +803,128 @@ export default function ExamPaperEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#f1f5f9] admin-dark:bg-[#0b1628]" role="dialog" aria-modal="true">
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Single scroll container — headerBlock scrolls away, detection banner sticks */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain">
         {hiddenFileInput}
         {headerBlock}
-        {innerPaper}
+
+        {/* Sticky detection banner — stays visible while scrolling questions */}
+        {(error || notice) && (
+          <div className="sticky top-0 z-20 space-y-2 bg-[#f1f5f9] px-4 pt-3 sm:px-6 admin-dark:bg-[#0b1628]">
+            {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-md admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{error}</p>}
+            {notice && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 shadow-md admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{notice}</p>}
+            {Object.keys(detectExistingMap).length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold leading-tight text-amber-700 shadow-md admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20 admin-dark:text-amber-300">
+                ⚠ Already-added questions overwritten: {Object.keys(detectExistingMap).map((k) => `Q${pad(Number(k) + 1)}`).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Questions list */}
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+          {questions === null ? (
+            <p className={`${cardClass} p-6 text-center text-sm text-slate-500`}>Loading paper…</p>
+          ) : totalSlots === 0 ? (
+            <div className={`${cardClass} p-6 text-center`}>
+              <p className="text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">No slots configured.</p>
+              <p className="mt-1 text-xs text-slate-500">Set Total Questions on the exam to generate Q01..QNN slots.</p>
+            </div>
+          ) : (
+            <ol className="space-y-4">
+              {displaySlots.map(({ index, q }) => {
+                const slotNumber = index + 1;
+                const draft = drafts[index] ?? { question: q?.question || "", options: (q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS]), correctIndex: (q?.correctIndex ?? 0) };
+                const opts = [...draft.options];
+                while (opts.length < 4) opts.push("");
+                const isSaving = savingSlot === index;
+                const warnings = detectWarnings[index];
+
+                return (
+                  <li
+                    key={q?.id ?? `slot-${index}`}
+                    className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${warnings && warnings.length > 0 ? "border-amber-300 admin-dark:border-amber-700" : "border-[#dbeafe] admin-dark:border-[#1e3a65]"} admin-dark:bg-[#112544]`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">
+                        Q{pad(slotNumber)}
+                        {q?.id !== null && q?.id !== undefined && (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold tracking-normal text-slate-500 admin-dark:bg-[#0f2547] admin-dark:text-slate-400" title="Permanent Question ID — identical across versions, sets and students">
+                            ID {q.id}
+                          </span>
+                        )}
+                      </p>
+                      {warnings && warnings.length > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
+                      )}
+                    </div>
+
+                    <div className="mt-2">
+                      <textarea
+                        value={draft.question}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [index]: { ...draft, question: e.target.value, options: opts.slice(0, 4) } }))}
+                        onBlur={() => void persistSlot(index)}
+                        placeholder=""
+                        rows={2}
+                        className="min-h-[48px] w-full resize-y rounded-xl border border-transparent bg-[#f8fbff] p-3 text-sm font-semibold leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 hover:border-[#dbeafe] focus:border-[#93c5fd] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500 admin-dark:focus:bg-[#0f2547]"
+                      />
+                      {q?.questionImage && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={q.questionImage} alt="Question image" className="mt-3 max-h-48 w-auto rounded-xl border border-neutral-200 object-contain admin-dark:border-zinc-700" />
+                      )}
+                      {isSaving && <p className="mt-1 text-[11px] font-bold text-slate-400">Saving…</p>}
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {opts.slice(0, 4).map((opt, oi) => {
+                        const isCorrect = draft.correctIndex === oi;
+                        return (
+                          <div
+                            key={oi}
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition ${isCorrect ? "border-[#2f6bce] bg-[#eff6ff] admin-dark:border-[#2f6bce] admin-dark:bg-[#1a3a78]/30" : "border-[#e2e8f0] bg-[#f8fbff] hover:border-[#93c5fd] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"}`}
+                          >
+                            <button
+                              type="button"
+                              aria-label={`Mark option ${String.fromCharCode(65 + oi)} as correct`}
+                              onClick={() => void handleCorrectChange(index, oi)}
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-extrabold ${isCorrect ? "border-[#1a3a78] bg-[#1a3a78] text-white admin-dark:border-[#3b82f6] admin-dark:bg-[#3b82f6]" : "border-slate-300 bg-white text-slate-500 admin-dark:border-zinc-600 admin-dark:bg-[#112544]"}`}
+                            >
+                              {isCorrect ? "●" : "○"}
+                            </button>
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${isCorrect ? "bg-[#1a3a78] text-white admin-dark:bg-[#3b82f6]" : "bg-white text-slate-500 border border-slate-200 admin-dark:bg-[#1e3a65] admin-dark:text-slate-300"}`}>
+                              {String.fromCharCode(65 + oi)}
+                            </span>
+                            <input
+                              value={opt}
+                              onChange={(e) => {
+                                const nextOpts = [...opts];
+                                nextOpts[oi] = e.target.value;
+                                setDrafts((prev) => ({ ...prev, [index]: { ...draft, options: nextOpts.slice(0, 4) } }));
+                              }}
+                              onBlur={() => void persistSlot(index)}
+                              placeholder=""
+                              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none admin-dark:text-zinc-200 admin-dark:placeholder:text-slate-500"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {warnings && warnings.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 admin-dark:border-amber-800/50 admin-dark:bg-amber-900/20">
+                        {warnings.map((w, wi) => (
+                          <p key={wi} className="text-[11px] font-bold leading-tight text-amber-700 admin-dark:text-amber-300">
+                            ⚠ {w}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
       </div>
       <div className="shrink-0 border-t border-[#dbeafe] bg-white p-3 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
         <button type="button" onClick={onClose} className={buttonSecondaryClass}>Close</button>
