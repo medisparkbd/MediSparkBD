@@ -122,8 +122,8 @@ export default function ExamCategoryCards({
   }, []);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="relative mb-10 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-6 py-8 text-center shadow-lg shadow-black/20 sm:px-10 sm:py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="relative mb-10 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-5 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
         <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
         <h2 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">

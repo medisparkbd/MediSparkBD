@@ -104,7 +104,7 @@ export default function DashboardHome({
 
   return (
     <main className="flex-1 bg-dark-950">
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <ProfileCard
           name={profile.fullName}
           studentId={profile.studentId}
