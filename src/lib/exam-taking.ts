@@ -1349,6 +1349,7 @@ export type ExamResultScript = {
   submittedAt: string | null;
   timeTakenSeconds: number | null;
   meritPosition: number | null;
+  highestMark: number | null;
   negativeDeduction: number;
   timerPenalty: number;
   secondTimer: boolean;
@@ -1595,6 +1596,7 @@ export async function getExamResultScript(
       result.merit_position === null || result.merit_position === undefined
         ? null
         : Number(result.merit_position),
+    highestMark: await highestMarkFor(examId),
     negativeDeduction: toNum(result.negative_deduction),
     timerPenalty: toNum(result.timer_penalty),
     secondTimer: (result.is_second_timer ?? 0) === 1,

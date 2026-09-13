@@ -23,6 +23,7 @@ type ResultScript = {
   submittedAt: string | null;
   timeTakenSeconds: number | null;
   meritPosition: number | null;
+  highestMark: number | null;
   negativeDeduction: number;
   timerPenalty: number;
   secondTimer: boolean;
@@ -235,21 +236,13 @@ export default function ExamResultClient({
       <div className="mx-auto mt-4 max-w-2xl rounded-2xl border border-ink/10 bg-dark-900 p-5 sm:p-6">
         <div className="text-center">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-neutral-500">━━━━━━━━━━━━ Exam Result ━━━━━━━━━━━━</p>
-          <div className="mt-3 grid gap-2 text-left sm:grid-cols-2">
+          <div className="mt-3">
             <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Student Name</p>
-              <p className="text-sm font-bold text-heading">{profile.fullName}</p>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Student ID</p>
-              <p className="text-sm font-bold text-heading">{profile.studentId ?? "—"}</p>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 sm:col-span-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Exam Name</p>
               <p className="text-sm font-bold text-heading">{script.examName || examName}</p>
             </div>
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:grid-cols-4">
+          <dl className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
               <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Total Questions</dt>
               <dd className="text-sm font-extrabold text-heading">{totalQuestions}</dd>
@@ -265,6 +258,10 @@ export default function ExamResultClient({
             <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
               <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Submission Status</dt>
               <dd className="text-sm font-extrabold text-heading">Completed</dd>
+            </div>
+            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center sm:col-span-2 lg:col-span-1">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Highest Mark</dt>
+              <dd className="text-sm font-extrabold text-heading">{script.highestMark != null ? script.highestMark : "—"}</dd>
             </div>
           </dl>
         </div>
