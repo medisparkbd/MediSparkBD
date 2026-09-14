@@ -4,7 +4,7 @@ import { getSocialPlatformIcon } from "@/components/social-icons";
 import SectionHeading, { JoinIcon } from "@/components/home/SectionHeading";
 
 const JOIN_DESCRIPTIONS: Record<string, string> = {
-  facebook: "Follow us on Facebook",
+  facebook: "Join our Facebook Group",
   youtube: "Subscribe to our YouTube channel",
   telegram: "Join our Telegram community",
   instagram: "Follow us on Instagram",
@@ -14,7 +14,7 @@ const JOIN_DESCRIPTIONS: Record<string, string> = {
 };
 
 const JOIN_BUTTON_LABELS: Record<string, string> = {
-  facebook: "Follow on Facebook",
+  facebook: "Join Facebook Group",
   youtube: "Subscribe on YouTube",
   telegram: "Join on Telegram",
   instagram: "Follow on Instagram",
@@ -104,12 +104,9 @@ export default async function JoinWithUs({
                 <p className="mb-3 mt-3 line-clamp-2 min-h-[2.75em] text-[13px] leading-snug text-neutral-400">
                   {platform.description}
                 </p>
-                {/* Below Description — Action Button (bottom-aligned) */}
-                <span className="mt-auto inline-flex items-center justify-center gap-1.5 self-start rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-primary-900/30 transition group-hover:bg-primary-700">
+                {/* Below Description — Action Button (bottom-aligned; text only, centered, no arrow icon) */}
+                <span className="mt-auto inline-flex items-center justify-center self-start rounded-xl bg-primary-600 px-4 py-2 text-center text-xs font-bold text-white shadow-md shadow-primary-900/30 transition group-hover:bg-primary-700">
                   {platform.buttonLabel}
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 17L17 7M17 7H7m10 0v10" />
-                  </svg>
                 </span>
               </a>
             );
