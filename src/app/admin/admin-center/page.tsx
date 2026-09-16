@@ -25,7 +25,7 @@ const ROLES = [
     bg: "bg-purple-500/10",
     text: "text-purple-400",
     viewHref: "/admin/admin-center/admins",
-    rolesHref: "/admin/admin-center/staff-roles#admin",
+    rolesHref: "/admin/admin-center/roles/admin",
   },
   {
     value: "moderator",
@@ -35,7 +35,7 @@ const ROLES = [
     bg: "bg-blue-500/10",
     text: "text-blue-400",
     viewHref: "/admin/admin-center/moderators",
-    rolesHref: "/admin/admin-center/staff-roles#moderator",
+    rolesHref: "/admin/admin-center/roles/moderator",
   },
   {
     value: "teacher",
@@ -45,7 +45,7 @@ const ROLES = [
     bg: "bg-emerald-500/10",
     text: "text-emerald-400",
     viewHref: "/admin/admin-center/teachers",
-    rolesHref: "/admin/admin-center/staff-roles#teacher",
+    rolesHref: "/admin/admin-center/roles/teacher",
   },
 ] as const;
 

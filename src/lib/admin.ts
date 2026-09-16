@@ -112,21 +112,19 @@ export async function requireAdmin(
  */
 export async function requirePermission(
   request: NextRequest,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   permission: AdminPermission,
 ): Promise<DecodedIdToken | null> {
   const user = await getFirebaseUser(request);
   if (!user) return null;
-  // The admin check and the role lookup are independent queries — run them
-  // concurrently instead of sequentially to halve auth latency.
   const email = user.email_verified === true ? (user.email ?? null) : null;
-  const [authorized, { role }] = await Promise.all([
+  const [authorized, { role, permissions }] = await Promise.all([
     isAdminUid(user.uid, email),
     resolveAdminPermissions(user.email),
   ]);
   if (!authorized) return null;
-  // Temporary: all three levels have identical access.
-  if (role === "admin" || role === "moderator" || role === "teacher") return user;
+  // Admin always passes; other roles must have the specific permission.
+  if (role === "admin") return user;
+  if (permissions.includes(permission)) return user;
   return null;
 }
 
@@ -137,20 +135,19 @@ export async function requirePermission(
  */
 export async function requireAnyPermission(
   request: NextRequest,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   permissions: readonly AdminPermission[],
 ): Promise<DecodedIdToken | null> {
   const user = await getFirebaseUser(request);
   if (!user) return null;
-  // The admin check and the role lookup are independent queries — run them
-  // concurrently instead of sequentially to halve auth latency.
   const email = user.email_verified === true ? (user.email ?? null) : null;
-  const [authorized, { role }] = await Promise.all([
+  const [authorized, resolved] = await Promise.all([
     isAdminUid(user.uid, email),
     resolveAdminPermissions(user.email),
   ]);
   if (!authorized) return null;
-  // Temporary: all three levels have identical access.
-  if (role === "admin" || role === "moderator" || role === "teacher") return user;
+  // Admin always passes.
+  if (resolved.role === "admin") return user;
+  // Other roles need at least one matching permission.
+  if (permissions.some((p) => resolved.permissions.includes(p))) return user;
   return null;
 }

@@ -53,8 +53,8 @@ function hasControlAccess(
   permissions: string[],
   href: string,
 ): boolean {
-  // Temporary: all three levels have identical access.
-  if (role === "admin" || role === "moderator" || role === "teacher") return true;
+  // Admin always has full access.
+  if (role === "admin") return true;
   if (href === "/admin") return true;
   const required = ADMIN_CONTROL_PERMISSIONS[href];
   if (!required) return true;
@@ -116,9 +116,8 @@ function WebsiteAdminShellInner({
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
   // Route-level RBAC: block direct navigation to controls the role cannot access
-  // Temporary: all three levels have identical access.
   const isDeniedByRole = (() => {
-    if (gate.role === "admin" || gate.role === "moderator" || gate.role === "teacher") return false;
+    if (gate.role === "admin") return false;
     if (pathname === "/admin") return false;
     // Longest prefix match among ADMIN_CONTROL_PERMISSIONS
     let matched: string | null = null;

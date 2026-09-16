@@ -221,11 +221,9 @@ export const ALL_PERMISSIONS = [
 export type AdminPermission = (typeof ALL_PERMISSIONS)[number];
 
 const DEFAULT_PERMISSIONS_BY_ROLE: Record<AdminRole, readonly AdminPermission[]> = {
-  // Temporary: all three levels have identical access (full permissions).
-  // Actual role-wise permissions will be defined later.
   admin: [...ALL_PERMISSIONS],
-  moderator: [...ALL_PERMISSIONS],
-  teacher: [...ALL_PERMISSIONS],
+  moderator: ["manageContent", "manageCourses", "manageExams"],
+  teacher: ["manageCourseContent", "managePublicExam", "manageQa", "manageResults"],
 };
 
 /**
@@ -255,21 +253,21 @@ export function hasControlAccess(
   permissions: string[],
   href: string,
 ): boolean {
-  // Temporary: all three levels have identical access.
-  if (role === "admin" || role === "moderator" || role === "teacher") return true;
+  // Admin always has full access.
+  if (role === "admin") return true;
   const required = ADMIN_CONTROL_PERMISSIONS[href];
   if (!required) return true; // unknown route → allow for non-restricted pages
   return required.some((perm) => permissions.includes(perm));
 }
 
-/** Check if a permission set grants any of the required permissions (temporary: all roles pass). */
+/** Check if a permission set grants any of the required permissions. */
 export function hasAnyPermission(
   role: string | null | undefined,
   permissions: string[],
   required: readonly string[],
 ): boolean {
-  // Temporary: all three levels have identical access.
-  if (role === "admin" || role === "moderator" || role === "teacher") return true;
+  // Admin always has full access.
+  if (role === "admin") return true;
   return required.some((perm) => permissions.includes(perm));
 }
 
@@ -298,10 +296,36 @@ async function ensureRolePermissionsTable(): Promise<void> {
 
 /** Configured permission set for a role; falls back to built-in defaults. */
 export async function fetchRolePermissions(): Promise<Record<string, string[]>> {
-  // Temporary: all three levels have identical permissions (full access).
+  await ensureRolePermissionsTable();
   const result: Record<string, string[]> = {};
+  // Admin always has all permissions (hardcoded).
+  result.admin = [...ALL_PERMISSIONS];
+  // Read moderator and teacher permissions from database.
   for (const role of AVAILABLE_ROLES) {
-    result[role] = [...ALL_PERMISSIONS];
+    if (role === "admin") continue;
+    try {
+      const rows = await query<{ permissions: string }[]>(
+        `SELECT permissions FROM role_permissions WHERE role = ? LIMIT 1`,
+        [role],
+      );
+      if (rows[0]?.permissions) {
+        const parsed = JSON.parse(rows[0].permissions) as unknown;
+        if (Array.isArray(parsed)) {
+          result[role] = parsed
+            .map(String)
+            .filter((p): p is AdminPermission =>
+              (ALL_PERMISSIONS as readonly string[]).includes(p as AdminPermission),
+            );
+          continue;
+        }
+      }
+    } catch {
+      // Fall through to defaults.
+    }
+    // Default permissions when no DB row exists.
+    result[role] = role === "teacher"
+      ? ["manageCourseContent", "managePublicExam", "manageQa", "manageResults"]
+      : ["manageContent", "manageCourses", "manageExams"];
   }
   return result;
 }
@@ -357,12 +381,17 @@ export async function resolveAdminPermissions(
       if ((AVAILABLE_ROLES as readonly string[]).includes(rawRole)) {
         assignedRole = rawRole as AdminRole;
       } else if (rawRole === "super-admin") {
-        // Legacy super-admin migrated to Admin (full access).
         assignedRole = "admin";
       }
     }
-    // Temporary: all three levels have identical permissions (full access).
-    return { role: assignedRole, permissions: [...ALL_PERMISSIONS] };
+    // Admin always has all permissions.
+    if (assignedRole === "admin") {
+      return { role: "admin", permissions: [...ALL_PERMISSIONS] };
+    }
+    // Read the role's permissions from the database.
+    const matrix = await fetchRolePermissions();
+    const perms = (matrix[assignedRole] ?? []) as AdminPermission[];
+    return { role: assignedRole, permissions: perms };
   } catch {
     return fallback;
   }
