@@ -164,7 +164,7 @@ export default function SocialLinksManagementPage() {
       return;
     }
     if (addForm.url && addForm.url.trim() && !/^https?:\/\//.test(addForm.url.trim())) {
-      toast.showToast("error", "URL must start with https://");
+      toast.showToast("error", "URL must start with http:// or https://");
       return;
     }
     if (!links) return;
@@ -224,7 +224,7 @@ export default function SocialLinksManagementPage() {
       return;
     }
     if (editForm.url && editForm.url.trim() && !/^https?:\/\//.test(editForm.url.trim())) {
-      toast.showToast("error", "URL must start with https://");
+      toast.showToast("error", "URL must start with http:// or https://");
       return;
     }
     setBusyKey(editingKey);

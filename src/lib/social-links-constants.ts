@@ -32,8 +32,10 @@ export function getSocialLabel(key: SocialPlatformKey): string {
 }
 
 export function isValidSocialUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;

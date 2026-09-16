@@ -125,9 +125,10 @@ export async function saveSocialLinks(
   await ensureSchema();
 
   for (const update of updates) {
-    if (update.url && !isValidHttpUrl(update.url)) {
+    const trimmedUrl = update.url?.trim() || null;
+    if (trimmedUrl && !isValidHttpUrl(trimmedUrl)) {
       throw new Error(
-        `${update.label || getSocialLabel(update.key)} link must be a valid https:// URL.`,
+        `${update.label || getSocialLabel(update.key)}: "${trimmedUrl}" is not a valid URL. Must start with http:// or https://.`,
       );
     }
     if (!update.key || update.key.trim().length < 2 || update.key.length > 50) {
@@ -174,8 +175,9 @@ export async function upsertSocialLink(
   adminUid: string,
 ): Promise<SocialLink[]> {
   await ensureSchema();
-  if (update.url && !isValidHttpUrl(update.url)) {
-    throw new Error(`${update.label || getSocialLabel(update.key)} link must be a valid https:// URL.`);
+  const trimmedUrl = update.url?.trim() || null;
+  if (trimmedUrl && !isValidHttpUrl(trimmedUrl)) {
+    throw new Error(`${update.label || getSocialLabel(update.key)}: "${trimmedUrl}" is not a valid URL. Must start with http:// or https://.`);
   }
   const key = update.key.trim().toLowerCase().replace(/\s+/g, "-");
   if (!/^[a-z0-9][a-z0-9-_]{1,49}$/.test(key)) {

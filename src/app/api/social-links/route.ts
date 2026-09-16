@@ -57,13 +57,6 @@ export async function PUT(request: NextRequest) {
 
   try {
     const links = await saveSocialLinks(updates, admin.uid);
-    const currentKeys = new Set(updates.map((u) => u.key));
-    const existing = await fetchAllSocialLinks();
-    for (const link of existing) {
-      if (!currentKeys.has(link.key)) {
-        await deleteSocialLink(link.key);
-      }
-    }
     const finalLinks = await fetchAllSocialLinks();
     return NextResponse.json({
       message: "Social links saved successfully.",
