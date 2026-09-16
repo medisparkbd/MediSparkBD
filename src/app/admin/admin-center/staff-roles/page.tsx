@@ -63,6 +63,16 @@ export default function StaffRolesPage() {
     if (gate.ready && allowed) void load();
   }, [gate.ready, allowed, load]);
 
+  // Scroll to the role section when the URL contains a hash (e.g. #admin, #moderator, #teacher).
+  useEffect(() => {
+    if (!gate.ready) return;
+    const hash = window.location.hash.replace("#", "");
+    if (hash) {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [gate.ready]);
+
   if (!gate.ready) return <AccessLoading label="Loading Staff Roles…" />;
   if (!allowed) {
     return (
