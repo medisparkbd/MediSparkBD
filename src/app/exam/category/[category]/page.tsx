@@ -69,14 +69,8 @@ export default async function ExamCategoryPage({ params }: CategoryPageProps) {
 
   return (
     <main className="flex-1 bg-dark-950">
-      <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <SmartBackButton href="/exam" label="All Categories" />
-        <h1 className="mt-3 text-2xl font-extrabold text-heading sm:text-3xl">
-          {valid.label}
-        </h1>
-        <p className="mt-1 text-sm text-neutral-400">
-          {categoryMeta[valid.key].description}
-        </p>
       </section>
 
       {/* Inside every category: Live Exams → Upcoming Exams → Previous Exams */}

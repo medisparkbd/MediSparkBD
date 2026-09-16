@@ -175,12 +175,6 @@ export default function PublicExamList({
           <div className="space-y-8">
             {visibleSections.map((section) => (
               <div key={section.key}>
-                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-heading">
-                  {section.label}
-                  <span className="rounded-full bg-dark-850 px-2 py-0.5 text-xs font-semibold text-neutral-400">
-                    {filtered.filter((exam) => exam.status === section.key).length}
-                  </span>
-                </h3>
                 {filtered.some((exam) => exam.status === section.key) ? (
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered
