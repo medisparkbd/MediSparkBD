@@ -186,12 +186,12 @@ export default function ExamPaperEditor({
       : `${completedCount} questions`;
 
   // Local draft for inline editing — mirrors DB but allows immediate typing before save
-  const [drafts, setDrafts] = useState<Record<number, { question: string; options: string[]; correctIndex: number }>>({});
+  const [drafts, setDrafts] = useState<Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }>>({});
 
   useEffect(() => {
     // Sync drafts when questions load (keep user edits if already drafting)
     if (!questions) return;
-    const next: Record<number, { question: string; options: string[]; correctIndex: number }> = {};
+    const next: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = {};
     for (let i = 0; i < totalSlots; i++) {
       const q = i < questions.length ? questions[i] : null;
       if (q && q.id !== null) {
@@ -201,13 +201,13 @@ export default function ExamPaperEditor({
         } else {
           const opts = q.options.length >= 4 ? q.options.slice(0, 4) : [...q.options, ...EMPTY_OPTIONS.slice(q.options.length)];
           while (opts.length < 4) opts.push("");
-          next[i] = { question: q.question || "", options: opts.slice(0, 4), correctIndex: q.correctIndex ?? 0 };
+          next[i] = { question: q.question || "", options: opts.slice(0, 4), correctIndex: q.correctIndex ?? 0, explanation: q.explanation ?? "" };
         }
       } else {
         if (drafts[i]) {
           next[i] = drafts[i];
         } else {
-          next[i] = { question: q?.question || "", options: q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS], correctIndex: q?.correctIndex ?? 0 };
+          next[i] = { question: q?.question || "", options: q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS], correctIndex: q?.correctIndex ?? 0, explanation: q?.explanation ?? "" };
           while (next[i].options.length < 4) next[i].options.push("");
           next[i].options = next[i].options.slice(0, 4);
         }
@@ -216,7 +216,7 @@ export default function ExamPaperEditor({
     // Only update if drafts empty or totalSlots changed; avoid overwriting active edits on every load
     // We merge: keep existing drafts for slots that already have draft
     setDrafts((prev) => {
-      const merged: Record<number, { question: string; options: string[]; correctIndex: number }> = { ...prev };
+      const merged: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = { ...prev };
       for (let i = 0; i < totalSlots; i++) {
         if (!merged[i]) merged[i] = next[i];
       }
@@ -272,7 +272,7 @@ export default function ExamPaperEditor({
         question_image: existing?.questionImage || null,
         options: finalOptions,
         correctIndex: ci,
-        explanation: existing?.explanation || null,
+      explanation: draft.explanation || existing?.explanation || null,
         marks: (existing?.marks ?? marksPerQ) as number,
         isActive: true,
         order,
@@ -364,6 +364,7 @@ export default function ExamPaperEditor({
             question: p.question,
             options: p.options.slice(0, 4) as string[],
             correctIndex: ci >= 0 ? ci : -1,
+            explanation: p.explanation ?? "",
           };
         }
         return next;
@@ -379,7 +380,7 @@ export default function ExamPaperEditor({
         const ciPersist = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : 0;
         const hasMissingAnswer = p.correctIndex === null;
         if (hasMissingAnswer) skippedDueToMissingAnswer += 1;
-        const draft = { question: p.question, options: p.options.slice(0, 4) as string[], correctIndex: ciPersist };
+        const draft = { question: p.question, options: p.options.slice(0, 4) as string[], correctIndex: ciPersist, explanation: p.explanation ?? "" };
         // Validate before persist: need at least question and 2 options
         const qTrim = draft.question.trim();
         const filledOpts = draft.options.filter((o) => o.trim()).length;
@@ -409,7 +410,7 @@ export default function ExamPaperEditor({
     }
   }
 
-  async function persistSlotWithData(slotIndex: number, draft: { question: string; options: string[]; correctIndex: number }) {
+  async function persistSlotWithData(slotIndex: number, draft: { question: string; options: string[]; correctIndex: number; explanation: string }) {
     const slot = displaySlots[slotIndex];
     const existing = slot?.q;
     const order = slotIndex + 1;

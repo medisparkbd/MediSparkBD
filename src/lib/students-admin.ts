@@ -27,6 +27,16 @@ export type StudentEnrollmentInfo = {
   enrolledAt: number | null;
 };
 
+export type StudentExamResult = {
+  id: number;
+  examId: string;
+  examTitle: string;
+  score: number;
+  totalMarks: number;
+  percentage: number;
+  submittedAt: number | null;
+};
+
 type StudentRow = {
   uid: string;
   student_id: string;
@@ -143,6 +153,7 @@ export async function fetchStudents(
 export async function fetchStudentDetail(uid: string): Promise<{
   student: AdminStudent;
   enrollments: StudentEnrollmentInfo[];
+  examResults: StudentExamResult[];
 } | null> {
   try {
     const rows = await query<StudentRow[]>(
@@ -184,7 +195,44 @@ export async function fetchStudentDetail(uid: string): Promise<{
       enrollments = [];
     }
 
-    return { student: mapStudent(rows[0]), enrollments };
+    let examResults: StudentExamResult[] = [];
+    try {
+      const resultRows = await query<
+        {
+          id: number;
+          exam_id: string;
+          exam_title: string;
+          score: number;
+          total_marks: number;
+          submitted_at: Date | string | null;
+        }[]
+      >(
+        `SELECT er.id, er.exam_id, ex.title AS exam_title, er.score, er.total_marks, er.submitted_at
+         FROM exam_results er
+         LEFT JOIN exams ex ON ex.id = er.exam_id
+         WHERE er.student_uid = ?
+         ORDER BY er.submitted_at DESC
+         LIMIT 50`,
+        [uid],
+      );
+      examResults = resultRows.map((row) => {
+        const total = toNumber(row.total_marks);
+        const score = toNumber(row.score);
+        return {
+          id: row.id,
+          examId: row.exam_id,
+          examTitle: row.exam_title || row.exam_id,
+          score,
+          totalMarks: total,
+          percentage: total > 0 ? Math.round((score / total) * 100) : 0,
+          submittedAt: parseTime(row.submitted_at),
+        };
+      });
+    } catch {
+      examResults = [];
+    }
+
+    return { student: mapStudent(rows[0]), enrollments, examResults };
   } catch {
     return null;
   }

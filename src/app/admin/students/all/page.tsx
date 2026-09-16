@@ -1,15 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
-import type {
-  AdminStudent,
-  StudentEnrollmentInfo,
-} from "@/lib/students-admin";
+import type { AdminStudent } from "@/lib/students-admin";
 
 type StatusFilter = "all" | "active" | "deactivated";
 
@@ -19,15 +17,6 @@ const STATUS_TABS: Array<{ value: StatusFilter; label: string }> = [
   { value: "deactivated", label: "Deactivated" },
 ];
 
-function formatDate(value: number | null): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export default function AllStudentsPage() {
   const { user, authLoading } = useAuth();
   const toast = useAdminToast();
@@ -36,14 +25,6 @@ export default function AllStudentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-
-  // Detail panel
-  const [detailUid, setDetailUid] = useState<string | null>(null);
-  const [detail, setDetail] = useState<{
-    student: AdminStudent;
-    enrollments: StudentEnrollmentInfo[];
-  } | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   // Activation confirm
   const [confirmTarget, setConfirmTarget] = useState<{ student: AdminStudent; active: boolean } | null>(null);
@@ -111,27 +92,6 @@ export default function AllStudentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- search input debounce
   }, [search]);
 
-  function openDetail(student: AdminStudent) {
-    setDetailUid(student.uid);
-    setDetail(null);
-    setDetailLoading(true);
-    user
-      ?.getIdToken()
-      .then((token) =>
-        fetch(`/api/admin/students?uid=${encodeURIComponent(student.uid)}`, {
-          cache: "no-store",
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      )
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { student?: AdminStudent; enrollments?: StudentEnrollmentInfo[] } | null) => {
-        if (data?.student) {
-          setDetail({ student: data.student, enrollments: data.enrollments ?? [] });
-        }
-      })
-      .finally(() => setDetailLoading(false));
-  }
-
   async function handleToggleActive(student: AdminStudent, active: boolean) {
     if (!user) return;
     setToggling(true);
@@ -159,11 +119,6 @@ export default function AllStudentsPage() {
             )
           : prev,
       );
-      if (detail?.student.uid === student.uid) {
-        setDetail((prev) =>
-          prev ? { ...prev, student: { ...prev.student, isActive: active } } : prev,
-        );
-      }
     } catch {
       toast.showToast("error", "Failed to update the account.");
     } finally {
@@ -265,19 +220,15 @@ export default function AllStudentsPage() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => openDetail(student)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <p className="truncate text-sm font-bold text-[#0b1e3a] transition hover:text-[#1a3a78] admin-dark:text-zinc-100">
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">
                   {student.fullName}
                 </p>
                 <p className="truncate text-xs text-slate-500">
                   {student.studentId}
                   {student.email ? ` · ${student.email}` : ""}
                 </p>
-              </button>
+              </div>
 
               <div className="hidden text-right sm:block">
                 <p className="text-xs font-semibold text-slate-500">{student.hscBatch}</p>
@@ -296,125 +247,13 @@ export default function AllStudentsPage() {
                 {student.isActive ? "Active" : "Deactivated"}
               </span>
 
-              <button
-                type="button"
-                onClick={() => openDetail(student)}
-                className="shrink-0 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-bold text-zinc-600 transition hover:border-primary-500/50 hover:text-[#1a3a78] admin-dark:border-zinc-700 admin-dark:text-zinc-300"
+              <Link
+                href={`/admin/students/details/${encodeURIComponent(student.uid)}`}
+                className="shrink-0 rounded-lg border border-[#dbeafe] bg-[#eff6ff] px-3 py-1.5 text-xs font-bold text-[#1a3a78] transition hover:border-[#93c5fd] hover:bg-[#dbeafe] admin-dark:border-[#1e3a65] admin-dark:bg-[#132a4f] admin-dark:text-[#93c5fd] admin-dark:hover:border-[#2f5aa0] admin-dark:hover:bg-[#1e3a65]"
               >
-                Details
-              </button>
+                View Details →
+              </Link>
             </div>
-
-            {/* Detail panel */}
-            {detailUid === student.uid && (
-              <div className="border-t border-neutral-100 p-4 sm:p-5 admin-dark:border-zinc-800">
-                {detailLoading && (
-                  <p className="py-3 text-center text-sm font-semibold text-slate-500">
-                    Loading details…
-                  </p>
-                )}
-                {!detailLoading && detail?.student.uid === student.uid && (
-                  <>
-                    <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Student ID</dt>
-                        <dd className="font-mono text-slate-700 admin-dark:text-zinc-200">{detail.student.studentId}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Email</dt>
-                        <dd className="truncate text-slate-700 admin-dark:text-zinc-200">{detail.student.email || "—"}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Phone</dt>
-                        <dd className="text-slate-700 admin-dark:text-zinc-200">{detail.student.contactNumber || "—"}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Gender</dt>
-                        <dd className="text-slate-700 admin-dark:text-zinc-200">{detail.student.gender || "—"}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Institution</dt>
-                        <dd className="truncate text-slate-700 admin-dark:text-zinc-200">{detail.student.institution || "—"}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">HSC Batch</dt>
-                        <dd className="text-slate-700 admin-dark:text-zinc-200">{detail.student.hscBatch || "—"}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Joined</dt>
-                        <dd className="text-slate-700 admin-dark:text-zinc-200">{formatDate(detail.student.createdAt)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3 sm:block">
-                        <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">Sign-in Method</dt>
-                        <dd className="text-slate-700 admin-dark:text-zinc-200">{detail.student.provider}</dd>
-                      </div>
-                    </dl>
-
-                    {/* Enrollments */}
-                    <h4 className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Enrollments ({detail.enrollments.length})
-                    </h4>
-                    {detail.enrollments.length === 0 ? (
-                      <p className="mt-2 rounded-xl border border-dashed border-neutral-300 p-4 text-center text-xs font-semibold text-slate-500 admin-dark:border-zinc-700">
-                        No enrollments yet.
-                      </p>
-                    ) : (
-                      <ul className="mt-2 space-y-2">
-                        {detail.enrollments.map((enrollment) => (
-                          <li
-                            key={enrollment.courseId}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#f8fbff] px-3 py-2 text-sm admin-dark:bg-[#132a4f]/60"
-                          >
-                            <span className="min-w-0 truncate font-semibold text-slate-700 admin-dark:text-zinc-200">
-                              {enrollment.courseName}
-                            </span>
-                            <span className="flex items-center gap-2 text-xs text-slate-500">
-                              <span className="rounded-full bg-white px-2 py-0.5 font-bold uppercase admin-dark:bg-zinc-900">
-                                {enrollment.courseKind}
-                              </span>
-                              <span>{formatDate(enrollment.enrolledAt)}</span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 font-bold ${
-                                  enrollment.status === "active"
-                                    ? "bg-emerald-500/10 text-emerald-600 admin-dark:text-emerald-400"
-                                    : "bg-zinc-200 text-slate-500 admin-dark:bg-zinc-700 admin-dark:text-zinc-300"
-                                }`}
-                              >
-                                {enrollment.status}
-                              </span>
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {/* Activation control */}
-                    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-4 admin-dark:border-zinc-800">
-                      <p className="text-xs text-slate-500">
-                        Deactivating blocks the student&apos;s access to enrolled content. Authentication credentials are never modified.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setConfirmTarget({
-                            student: detail.student,
-                            active: !detail.student.isActive,
-                          })
-                        }
-                        disabled={toggling}
-                        className={`ml-auto rounded-xl px-4 py-2 text-xs font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60 ${
-                          detail.student.isActive
-                            ? "bg-red-600 shadow-red-900/30 hover:bg-red-700"
-                            : "bg-emerald-600 shadow-emerald-900/30 hover:bg-emerald-700"
-                        }`}
-                      >
-                        {detail.student.isActive ? "Deactivate Account" : "Activate Account"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </li>
         ))}
       </ul>

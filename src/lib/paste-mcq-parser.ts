@@ -8,6 +8,7 @@ export type ParsedPasteMcq = {
   question: string;
   options: [string, string, string, string];
   correctIndex: number | null;
+  explanation: string;
   marks: number;
   rawBlock: string;
   issues: string[];
@@ -260,6 +261,7 @@ function extractAnswerPayload(line: string): string | null {
   // Prefixes: Answer, Ans, Ans., Correct Answer, Correct, Correct option, উত্তর, উত্তরঃ, সঠিক উত্তর, সঠিক উত্তরঃ
   // Allow suffix punctuation : :ঃ - = — . and optional "is"
   // We capture everything after prefix as payload
+  // CRITICAL: Strip any trailing ব্যাখ্যা:/Explanation: that may appear on the same line
   const patterns: RegExp[] = [
     // Bangla সঠিক উত্তর
     /^\s*সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
@@ -274,6 +276,8 @@ function extractAnswerPayload(line: string): string | null {
     const m = t.match(re);
     if (m) {
       let payload = (m[1] ?? "").trim();
+      // Strip trailing ব্যাখ্যা:/Explanation: that might be on the same line
+      payload = payload.replace(/\s*(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—.].*$/i, "").trim();
       // payload may include trailing punctuation like "." or "."
       payload = payload.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]]\s*$/, "").trim();
       payload = payload.replace(/[\.\)\:\-]+$/g, "").trim();
@@ -282,6 +286,28 @@ function extractAnswerPayload(line: string): string | null {
   }
   // Also handle case where answer prefix and payload are separated by Bangla colon "："?
   // Already covered.
+  return null;
+}
+
+// ── explanation detection ─────────────────────────────────────────────────
+function extractExplanationPayload(line: string): string | null {
+  const t = line.trim();
+  if (!t) return null;
+  const patterns: RegExp[] = [
+    // Bangla ব্যাখ্যা
+    /^\s*ব্যাখ্যা\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    // English Explanation
+    /^\s*(?:Explanation|Explan\.?)\s*[:\-=—.]?\s*(.+?)\s*$/i,
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m) {
+      let payload = (m[1] ?? "").trim();
+      // Remove trailing punctuation that is likely answer marker remnants
+      payload = payload.replace(/[\.\)\:\-]+$/g, "").trim();
+      if (payload) return payload;
+    }
+  }
   return null;
 }
 
@@ -406,6 +432,8 @@ function injectNewlinesForInline(text: string): string {
   // Answer inline: handle multi-word prefixes first, then single-word with lookbehind to avoid splitting "Correct Answer" inside
   s = s.replace(/([^\n])\s+(?=(?:Correct\s+Answer|Correct\s+option|সঠিক\s+উত্তর)\s*[:\-=—ঃ])/gi, "$1\n");
   s = s.replace(/([^\n])\s+(?<!Correct\s)(?<!সঠিক\s)(?=(?:Ans(?:wer)?\.?|Correct|উত্তর\s*ঃ?)\s*[:\-=—ঃ])/gi, "$1\n");
+  // Explanation inline: ব্যাখ্যা: / Explanation:
+  s = s.replace(/([^\n])\s+(?=(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—ঃ])/gi, "$1\n");
   // Question header inline: handle " Q1. " or " 2. " after options — require header punctuation to avoid splitting inside question text like "Q1?"
   s = s.replace(/([^\n])\s+(?=(?:Q\s*0*\d+\s*[\.\)\:\-]|Question\s*(?:No\.?)?\s*\d+\s*[\.\)\:\-]|প্রশ্ন\s*(?:নং\.?)?\s*(?:\d+|[০-৯]+)\s*[\.\)\:\-।]|(?:\d{1,3}|[০-৯]{1,3})\s*[\.\)\।\)]\s+[^\n]{3,}))/g, (m, p1) => p1 + "\n");
   // Roman question inline: " I. " or " II. "
@@ -430,8 +458,9 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
   let seenOptions = false;
   let optionMarkerCorrectIdx: number | null = null;
 
-  // First pass: collect answer payloads and options, separate question
+  // First pass: collect answer payloads, explanation, and options, separate question
   const nonAnswerLines: string[] = [];
+  let explanationRaw: string | null = null;
   for (let i = 0; i < linesRaw.length; i++) {
     const line = linesRaw[i];
     const payload = extractAnswerPayload(line);
@@ -439,6 +468,12 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
       // This line is answer
       answerPayloadRaw = payload; // keep last
       // Don't add to nonAnswerLines
+      continue;
+    }
+    const explanationPayload = extractExplanationPayload(line);
+    if (explanationPayload !== null) {
+      // This line is explanation — store separately, don't add to nonAnswerLines
+      explanationRaw = explanationPayload;
       continue;
     }
     if (isMarkLine(line)) {
@@ -665,6 +700,7 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
     question,
     options,
     correctIndex,
+    explanation: explanationRaw ?? "",
     marks: 1,
     rawBlock,
     issues,
@@ -678,7 +714,7 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
 function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
   const rawBlock = blockText;
   // Find answer first
-  const answerRe = /(?:উত্তর\s*ঃ?\s*[:\-=—.]?|সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?|Ans(?:wer)?\.?\s*(?:is)?\s*[:\-=—.]?|Correct(?:\s+Answer)?\s*(?:is)?\s*[:\-=—.]?)\s*([^\n\r]+)/gi;
+  const answerRe = /(?:উত্তর\s*ঃ?\s*[:\-=—.]?|সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?|Ans(?:wer)?\.?\s*(?:is)?\s*[:\-=—.]?|Correct(?:\s+Answer)?\s*(?:is)?\s*[:\-=—.]?)\s*([^\n\r]*?)(?:\s*(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—.]|$)/gi;
   // We'll work on normalized block without injecting newlines
   let answerPayload: string | null = null;
   let answerPos = -1;
@@ -696,6 +732,17 @@ function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
     answerPos = last.index;
   }
   const textBeforeAnswer = answerPos >= 0 ? blockText.slice(0, answerPos) : blockText;
+
+  // Find explanation (after answer)
+  const textAfterAnswer = answerPos >= 0 ? blockText.slice(answerPos) : "";
+  const explanationRe = /(?:ব্যাখ্যা\s*ঃ?\s*[:\-=—.]?|Explanation|Explan\.?)\s*[:\-=—.]?\s*([^\n\r]+)/gi;
+  let explanationPayload: string | null = null;
+  let mExp: RegExpExecArray | null;
+  while ((mExp = explanationRe.exec(textAfterAnswer)) !== null) {
+    let p = (mExp[1] ?? "").trim();
+    p = p.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
+    if (p) explanationPayload = p;
+  }
 
   // Find option markers globally
   const optGlobalRe = /(?:\(\s*([A-Da-d])\s*\)|[\(\[]\s*([A-Da-d])\s*[\)\]]|([A-Da-d])\s*[\.\)\:\-\—]|\([কখগঘ]\)|([কখগঘ])\s*[\.\)\:\-।]|\(([কখগঘ])\)|([1-4])\s*[\.\)\:\-]|([১-৪])\s*[\.\)\:\-।]|(i{1,3}|iv)\s*[\.\)\:\-]|(I{1,3}|IV)\s*[\.\)\:\-])/g;
@@ -791,6 +838,7 @@ function parseSingleBlockInline(blockText: string): ParsedPasteMcq | null {
     question: qTextRaw,
     options: tmpOptions,
     correctIndex,
+    explanation: explanationPayload ?? "",
     marks,
     rawBlock,
     issues,
@@ -868,7 +916,7 @@ function splitByNumbering(text: string): string[] | null {
 function parseViaLineScan(text: string): ParsedPasteMcq[] {
   const withInlines = injectNewlinesForInline(text.replace(/\r\n/g, "\n"));
   const rawLines = withInlines.split("\n");
-  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; marks: number; rawLines: string[]; originalNumber: string | null };
+  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; explanation: string; marks: number; rawLines: string[]; originalNumber: string | null };
   const blocks: Block[] = [];
   let current: Block | null = null;
 
@@ -907,6 +955,15 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       continue;
     }
 
+    const explanationPayload = extractExplanationPayload(line);
+    if (explanationPayload !== null) {
+      if (!current) continue;
+      // Store explanation — last one wins
+      current.explanation = explanationPayload;
+      current.rawLines.push(line);
+      continue;
+    }
+
     // Statement lines — must be checked before option, when still in question phase
     if (current && current.options.every((o) => o === "") && isStatementLine(line)) {
       current.statements.push(trimmed);
@@ -932,14 +989,14 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       } else {
         qText = line.trim();
       }
-      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: orig };
+      current = { questionLines: qText ? [qText] : [], statements: [], options: ["", "", "", ""], correctIndex: null, explanation: "", marks: 1, rawLines: [line], originalNumber: orig };
       continue;
     }
 
     const opt = parseOptionLine(line, true);
     if (opt) {
       if (!current) {
-        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, explanation: "", marks: 1, rawLines: [], originalNumber: null };
       }
       // Duplicate option label suggests new question if current already has question and at least 2 options
       if (current.options[opt.index] !== "" && current.options.some((o) => o !== "")) {
@@ -947,7 +1004,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
         const filled = current.options.filter((o) => o.trim()).length;
         if (hasQuestion && filled >= 2) {
           flushCurrent();
-        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [], originalNumber: null };
+        current = { questionLines: [], statements: [], options: ["", "", "", ""], correctIndex: null, explanation: "", marks: 1, rawLines: [], originalNumber: null };
         }
       }
       if (opt.isCorrectMarker && current.correctIndex === null) {
@@ -961,7 +1018,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
 
     // Plain text
     if (!current) {
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, explanation: "", marks: 1, rawLines: [line], originalNumber: null };
       continue;
     }
     const hasAnyOption = current.options.some((o) => o !== "");
@@ -976,7 +1033,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     } else {
       // After options, plain text likely starts new question
       flushCurrent();
-      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, marks: 1, rawLines: [line], originalNumber: null };
+      current = { questionLines: [trimmed], statements: [], options: ["", "", "", ""], correctIndex: null, explanation: "", marks: 1, rawLines: [line], originalNumber: null };
     }
   }
   flushCurrent();
@@ -1013,6 +1070,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
       question,
       options: b.options,
       correctIndex: b.correctIndex,
+      explanation: b.explanation ?? "",
       marks: (b as any).marks ?? null,
       rawBlock: blockText,
       issues,
