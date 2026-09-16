@@ -744,6 +744,23 @@ export default function ExamPaperEditor({
                     </div>
                   )}
 
+                  {/* Explanation — editable per question */}
+                  <div className="mt-3">
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-widest text-slate-500 admin-dark:text-slate-400">
+                      Explanation / ব্যাখ্যা
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={draft.explanation}
+                      onChange={(e) => {
+                        setDrafts((prev) => ({ ...prev, [index]: { ...draft, explanation: e.target.value } }));
+                      }}
+                      onBlur={() => void persistSlot(index)}
+                      placeholder="ব্যাখ্যা বা Explanation লিখুন (ঐচ্ছিক)"
+                      className="w-full rounded-lg border border-[#dbeafe] bg-[#f8fbff] px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#2f6bce] focus:ring-2 focus:ring-[#2f6bce]/10 admin-dark:border-[#1e3a65] admin-dark:bg-[#132a4f] admin-dark:text-slate-200 admin-dark:placeholder:text-slate-500 admin-dark:focus:border-[#2f5aa0]"
+                    />
+                  </div>
+
                   {/* Image upload — small, per question */}
                   <div className="mt-3 flex items-center gap-2">
                     <button
