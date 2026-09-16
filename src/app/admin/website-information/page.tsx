@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -31,6 +30,7 @@ const PLATFORMS: SocialPlatformKey[] = [
   "telegram",
   "instagram",
   "linkedin",
+  "whatsapp",
 ];
 
 const PLATFORM_LABEL: Record<SocialPlatformKey, string> = {
@@ -39,6 +39,7 @@ const PLATFORM_LABEL: Record<SocialPlatformKey, string> = {
   telegram: "Telegram",
   instagram: "Instagram",
   linkedin: "LinkedIn",
+  whatsapp: "WhatsApp",
 };
 
 const cardClass =
@@ -50,17 +51,6 @@ const inputClass =
 const labelClass =
   "block text-[11px] font-bold uppercase tracking-wider text-slate-400 admin-dark:text-slate-500";
 
-function waNumberToHref(number: string): string {
-  const digits = number.replace(/\D/g, "");
-  return `https://wa.me/${digits}`;
-}
-
-function hrefToWaNumber(href: string | undefined | null): string {
-  if (!href) return "";
-  const match = href.match(/wa\.me\/([\d]+)/);
-  return match ? match[1] : "";
-}
-
 export default function WebsiteInformationPage() {
   const toast = useAdminToast();
   const { user, authLoading } = useAuth();
@@ -71,7 +61,6 @@ export default function WebsiteInformationPage() {
   const [tagline, setTagline] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
   const [address, setAddress] = useState("");
   const [copyrightText, setCopyrightText] = useState("");
 
@@ -135,8 +124,6 @@ export default function WebsiteInformationPage() {
           setFaviconName((s.faviconFileName as string | null) ?? null);
           const others = (s.otherContactLinks as OthersLink[] | null) ?? [];
           setOtherContactLinks(others);
-          const waEntry = others.find((l) => l.label === "WhatsApp");
-          setWhatsapp(hrefToWaNumber(waEntry?.href));
         }
 
         if (logoRes.ok) {
@@ -196,15 +183,6 @@ export default function WebsiteInformationPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
-
-  const mergedOtherLinks = useMemo<OthersLink[]>(() => {
-    const withoutWa = otherContactLinks.filter((l) => l.label !== "WhatsApp");
-    const digits = whatsapp.replace(/\D/g, "");
-    if (digits.length > 0) {
-      withoutWa.push({ label: "WhatsApp", href: waNumberToHref(digits) });
-    }
-    return withoutWa;
-  }, [otherContactLinks, whatsapp]);
 
   // ── Logo uploads (saved immediately, like the live logo pipeline) ────────
   async function uploadLogo(file: File, mode: "light" | "dark") {
@@ -371,7 +349,7 @@ export default function WebsiteInformationPage() {
           contactPhone: contactPhone.trim(),
           address: address.trim(),
           copyrightText: copyrightText.trim(),
-          otherContactLinks: mergedOtherLinks,
+          otherContactLinks: otherContactLinks,
         }),
       });
       const settingsData = (await settingsRes.json()) as { error?: string };
@@ -443,7 +421,7 @@ export default function WebsiteInformationPage() {
     }
     toast.showToast("success", "All Website Information saved — live on the Main Website.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, siteName, tagline, contactEmail, contactPhone, address, whatsapp, copyrightText, mergedOtherLinks, links, siteTitle, metaDescription, preservedSeo, ogImageUrl]);
+  }, [user, siteName, tagline, contactEmail, contactPhone, address, copyrightText, otherContactLinks, links, siteTitle, metaDescription, preservedSeo, ogImageUrl]);
 
   function patchLink(key: SocialPlatformKey, patch: Partial<SocialLink>) {
     setLinks((prev) =>
@@ -623,19 +601,6 @@ export default function WebsiteInformationPage() {
               className={`${inputClass} mt-1.5`}
               placeholder="+880 1XXX-XXXXXX"
             />
-          </div>
-          <div>
-            <label className={labelClass}>WhatsApp Number</label>
-            <input
-              type="tel"
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              className={`${inputClass} mt-1.5`}
-              placeholder="+880 1XXX-XXXXXX"
-            />
-            <p className="mt-1 text-[10px] text-slate-400 admin-dark:text-slate-500">
-              Opens a chat at wa.me. Saves as a WhatsApp link in the footer.
-            </p>
           </div>
           <div className="sm:col-span-1">
             <label className={labelClass}>Address</label>
