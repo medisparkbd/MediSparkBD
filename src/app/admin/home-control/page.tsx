@@ -17,6 +17,7 @@ import { fetchHeroSettings } from "@/lib/hero-settings";
 import { fetchPublishedReviewRecords } from "@/lib/reviews-store";
 import { fetchPublishedFaqs } from "@/lib/faq-store";
 import { fetchActiveJerseys } from "@/lib/content-admin";
+import { getSectionConfig } from "@/lib/homepage-sections-constants";
 import type { StudentReview } from "@/lib/reviews";
 import type { HomepageSection } from "@/lib/homepage-sections-constants";
 import type { ReactNode } from "react";
@@ -27,8 +28,8 @@ export const dynamic = "force-dynamic";
  * Admin → Home Control: the exact Main Website Home Page (same structure,
  * layout, design, content and responsiveness) with one admin-only control
  * bar BELOW each section: [Edit] everywhere, plus [+ Add ...] only where
- * new items can be added. Edit/Add open the section's MySQL-backed
- * interfaces; every target API re-verifies admin authorization.
+ * new items can be added. Every section also has an ON/OFF toggle that
+ * controls its visibility on the live public website.
  */
 export default async function HomeControlPage() {
   const [sections, heroSettings, reviewRecords, publishedFaqs, activeJerseys] =
@@ -39,7 +40,6 @@ export default async function HomeControlPage() {
       fetchPublishedFaqs(),
       fetchActiveJerseys(),
     ]);
-  const activeSections = sections.filter((section) => section.isActive);
 
   const publishedReviews: StudentReview[] = reviewRecords.map((record, index) => ({
     id: record.id,
@@ -58,7 +58,6 @@ export default async function HomeControlPage() {
     status: "published",
   }));
 
-  // Jersey visibility mirrors the Main Website exactly.
   const jerseySection = sections.find((section) => section.key === "jersey");
   const showJersey = Boolean(jerseySection?.isActive) && activeJerseys.length > 0;
 
@@ -92,18 +91,29 @@ export default async function HomeControlPage() {
     }
   }
 
-  /** Section content + its bottom control bar ([Edit] / [+ Add ...]). */
+  /** Section content + its bottom control bar ([Edit] / [+ Add ...] / ON-OFF toggle). */
   function controlled(
     key: string,
     node: ReactNode | null,
     editHref: string,
+    section: HomepageSection,
     add?: { href: string; label: string },
   ): ReactNode | null {
     if (node === null) return null;
+    const config = getSectionConfig(section.key);
     return (
-      <div key={key}>
+      <div
+        key={key}
+        className={!section.isActive ? "opacity-60" : undefined}
+      >
         {node}
-        <HomeControlBar sectionKey={key} editHref={editHref} add={add} />
+        <HomeControlBar
+          sectionKey={key}
+          sectionLabel={config.label}
+          editHref={editHref}
+          add={add}
+          isActive={section.isActive}
+        />
       </div>
     );
   }
@@ -111,38 +121,43 @@ export default async function HomeControlPage() {
   function renderControlledSection(section: HomepageSection): ReactNode | null {
     switch (section.key) {
       case "banner":
-        return controlled("banner", renderSectionNode(section), "/admin/home-control/banner");
+        return controlled("banner", renderSectionNode(section), "/admin/home-control/banner", section);
       case "hero":
         return (
-          <div key="hero">
+          <div key="hero" className={!section.isActive ? "opacity-60" : undefined}>
             {renderSectionNode(section)}
-            <HomeControlBar sectionKey="hero" editHref="/admin/website/homepage/hero" />
+            <HomeControlBar
+              sectionKey="hero"
+              sectionLabel="Hero Section"
+              editHref="/admin/website/homepage/hero"
+              isActive={section.isActive}
+            />
             <div className="flex justify-center px-4 pb-4">
               <HeroTextEditor />
             </div>
           </div>
         );
       case "featured-courses":
-        return controlled("featured-courses", renderSectionNode(section), "/admin/marketing/featured-courses", {
+        return controlled("featured-courses", renderSectionNode(section), "/admin/marketing/featured-courses", section, {
           href: "/admin/marketing/featured-courses",
           label: "Course",
         });
       case "why-medispark":
-        return controlled("why-medispark", renderSectionNode(section), "/admin/website/homepage/cards");
+        return controlled("why-medispark", renderSectionNode(section), "/admin/website/homepage/cards", section);
       case "our-success":
-        return controlled("our-success", renderSectionNode(section), "/admin/website/homepage/cards");
+        return controlled("our-success", renderSectionNode(section), "/admin/website/homepage/cards", section);
       case "mentors":
-        return controlled("mentors", renderSectionNode(section), "/admin/mentors/all", {
+        return controlled("mentors", renderSectionNode(section), "/admin/mentors/all", section, {
           href: "/admin/mentors/all",
           label: "Mentor",
         });
       case "faq":
-        return controlled("faq", renderSectionNode(section), "/admin/content/faq", {
+        return controlled("faq", renderSectionNode(section), "/admin/content/faq", section, {
           href: "/admin/content/faq",
           label: "FAQ",
         });
       case "join-with-us":
-        return controlled("join-with-us", renderSectionNode(section), "/admin/website/social-links", {
+        return controlled("join-with-us", renderSectionNode(section), "/admin/website/social-links", section, {
           href: "/admin/website/social-links",
           label: "Social Media",
         });
@@ -157,9 +172,27 @@ export default async function HomeControlPage() {
     />
   );
 
-  const ourSuccessActive = activeSections.some((section) => section.key === "our-success");
+  function controlledJersey(): ReactNode {
+    const config = getSectionConfig("jersey");
+    return (
+      <div
+        key="jersey"
+        className={!jerseySection?.isActive ? "opacity-60" : undefined}
+      >
+        {jerseyNode}
+        <HomeControlBar
+          sectionKey="jersey"
+          sectionLabel={config.label}
+          editHref="/admin/content/jersey"
+          add={{ href: "/admin/content/jersey", label: "Jersey" }}
+          isActive={jerseySection?.isActive ?? true}
+        />
+      </div>
+    );
+  }
 
-  // Join With Us Now! — same component, position and data as the Live Website
+  const ourSuccessActive = sections.some((section) => section.key === "our-success" && section.isActive);
+
   const joinSection = sections.find((s) => s.key === "join-with-us");
   const joinNode: ReactNode = (
     <JoinWithUs
@@ -169,65 +202,49 @@ export default async function HomeControlPage() {
     />
   );
   const joinControlledNode: ReactNode = (
-    <div key="join-with-us-controlled">
+    <div key="join-with-us-controlled" className={joinSection?.isActive === false ? "opacity-60" : undefined}>
       {joinNode}
       <HomeControlBar
         sectionKey="join-with-us"
+        sectionLabel="Join With Us Now!"
         editHref="/admin/website/social-links"
         add={{ href: "/admin/website/social-links", label: "Social Media" }}
+        isActive={joinSection?.isActive ?? true}
       />
     </div>
   );
 
   return (
     <section className="pb-10">
-      {/* Live copy of the homepage — identical to the Main Website */}
       <PromotionsSection />
-      {activeSections
+      {sections
         .filter((section) => section.key !== "jersey" && section.key !== "join-with-us")
         .flatMap((section) => {
           const nodes = [renderControlledSection(section)];
-          // Exact website order: Our Success → Jersey → Mentors.
           if (showJersey && section.key === "our-success") {
-            nodes.push(
-              controlled("jersey", jerseyNode, "/admin/content/jersey", {
-                href: "/admin/content/jersey",
-                label: "Jersey",
-              }),
-            );
+            nodes.push(controlledJersey());
           } else if (showJersey && !ourSuccessActive && section.key === "mentors") {
-            nodes.unshift(
-              controlled("jersey", jerseyNode, "/admin/content/jersey", {
-                href: "/admin/content/jersey",
-                label: "Jersey",
-              }),
-            );
+            nodes.unshift(controlledJersey());
           }
-          // Required order: FAQ → Join With Us Now! (same as Live Website)
           if (section.key === "faq") {
-            if (joinSection?.isActive !== false) nodes.push(joinControlledNode);
+            nodes.push(joinControlledNode);
           }
           return nodes;
         })}
-      {/* Fallback: both neighbours disabled but jersey still published. */}
+      {/* Jersey fallback: both neighbours disabled but jersey still published. */}
       {showJersey &&
-      !activeSections.some((section) => section.key === "our-success" || section.key === "mentors")
-        ? controlled("jersey", jerseyNode, "/admin/content/jersey", {
-            href: "/admin/content/jersey",
-            label: "Jersey",
-          })
+      !sections.some((section) => (section.key === "our-success" || section.key === "mentors") && section.isActive)
+        ? controlledJersey()
         : null}
-      {/* If FAQ is disabled/hidden, still show Join With Us before Footer (mirrors Live Website fallback) */}
-      {!activeSections.some((s) => s.key === "faq") && joinSection?.isActive !== false ? joinControlledNode : null}
+      {/* If FAQ is disabled/hidden, still show Join With Us before Footer */}
+      {!sections.some((s) => s.key === "faq" && s.isActive) ? joinControlledNode : null}
 
-      {/* Footer — the EXACT Main Website footer component (same layout,
-           design, typography, links, social icons and responsiveness).
-           The bar below adds admin-only [Edit] / [+ Add ...] controls; Edit
-           opens one dedicated interface for every editable footer element. */}
+      {/* Footer */}
       <div>
         <Footer />
         <HomeControlBar
           sectionKey="footer"
+          sectionLabel="Footer"
           editHref="/admin/home-control/footer"
           adds={[
             {
