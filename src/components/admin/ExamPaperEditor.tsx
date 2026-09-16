@@ -351,24 +351,19 @@ export default function ExamPaperEditor({
       }
       setDetectWarnings(warnings);
 
-      // Update drafts locally first for instant fill — preserve original order Q01..QNN
-      setDrafts((prev) => {
-        const next = { ...prev };
-        for (let i = 0; i < count; i++) {
-          const p = useParsed[i];
-          // Map null correctIndex to 0 for storage but keep warning so admin verifies; UI will show warning
-          // If we want blank, store -1 and handle in persist (will fallback to 0 on save but UI shows none selected)
-          const ci = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : -1;
-          // Keep blank as -1 to show "none selected" until admin picks
-          next[i] = {
-            question: p.question,
-            options: p.options.slice(0, 4) as string[],
-            correctIndex: ci >= 0 ? ci : -1,
-            explanation: p.explanation ?? "",
-          };
-        }
-        return next;
-      });
+      // Fully replace drafts — clear ALL old drafts first, then set only the newly detected ones
+      const newDrafts: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = {};
+      for (let i = 0; i < count; i++) {
+        const p = useParsed[i];
+        const ci = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : -1;
+        newDrafts[i] = {
+          question: p.question,
+          options: p.options.slice(0, 4) as string[],
+          correctIndex: ci >= 0 ? ci : -1,
+          explanation: p.explanation ?? "",
+        };
+      }
+      setDrafts(newDrafts);
 
       // Persist sequentially to preserve order
       let persisted = 0;
@@ -424,11 +419,11 @@ export default function ExamPaperEditor({
       set: setLabel,
       subject: existing?.subject || exam.subject || "",
       question: draft.question.trim(),
-      questionImage: existing?.questionImage || null,
-      question_image: existing?.questionImage || null,
+      questionImage: null,
+      question_image: null,
       options: finalOptions.slice(0, 4),
       correctIndex: draft.correctIndex,
-      explanation: existing?.explanation || null,
+      explanation: draft.explanation || null,
       marks: (existing?.marks ?? marksPerQ) as number,
       isActive: true,
       order,
