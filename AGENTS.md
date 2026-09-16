@@ -8,8 +8,8 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind, package manager: **p
 User communicates in Bengali/Banglish — reply in the same style.
 
 ## Infrastructure (current, as of 2026-09)
-- **Hosting:** Vercel project `medisparkbd` (account `medisparkbd-5969`) — **DELETED 2026-09-16** per user request (bloodarenabd.tech removed, all deployments/domains removed). No live Vercel deployment — re-create project if hosting needed.
-- **Domain:** bloodarenabd.tech + medisparkbd.com → previously Vercel DNS (ns1/ns2.vercel-dns.com) — now **removed from Vercel** (bloodarenabd.tech returns DEPLOYMENT_NOT_FOUND; medisparkbd.com DNS zone still in Vercel awaiting registrar nameserver change). Update registrar to remove Vercel NS to fully delete zone.
+- **Hosting:** Vercel project `medisparkbd` (account `medisparkbd-5969`) — **RESTORED 2026-09-16** (previously deleted, recreated `prj_lGv3DEft2x0ZgEdv4bDE2JW2dhzC`). Live at `medisparkbd.com` + `medisparkbd.vercel.app`. `bloodarenabd.tech` **permanently removed** — not attached to Vercel, returns DEPLOYMENT_NOT_FOUND, no alias.
+- **Domain:** `medisparkbd.com` → Vercel DNS (ns1/ns2.vercel-dns.com, verified) — active alias to production deployment. `bloodarenabd.tech` removed from Vercel and codebase.
 - **MySQL:** Azure Database for MySQL Flexible Server (managed PaaS)
   - Host: `eduall2005pass.mysql.database.azure.com` port **3306**, TLS required
     (`src/lib/mysql.ts` enables SSL automatically for azure.com hosts)
@@ -28,26 +28,25 @@ User communicates in Bengali/Banglish — reply in the same style.
   Vercel env vars are set in production (MYSQL_*, FIREBASE_*).
 
 ## Sync rule (IMPORTANT — do this FIRST)
-Single working repo: `medisparkbd/MediSparkBD` (remote `medisparkbd`).
+Single working repo: `medisparkbd/MediSparkBD` (remote `origin`).
 **Before starting ANY work, always sync first:**
 
 ```bash
-git pull medisparkbd main
+git pull origin main
 ```
 
 - If there are local uncommitted changes, stash or commit them before pulling.
 - Prefer fast-forward pulls; if diverged, rebase local commits on top:
-  `git pull --rebase medisparkbd main`
+  `git pull --rebase origin main`
 - Never force-push. If a push is rejected, pull --rebase first, then push again.
-- After finishing any change: commit + `git push medisparkbd main` immediately
+- After finishing any change: commit + `git push origin main` immediately
   so Vercel auto-deploys.
 
 ## Deploy flow (single track)
-- Remote `medisparkbd` (`medisparkbd/MediSparkBD`) → Vercel project
-  `medisparkbd` → live at bloodarenabd.tech + medisparkbd-ecru.vercel.app
+- Remote `origin` (`medisparkbd/MediSparkBD`) → Vercel project
+  `medisparkbd` → live at `medisparkbd.com` + `medisparkbd.vercel.app`
   (Azure MySQL + medispark.duckdns.org media). Push to `main` auto-deploys.
-  **DELETED 2026-09-16 — project removed, auto-deploy disabled.**
-- Manual alternative: `vercel --prod` (requires re-creating project + `vercel link`).
+- Manual alternative: `vercel --prod`.
 
 ## Database rules
 - ALL data lives in Azure MySQL. Never use Firestore/Supabase/local disk for data.

@@ -21,17 +21,8 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS.
 
 ## Repository / deploy flow
 
-- This repo (`eduall2005pass/medisparkbd`) is the **verify track** — every push to
-  `main` auto-deploys to Vercel and runs against Azure MySQL + medispark.duckdns.org.
-- Collaborators work on `eduall2005pass/clinic` (legacy track, still on the old VM's
-  MariaDB). Before starting work, pull their changes:
-
-  ```bash
-  git pull clinic main
-  ```
-
-- Code must stay compatible with BOTH databases (see SSL logic in `src/lib/mysql.ts`).
-- **Never force-push.** If a push is rejected: `git pull --rebase` first, then push again.
+- Single repo: `medisparkbd/MediSparkBD` — every push to `main` auto-deploys to Vercel (when linked) and runs against Azure MySQL + medispark.duckdns.org.
+- **Never force-push.** If a push is rejected: `git pull --rebase medisparkbd main` first, then push again.
 
 ## Getting started
 
