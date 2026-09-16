@@ -67,14 +67,34 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const REDIRECT_PENDING_KEY = "medispark:auth-redirect-pending";
+const REDIRECT_PENDING_AT_KEY = "medispark:auth-redirect-pending-at";
 const REDIRECT_ERROR_KEY = "medispark:auth-redirect-error";
+const USE_REDIRECT_NEXT_KEY = "medispark:auth-use-redirect-next";
+
+function safeGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {}
+}
+function safeRemove(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {}
+}
 
 function friendlyRedirectError(code: string, fallback: string): string {
   switch (code) {
     case "auth/unauthorized-domain":
       return "This website domain is not authorized for Google login. Please contact support (Firebase authorized-domains check needed).";
     case "auth/network-request-failed":
-      return "Network error during Google login. Adblocker thakle off kore, connection check kore abar try koro.";
+      return "Network error during Google login. Please check your connection and try again.";
     case "auth/web-storage-unsupported":
       return "Browser cookies/site-storage block kore rekheche, tai login complete hocche na. Cookies allow kore abar try koro.";
     case "auth/cancelled-popup-request":
@@ -127,6 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthLoading(false);
       return;
     }
+    // Pre-set persistence once on mount — NOT on click — so the popup call
+    // stays a direct user gesture (await before signInWithPopup breaks the
+    // gesture chain and causes browsers to block the popup as "popup-blocked").
+    setPersistence(auth, browserLocalPersistence).catch(() => {
+      // Ignore — signInWithGoogle will handle unsupported storage explicitly
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
@@ -145,18 +172,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // NOTE: getRedirectResult settles ASYNC — LoginClient may already have
     // mounted before it finishes, so errors go into reactive `authError`
     // state (a sessionStorage-only handoff races and stays invisible).
-    let hadPendingRedirect = false;
-    try {
-      hadPendingRedirect =
-        sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
-    } catch {}
+    const pending = safeGet(REDIRECT_PENDING_KEY) === "1";
+    const pendingAtRaw = safeGet(REDIRECT_PENDING_AT_KEY);
+    const pendingAt = pendingAtRaw ? Number(pendingAtRaw) : 0;
+    // Stale pending flag (e.g. tab left open, user never completed redirect)
+    // should not show a scary adblock error on next visit. Treat as expired
+    // after 10 minutes.
+    const isStalePending = pending && pendingAt > 0 && Date.now() - pendingAt > 10 * 60 * 1000;
+    if (isStalePending) {
+      safeRemove(REDIRECT_PENDING_KEY);
+      safeRemove(REDIRECT_PENDING_AT_KEY);
+    }
+    const hadPendingRedirect = pending && !isStalePending;
+
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
-          try {
-            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-            sessionStorage.removeItem(REDIRECT_ERROR_KEY);
-          } catch {}
+          safeRemove(REDIRECT_PENDING_KEY);
+          safeRemove(REDIRECT_PENDING_AT_KEY);
+          safeRemove(REDIRECT_ERROR_KEY);
+          safeRemove(USE_REDIRECT_NEXT_KEY);
           setAuthError(null);
           setUser(result.user);
           setAuthLoading(false);
@@ -165,21 +200,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Redirect was started (pending flag set) but we came back with no
         // user — e.g. back button pressed at Google, or the browser dropped
-        // the pending state. Show a visible error instead of silent fail.
+        // the pending state. Only show error if the pending is fresh (user
+        // just came back from redirect), otherwise clear silently to avoid
+        // false "adblock" popup on first visit.
         if (hadPendingRedirect) {
-          try {
-            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-          } catch {}
+          safeRemove(REDIRECT_PENDING_KEY);
+          safeRemove(REDIRECT_PENDING_AT_KEY);
+          // This is a fresh abort — show a gentle retry message, not adblock scare
           setAuthError(
-            "Google login could not be completed — no account was returned. Google page-e account select na kore back kore thakle abar try koro. Bar bar hole browser cookies allow + adblocker off kore try koro.",
+            "Google login was not completed. Please click 'Continue with Google' again to try.",
           );
         }
       })
       .catch((err) => {
         console.error("[auth] getRedirectResult failed:", err);
-        try {
-          sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-        } catch {}
+        safeRemove(REDIRECT_PENDING_KEY);
+        safeRemove(REDIRECT_PENDING_AT_KEY);
         const code =
           typeof err === "object" && err !== null && "code" in err
             ? String((err as { code?: unknown }).code ?? "")
@@ -189,9 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const msg = friendlyRedirectError(code, rawMsg);
         setAuthError(msg);
         // Backup for LoginClient to show — use sessionStorage to survive the redirect
-        try {
-          sessionStorage.setItem(REDIRECT_ERROR_KEY, msg);
-        } catch {}
+        safeSet(REDIRECT_ERROR_KEY, msg);
       });
 
     return unsubscribe;
@@ -221,33 +255,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       throw new Error("Firebase authentication is not configured.");
     }
-    // Fail fast when the browser blocks Firebase's storage (desktop privacy
-    // modes / cookie blockers). Otherwise BOTH popup (hangs forever) and
-    // redirect (silently returns no user) fail with no visible reason.
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-    } catch (err) {
-      const code =
-        typeof err === "object" && err !== null && "code" in err
-          ? String((err as { code?: unknown }).code ?? "")
-          : "";
-      if (code === "auth/web-storage-unsupported") {
-        throw new Error(
-          "Browser cookies/site-storage block kore rekheche, tai login hocche na. Cookies allow + adblocker off kore abar try koro.",
-        );
+    // Clear previous redirect errors on fresh attempt
+    setAuthError(null);
+    safeRemove(REDIRECT_ERROR_KEY);
+
+    // If previous popup timed out (hung due to third-party cookie blocking),
+    // the next click must use redirect DIRECTLY as a user gesture. Doing
+    // redirect from a setTimeout loses the gesture and gets blocked.
+    if (safeGet(USE_REDIRECT_NEXT_KEY) === "1") {
+      safeRemove(USE_REDIRECT_NEXT_KEY);
+      safeSet(REDIRECT_PENDING_KEY, "1");
+      safeSet(REDIRECT_PENDING_AT_KEY, String(Date.now()));
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectErr) {
+        safeRemove(REDIRECT_PENDING_KEY);
+        safeRemove(REDIRECT_PENDING_AT_KEY);
+        throw redirectErr;
       }
-      throw err;
+      return null;
     }
-    // Try a popup first (fast, no page reload). Some desktop browsers block
-    // the popup's third-party storage/cookies, in which case the popup
-    // promise NEVER settles (no resolve, no reject) and the UI would hang
-    // on "Signing in..." forever. Race it against a timeout so a hung popup
-    // falls back to full-page redirect, which uses top-level navigation and
-    // works even with third-party cookies blocked. Redirect completion is
-    // handled by getRedirectResult + onAuthStateChanged on mount above.
-    // 15s is enough for account-picking; longer just keeps desktop users
-    // staring at a stuck spinner.
-    const POPUP_TIMEOUT_MS = 15_000;
+
+    // Do NOT await setPersistence here — that breaks the user-gesture chain
+    // and makes browsers treat signInWithPopup as "popup-blocked". Persistence
+    // was already set on mount; best-effort try without await.
+    // Only call popup SYNCHRONOUSLY in this click handler.
+
+    // Try popup first (fast, no reload). Some browsers with strict tracking
+    // protection cause the popup promise to NEVER settle — race with a
+    // timeout and ask user to retry with redirect (next click will be redirect
+    // as user gesture, so it won't be blocked).
+    const POPUP_TIMEOUT_MS = 10_000;
     let popupTimer: ReturnType<typeof setTimeout> | null = null;
     const popupTimeout = new Promise<never>((_, reject) => {
       popupTimer = setTimeout(
@@ -260,40 +298,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithPopup(auth, googleProvider),
         popupTimeout,
       ]);
+      safeRemove(REDIRECT_PENDING_KEY);
+      safeRemove(REDIRECT_PENDING_AT_KEY);
+      safeRemove(USE_REDIRECT_NEXT_KEY);
       setUser(result.user);
       setAuthLoading(false);
-      // loadUserData already fetches the profile — reuse it instead of a
-      // second /api/me round-trip.
       return loadUserData(result.user);
     } catch (err) {
       const code =
         typeof err === "object" && err !== null && "code" in err
           ? String((err as { code?: unknown }).code ?? "")
           : "";
+      // Immediate fallback cases — these reject quickly while still in the
+      // user-gesture window, so redirect as fallback will not be blocked.
       if (
         code === "auth/popup-blocked" ||
-        code === "auth/operation-not-supported-in-this-environment" ||
-        code === "auth/web-storage-unsupported" ||
-        code === "auth/internal-error" ||
-        code === "auth/network-request-failed" ||
-        code === "auth/popup-timeout"
+        code === "auth/operation-not-supported-in-this-environment"
       ) {
-        // Remember that a redirect was started, so if we come back with no
-        // user the UI can show an error instead of failing silently.
-        try {
-          sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
-        } catch {}
+        safeSet(REDIRECT_PENDING_KEY, "1");
+        safeSet(REDIRECT_PENDING_AT_KEY, String(Date.now()));
         try {
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectErr) {
-          // Redirect never started (e.g. unauthorized domain) — clear the
-          // flag so a later reload doesn't show a stale "not completed" error.
-          try {
-            sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-          } catch {}
+          safeRemove(REDIRECT_PENDING_KEY);
+          safeRemove(REDIRECT_PENDING_AT_KEY);
           throw redirectErr;
         }
         return null;
+      }
+      // Popup hung — don't auto-redirect (would lose gesture and be blocked).
+      // Flag next click to use redirect directly as user gesture.
+      if (code === "auth/popup-timeout") {
+        safeSet(USE_REDIRECT_NEXT_KEY, "1");
+        throw new Error(
+          "Popup didn't respond. Please click 'Continue with Google' again — next attempt will use redirect and should work in one click.",
+        );
       }
       if (code === "auth/popup-closed-by-user") {
         throw new Error("Login popup closed before completing. Please try again.");
@@ -301,6 +340,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (code === "auth/unauthorized-domain") {
         throw new Error(
           "This site's domain is not authorized for Google login. Please contact support.",
+        );
+      }
+      if (code === "auth/web-storage-unsupported" || code === "auth/internal-error") {
+        throw new Error(
+          "Browser storage is blocked, so login can't complete. Please allow cookies/site data for this site and try again (no adblock needed).",
+        );
+      }
+      if (code === "auth/network-request-failed") {
+        throw new Error(
+          "Network error during login. Please check your internet and try again.",
         );
       }
       throw err;
