@@ -41,7 +41,7 @@ export async function chatWithFallback(
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://bloodarenabd.tech",
+          "HTTP-Referer": "https://medisparkbd.com",
           "X-Title": "MediSparkBD",
         },
         body: JSON.stringify({

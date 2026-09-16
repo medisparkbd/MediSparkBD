@@ -8,10 +8,8 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind, package manager: **p
 User communicates in Bengali/Banglish — reply in the same style.
 
 ## Infrastructure (current, as of 2026-09)
-- **Hosting:** Vercel — production project `medisparkbd` (account `medisparkbd-5969-projects`),
-  connected to GitHub repo `medisparkbd/MediSparkBD` (single working repo).
-  Live at bloodarenabd.tech + medisparkbd-ecru.vercel.app.
-- **Domain:** bloodarenabd.tech → Vercel DNS (ns1/ns2.vercel-dns.com)
+- **Hosting:** Vercel project `medisparkbd` (account `medisparkbd-5969`) — **DELETED 2026-09-16** per user request (bloodarenabd.tech removed, all deployments/domains removed). No live Vercel deployment — re-create project if hosting needed.
+- **Domain:** bloodarenabd.tech + medisparkbd.com → previously Vercel DNS (ns1/ns2.vercel-dns.com) — now **removed from Vercel** (bloodarenabd.tech returns DEPLOYMENT_NOT_FOUND; medisparkbd.com DNS zone still in Vercel awaiting registrar nameserver change). Update registrar to remove Vercel NS to fully delete zone.
 - **MySQL:** Azure Database for MySQL Flexible Server (managed PaaS)
   - Host: `eduall2005pass.mysql.database.azure.com` port **3306**, TLS required
     (`src/lib/mysql.ts` enables SSL automatically for azure.com hosts)
@@ -48,7 +46,8 @@ git pull medisparkbd main
 - Remote `medisparkbd` (`medisparkbd/MediSparkBD`) → Vercel project
   `medisparkbd` → live at bloodarenabd.tech + medisparkbd-ecru.vercel.app
   (Azure MySQL + medispark.duckdns.org media). Push to `main` auto-deploys.
-- Manual alternative: `vercel --prod`.
+  **DELETED 2026-09-16 — project removed, auto-deploy disabled.**
+- Manual alternative: `vercel --prod` (requires re-creating project + `vercel link`).
 
 ## Database rules
 - ALL data lives in Azure MySQL. Never use Firestore/Supabase/local disk for data.
