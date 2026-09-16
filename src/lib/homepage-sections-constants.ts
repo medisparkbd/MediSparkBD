@@ -4,6 +4,7 @@ export type HomepageSectionKey =
   | "homepage-courses"
   | "featured-courses"
   | "why-medispark"
+  | "glance"
   | "our-success"
   | "jersey"
   | "mentors"
@@ -65,6 +66,13 @@ export const HOMEPAGE_SECTIONS_CONFIG: HomepageSectionConfig[] = [
     defaultDescription:
       "One platform for your HSC academics and medical admission journey.",
     editableText: true,
+  },
+  {
+    key: "glance",
+    label: "MediSpark at a Glance",
+    defaultTitle: "MediSpark at a Glance",
+    defaultDescription: "",
+    editableText: false,
   },
   {
     key: "our-success",

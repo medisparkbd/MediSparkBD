@@ -13,12 +13,14 @@ export const HOME_CARD_SECTIONS = ["why", "success"] as const;
 export type HomeCardSection = (typeof HOME_CARD_SECTIONS)[number];
 
 export const WHY_ICONS = [
+  "teacher",
   "book",
+  "video",
   "exam",
   "chat",
+  "document",
   "chart",
-  "video",
-  "mentor",
+  "gift",
 ] as const;
 
 export const SUCCESS_ICONS = [
@@ -43,52 +45,68 @@ export type HomeCard = {
 
 const SEED_WHY_CARDS: Array<Omit<HomeCard, "key" | "section" | "isActive">> = [
   {
-    title: "Structured Courses",
+    title: "Expert Teacher Panel",
     description:
-      "Chapter-based lessons across HSC subjects and the medical admission syllabus.",
+      "অভিজ্ঞ শিক্ষকদের guidance-এর মাধ্যমে তোমার পড়াশোনার সঠিক direction ও expert support পেতে পারবে।",
     value: null,
-    icon: "book",
+    icon: "teacher",
     order: 1,
   },
   {
-    title: "Exam-Ready Practice",
+    title: "Structured Courses",
     description:
-      "Model tests and chapter-wise exams to build real exam confidence.",
+      "পরিকল্পিতভাবে সাজানো কোর্সের মাধ্যমে প্রতিটি বিষয় ধাপে ধাপে শিখতে পারবে।",
     value: null,
-    icon: "exam",
+    icon: "book",
     order: 2,
   },
   {
-    title: "Expert Q&A",
+    title: "Live & Recorded Classes",
     description:
-      "Ask questions and get clear answers from mentors and fellow students.",
+      "Live class-এ অংশ নেওয়ার পাশাপাশি recorded class দেখে যেকোনো সময় আবার revise করতে পারবে।",
+    value: null,
+    icon: "video",
+    order: 3,
+  },
+  {
+    title: "Live & Practice Exams",
+    description:
+      "Live ও Practice Exam-এর মাধ্যমে নিয়মিত পরীক্ষা দিয়ে তোমার প্রস্তুতি আরও শক্তিশালী করতে পারবে।",
+    value: null,
+    icon: "exam",
+    order: 4,
+  },
+  {
+    title: "Expert Q&A Support",
+    description:
+      "যেকোনো প্রশ্ন করে expert guidance-এর মাধ্যমে তোমার confusion দূর করতে পারবে।",
     value: null,
     icon: "chat",
-    order: 3,
+    order: 5,
+  },
+  {
+    title: "Study Materials",
+    description:
+      "প্রয়োজনীয় notes, study materials ও resources এক জায়গা থেকে পেতে পারবে।",
+    value: null,
+    icon: "document",
+    order: 6,
   },
   {
     title: "Track Your Progress",
     description:
-      "Monitor your preparation and stay on top of your study goals.",
+      "তোমার learning progress ও exam performance সহজেই দেখতে পারবে।",
     value: null,
     icon: "chart",
-    order: 4,
+    order: 7,
   },
   {
-    title: "Recorded Video Classes",
+    title: "Win a Gift",
     description:
-      "Watch classes anytime and revise every topic at your own pace.",
+      "ভালো ফলাফল করে MediSpark-এর পক্ষ থেকে সহজেই আকর্ষণীয় পুরস্কার বা gift জিতে নিতে পারবে।",
     value: null,
-    icon: "video",
-    order: 5,
-  },
-  {
-    title: "Mentor Support",
-    description:
-      "Guidance from experienced mentors at every step of your journey.",
-    value: null,
-    icon: "mentor",
-    order: 6,
+    icon: "gift",
+    order: 8,
   },
 ];
 
