@@ -44,8 +44,11 @@ function cleanOptionText(raw: string): string {
   s = s.replace(/\s*✔\s*$/g, "").trim();
   s = s.replace(/\s*\(correct\)\s*$/i, "").trim();
   s = s.replace(/\s*\*\s*$/g, "").trim();
-  // remove trailing punctuation that is likely answer marker remnants
   s = s.replace(/\s+$/, "").trim();
+  // Defense-in-depth: strip trailing answer/explanation text that leaked into option
+  // e.g. "Mollusca   উত্তর: (b) Nematoda" → "Mollusca"
+  s = s.replace(/\s+(?:Ans(?:wer)?\.?|Correct(?:\s+Answer|\s+option)?|উত্তর\s*ঃ?|সঠিক\s+উত্তর)\s*[:\-=—ঃ.:].*$/i, "").trim();
+  s = s.replace(/\s+(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—ঃ.:].*$/i, "").trim();
   return s;
 }
 
@@ -264,20 +267,20 @@ function extractAnswerPayload(line: string): string | null {
   // CRITICAL: Strip any trailing ব্যাখ্যা:/Explanation: that may appear on the same line
   const patterns: RegExp[] = [
     // Bangla সঠিক উত্তর
-    /^\s*সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*সঠিক\s*উত্তর\s*ঃ?\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
     // Bangla উত্তর (with optional ঃ) - must handle visarga char
-    /^\s*উত্তর\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*উত্তর\s*ঃ?\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
     // English: Correct Answer / Correct option / Answer / Ans
-    /^\s*(?:Correct\s+Answer|Correct\s+option|Correct|Ans(?:wer)?\.?)\s*(?:is)?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*(?:Correct\s+Answer|Correct\s+option|Correct|Ans(?:wer)?\.?)\s*(?:is)?\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
     // Generic fallback: "Answer: B" with optional Key/Solution
-    /^\s*(?:Answer\s*Key|Key|Solution)\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*(?:Answer\s*Key|Key|Solution)\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
   ];
   for (const re of patterns) {
     const m = t.match(re);
     if (m) {
       let payload = (m[1] ?? "").trim();
       // Strip trailing ব্যাখ্যা:/Explanation: that might be on the same line
-      payload = payload.replace(/\s*(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—.].*$/i, "").trim();
+      payload = payload.replace(/\s*(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—ঃ.:].*$/i, "").trim();
       // payload may include trailing punctuation like "." or "."
       payload = payload.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]]\s*$/, "").trim();
       payload = payload.replace(/[\.\)\:\-]+$/g, "").trim();
@@ -295,9 +298,9 @@ function extractExplanationPayload(line: string): string | null {
   if (!t) return null;
   const patterns: RegExp[] = [
     // Bangla ব্যাখ্যা
-    /^\s*ব্যাখ্যা\s*ঃ?\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*ব্যাখ্যা\s*ঃ?\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
     // English Explanation
-    /^\s*(?:Explanation|Explan\.?)\s*[:\-=—.]?\s*(.+?)\s*$/i,
+    /^\s*(?:Explanation|Explan\.?)\s*[:\-=—ঃ.:]?\s*(.+?)\s*$/i,
   ];
   for (const re of patterns) {
     const m = t.match(re);
@@ -430,8 +433,8 @@ function injectNewlinesForInline(text: string): string {
   s = s.replace(/([^\n])\s{2,}(?=(?:i{1,3}|iv)\s*[\.\)\:\-])/gi, "$1\n");
   s = s.replace(/([^\n])\s{2,}(?=(?:I{1,3}|IV)\s*[\.\)\:\-])/g, "$1\n");
   // Answer inline: handle multi-word prefixes first, then single-word with lookbehind to avoid splitting "Correct Answer" inside
-  s = s.replace(/([^\n])\s+(?=(?:Correct\s+Answer|Correct\s+option|সঠিক\s+উত্তর)\s*[:\-=—ঃ])/gi, "$1\n");
-  s = s.replace(/([^\n])\s+(?<!Correct\s)(?<!সঠিক\s)(?=(?:Ans(?:wer)?\.?|Correct|উত্তর\s*ঃ?)\s*[:\-=—ঃ])/gi, "$1\n");
+  s = s.replace(/([^\n])\s+(?=(?:Correct\s+Answer|Correct\s+option|সঠিক\s+উত্তর)\s*[:\-=—ঃ.:])/gi, "$1\n");
+  s = s.replace(/([^\n])\s+(?<!Correct\s)(?<!সঠিক\s)(?=(?:Ans(?:wer)?\.?|Correct|উত্তর\s*ঃ?)\s*[:\-=—ঃ.:])/gi, "$1\n");
   // Explanation inline: ব্যাখ্যা: / Explanation:
   s = s.replace(/([^\n])\s+(?=(?:ব্যাখ্যা\s*ঃ?|Explanation|Explan\.?)\s*[:\-=—ঃ])/gi, "$1\n");
   // Question header inline: handle " Q1. " or " 2. " after options — require header punctuation to avoid splitting inside question text like "Q1?"
