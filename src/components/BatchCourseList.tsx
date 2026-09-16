@@ -51,14 +51,14 @@ export default function BatchCourseList({
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-12 text-center">
           <p className="font-semibold text-heading">No courses found</p>
           <p className="mt-1 text-sm text-neutral-400">
             Courses for this batch are coming soon.
           </p>
         </div>
       ) : (
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((course) => (
             <CourseCard key={course.slug} course={course} />
           ))}
