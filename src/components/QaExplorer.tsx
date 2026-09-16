@@ -296,6 +296,30 @@ export default function QaExplorer({
             </svg>
             Ask Question
           </button>
+
+          {askOpen && (
+            <div className="mt-4">
+              {askOptionsError ? (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-sm font-semibold text-red-400">
+                  {askOptionsError}
+                </div>
+              ) : askOptions ? (
+                <QaAskForm
+                  options={askOptions}
+                  initialSubjectId={selectedSubjectId ?? undefined}
+                  onSubmit={handleAskSubmit}
+                  onUploadImage={handleUploadImage}
+                  onClose={closeAsk}
+                  cardSettings={askCardSettings}
+                />
+              ) : (
+                <div className="flex items-center justify-center gap-3 rounded-2xl border border-ink/10 bg-dark-900 p-8 text-sm text-neutral-400">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+                  Loading your courses…
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -314,30 +338,6 @@ export default function QaExplorer({
 
       {askGuidance && (
         <PermissionGuidanceCard guidance={askGuidance} />
-      )}
-
-      {askOpen && (
-        <div className="mb-6">
-          {askOptionsError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-sm font-semibold text-red-400">
-              {askOptionsError}
-            </div>
-          ) : askOptions ? (
-            <QaAskForm
-              options={askOptions}
-              initialSubjectId={selectedSubjectId ?? undefined}
-              onSubmit={handleAskSubmit}
-              onUploadImage={handleUploadImage}
-              onClose={closeAsk}
-              cardSettings={askCardSettings}
-            />
-          ) : (
-            <div className="flex items-center justify-center gap-3 rounded-2xl border border-ink/10 bg-dark-900 p-8 text-sm text-neutral-400">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-              Loading your courses…
-            </div>
-          )}
-        </div>
       )}
 
       {!selectedSubject ? (
