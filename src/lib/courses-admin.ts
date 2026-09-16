@@ -73,14 +73,8 @@ export const CONTENT_FLOWS: FlowMeta[] = [
     hierarchy: ["Course", "Subject", "Class / Exam / Materials / Archive", "Chapter", "Content"],
   },
   {
-    id: "flow-4",
-    label: "Flow 4 — Subject → Content",
-    description: "Course Content → Subject → Content — direct per-subject contents (video, PDF, note, image, audio, quiz, etc.) without Chapter layer.",
-    hierarchy: ["Course Content", "Subject", "Content"],
-  },
-  {
     id: "flow-5",
-    label: "Flow 5 — Exam Flow",
+    label: "Course Flow 4",
     description: "Course → Topic-wise / Paper Final / Subject Final / Final Model Test. Topic-wise branches into 8 fixed subjects; the other three list exams directly.",
     hierarchy: ["Course", "Topic-wise / Paper Final / Subject Final / Final Model", "Subject (topic-wise only)", "Exam"],
   },
@@ -89,8 +83,10 @@ export const CONTENT_FLOWS: FlowMeta[] = [
 /** Map legacy content_layout values to the new flow system. */
 function normalizeContentLayoutRaw(value: unknown): CourseContentLayout {
   const v = String(value ?? "").trim().toLowerCase();
-  // Direct mapping for new values (flow-5 = exam flow; existing flows untouched).
-  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-4" || v === "flow-5") return v;
+  // Direct mapping for known values.
+  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-5") return v;
+  // Legacy flow-4 (unused) → migrate to flow-5 (Course Flow 4).
+  if (v === "flow-4") return "flow-5";
   // Backward compatibility: map old values.
   if (v === "direct") return "flow-1";
   if (v === "paper") return "flow-2";

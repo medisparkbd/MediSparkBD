@@ -849,50 +849,7 @@ export default function CourseManager({
                     )}
                   </button>
 
-                  {/* Flow 4 — Subject → Content (NEW: Course Content → Subject → Content) */}
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, contentLayout: "flow-4" })}
-                    className={`group relative flex flex-col items-start rounded-xl border p-4 text-left transition ${
-                      form.contentLayout === "flow-4"
-                        ? "border-primary-500/60 bg-primary-600/10 shadow-md shadow-primary-900/20"
-                        : "border-ink/15 bg-dark-900 hover:border-primary-500/30"
-                    }`}
-                  >
-                    <div className="flex w-full items-center justify-between">
-                      <span className={`text-sm font-bold ${form.contentLayout === "flow-4" ? "text-primary-300" : "text-heading"}`}>
-                        Flow 4
-                      </span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        form.contentLayout === "flow-4"
-                          ? "bg-primary-500/20 text-primary-300"
-                          : "bg-ink/10 text-neutral-500"
-                      }`}>
-                        Subject→Content
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-neutral-400">Course Content → Subject → Content</p>
-                    {/* Hierarchy preview */}
-                    <div className="mt-3 w-full rounded-lg border border-ink/10 bg-dark-950 p-2.5">
-                      <div className="flex flex-col gap-1 text-[10px]">
-                        <div className="rounded bg-primary-500/15 px-2 py-1 text-center font-bold text-primary-300">Course Content</div>
-                        <div className="ml-2 text-center text-neutral-600">↓</div>
-                        <div className="rounded bg-ink/10 px-2 py-1 text-center font-semibold text-neutral-300">Subject</div>
-                        <div className="ml-2 text-center text-neutral-600">↓</div>
-                        <div className="rounded bg-ink/10 px-2 py-1 text-center font-semibold text-neutral-300">Content</div>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-[10px] leading-tight text-neutral-500">Biology, Chemistry, Physics etc. → video/PDF/note/image/audio/quiz</p>
-                    {form.contentLayout === "flow-4" && (
-                      <div className="absolute right-2 top-2">
-                        <svg className="h-5 w-5 text-primary-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Flow 5 — Exam Flow (NEW: Course → 4 Exam Cards) */}
+                  {/* Course Flow 4 — Exam Flow (Course → 4 Exam Cards) */}
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, contentLayout: "flow-5" })}
@@ -904,7 +861,7 @@ export default function CourseManager({
                   >
                     <div className="flex w-full items-center justify-between">
                       <span className={`text-sm font-bold ${form.contentLayout === "flow-5" ? "text-primary-300" : "text-heading"}`}>
-                        Flow 5
+                        Course Flow 4
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-5"

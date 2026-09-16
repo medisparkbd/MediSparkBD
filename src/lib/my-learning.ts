@@ -120,8 +120,10 @@ function toStringOrNull(value: unknown): string | null {
 
 function toLayout(value: unknown): CourseContentLayout {
   const v = String(value ?? "").trim().toLowerCase();
-  // New flow values (flow-5 = exam flow; existing flows untouched).
-  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-4" || v === "flow-5") return v as CourseContentLayout;
+  // New flow values (flow-5 = Course Flow 4 / Exam Flow; existing flows untouched).
+  if (v === "flow-1" || v === "flow-2" || v === "flow-3" || v === "flow-5") return v as CourseContentLayout;
+  // Legacy flow-4 (unused) → migrate to flow-5 (Course Flow 4).
+  if (v === "flow-4") return "flow-5";
   // Backward compatibility: map old values.
   if (v === "direct") return "flow-1";
   if (v === "paper") return "flow-2";

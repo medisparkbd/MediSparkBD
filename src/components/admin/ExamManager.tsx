@@ -777,7 +777,7 @@ export default function ExamManager({
                 )}
                 {exam.examFormat && (
                   <span
-                    title={exam.examFormat === "topic-wise" && exam.topicSubject ? `Topic-wise · ${exam.topicSubject}` : "Flow 5 exam category"}
+                    title={exam.examFormat === "topic-wise" && exam.topicSubject ? `Topic-wise · ${exam.topicSubject}` : "Course Flow 4 exam category"}
                     className="shrink-0 rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-500/20 admin-dark:bg-indigo-500/10 admin-dark:text-indigo-300"
                   >
                     {exam.examFormat === "topic-wise" ? "Topic-wise" : exam.examFormat === "paper-final" ? "Paper Final" : exam.examFormat === "subject-final" ? "Subject Final" : "Final Model"}
@@ -1121,7 +1121,7 @@ export default function ExamManager({
                   {allowEnrolled && form.kind === "enrolled" && (
                     <>
                       <div>
-                        <label className={labelClass} htmlFor="ex-format">Flow 5 exam category</label>
+                        <label className={labelClass} htmlFor="ex-format">Course Flow 4 exam category</label>
                         <select
                           id="ex-format"
                           className={inputClass}
@@ -1140,7 +1140,7 @@ export default function ExamManager({
                           <option value="subject-final">Subject Final Exam</option>
                           <option value="final-model">Final Model Test</option>
                         </select>
-                        <p className="mt-1 text-[11px] text-slate-500">Only categorized exams appear in Flow 5 courses — one category per exam, never mixed.</p>
+                        <p className="mt-1 text-[11px] text-slate-500">Only categorized exams appear in Course Flow 4 courses — one category per exam, never mixed.</p>
                       </div>
                       {(form as unknown as { examFormat?: string }).examFormat === "topic-wise" && (
                         <div>

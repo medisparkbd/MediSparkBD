@@ -63,7 +63,7 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
 
   useEffect(() => {
     if (authLoading || !user) return;
-    if (layout !== "flow-4") return;
+    if (layout !== "flow-5") return;
     void load();
   }, [authLoading, user, load, layout]);
 
@@ -86,8 +86,8 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
   }
 
   if (authLoading || layoutLoading || !user) return <AccessLoading label="Loading course…" />;
-  // Existing 3 flows: keep exactly as before via legacy component
-  if (layout !== "flow-4") {
+  // Course Flow 4 (stored as flow-5 in DB) — subject/content management
+  if (layout !== "flow-5") {
     return <LegacyCourseContent slug={slug} />;
   }
   if (subjects === null) return <AccessLoading label="Loading subjects…" />;
@@ -101,7 +101,7 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
         {decodeURIComponent(slug).replace(/-/g, " ")}
       </h1>
       <p className="mt-1 text-xs text-neutral-500">
-        Flow 4 — <span className="font-bold">Course Content → Subject → Content</span> · Manage subjects for this course. Existing flows 1-3 remain unchanged.
+        Course Flow 4 — <span className="font-bold">Course → Topic-wise / Paper Final / Subject Final / Final Model</span> · Manage subjects for this course. Existing flows 1-3 remain unchanged.
       </p>
 
       {subjects.length === 0 ? (
@@ -148,7 +148,7 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
         </div>
       )}
       <p className="mt-6 rounded-xl border border-dashed border-[#bfdbfe] bg-[#f8fbff]/70 px-4 py-3 text-center text-xs text-slate-500 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]/60">
-        Flow 4 navigation: Course Content → Subject → Content. If a subject has no content → student sees &quot;No Content Available&quot; while navigation remains.
+        Course Flow 4 navigation: Course → Exam Categories → Subject → Exam. If a subject has no content → student sees &quot;No Content Available&quot; while navigation remains.
       </p>
     </section>
   );

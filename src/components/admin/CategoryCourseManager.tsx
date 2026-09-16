@@ -820,7 +820,7 @@ export default function CategoryCourseManager({
                     )}
                   </button>
 
-                  {/* Flow 5 — Exam Flow (NEW: Course → 4 Exam Cards) */}
+                  {/* Course Flow 4 — Exam Flow (Course → 4 Exam Cards) */}
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, contentLayout: "flow-5" })}
@@ -832,7 +832,7 @@ export default function CategoryCourseManager({
                   >
                     <div className="flex w-full items-center justify-between">
                       <span className={`text-sm font-bold ${form.contentLayout === "flow-5" ? "text-primary-300" : "text-heading"}`}>
-                        Flow 5
+                        Course Flow 4
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-5"

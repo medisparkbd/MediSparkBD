@@ -32,9 +32,11 @@ export function isDirectContent(
 }
 
 export function isFlow4(layout: CourseContentLayout | undefined | string): boolean {
-  return layout === "flow-4";
+  // The working exam flow is stored as flow-5 in the database but displayed as "Course Flow 4".
+  return layout === "flow-5";
 }
 
+/** @deprecated Use isFlow4() — kept for backward compatibility. */
 export function isFlow5(layout: CourseContentLayout | undefined | string): boolean {
   return layout === "flow-5";
 }
