@@ -37,6 +37,15 @@ function parseDateValue(value: unknown): string {
 
 let messagingApp: App | null = null;
 
+function normalizePrivateKey(value: string): string {
+  return value
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .trim();
+}
+
 /** Lazily initialized Firebase app for Cloud Messaging. */
 function getMessagingInstance(): Messaging | null {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -51,7 +60,7 @@ function getMessagingInstance(): Messaging | null {
           credential: cert({
             projectId,
             clientEmail,
-            privateKey: privateKey.replace(/\\n/g, "\n"),
+            privateKey: normalizePrivateKey(privateKey),
           }),
         },
         "push-messaging",

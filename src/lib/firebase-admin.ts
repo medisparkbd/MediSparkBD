@@ -10,10 +10,23 @@ import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 const serviceAccountPath =
   process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? "";
 
+function normalizePrivateKey(value: string): string {
+  return value
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .trim();
+}
+
 function getServiceAccount() {
   const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (rawJson && rawJson.length > 0) {
-    return JSON.parse(rawJson) as Record<string, string>;
+    const parsed = JSON.parse(rawJson) as Record<string, string>;
+    if (parsed.private_key) {
+      parsed.private_key = normalizePrivateKey(parsed.private_key);
+    }
+    return parsed;
   }
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -22,7 +35,7 @@ function getServiceAccount() {
     return {
       project_id: projectId,
       client_email: clientEmail,
-      private_key: privateKey.replace(/\\n/g, "\n"),
+      private_key: normalizePrivateKey(privateKey),
     };
   }
   if (serviceAccountPath.length > 0) {
