@@ -2,6 +2,7 @@ import BannerSlider from "@/components/home/BannerSlider";
 import Hero from "@/components/home/Hero";
 import FeaturedCourses from "@/components/home/FeaturedCourses";
 import WhyMediSpark from "@/components/home/WhyMediSpark";
+import GlanceSection from "@/components/home/GlanceSection";
 import OurSuccess from "@/components/home/OurSuccess";
 import JerseyGallery from "@/components/home/JerseyGallery";
 import Mentors from "@/components/home/Mentors";
@@ -76,6 +77,8 @@ export default async function HomeControlPage() {
         return <FeaturedCourses {...textProps} />;
       case "why-medispark":
         return <WhyMediSpark {...textProps} />;
+      case "glance":
+        return <GlanceSection />;
       case "our-success":
         return <OurSuccess {...textProps} />;
       case "mentors":
@@ -144,6 +147,8 @@ export default async function HomeControlPage() {
         });
       case "why-medispark":
         return controlled("why-medispark", renderSectionNode(section), "/admin/website/homepage/cards", section);
+      case "glance":
+        return controlled("glance", renderSectionNode(section), "/admin/home-control", section);
       case "our-success":
         return controlled("our-success", renderSectionNode(section), "/admin/website/homepage/cards", section);
       case "mentors":
@@ -191,7 +196,7 @@ export default async function HomeControlPage() {
     );
   }
 
-  const ourSuccessActive = sections.some((section) => section.key === "our-success" && section.isActive);
+  const glanceActive = sections.some((section) => section.key === "glance" && section.isActive);
 
   const joinSection = sections.find((s) => s.key === "join-with-us");
   const joinNode: ReactNode = (
@@ -221,9 +226,9 @@ export default async function HomeControlPage() {
         .filter((section) => section.key !== "jersey" && section.key !== "join-with-us")
         .flatMap((section) => {
           const nodes = [renderControlledSection(section)];
-          if (showJersey && section.key === "our-success") {
+          if (showJersey && section.key === "glance") {
             nodes.push(controlledJersey());
-          } else if (showJersey && !ourSuccessActive && section.key === "mentors") {
+          } else if (showJersey && !glanceActive && section.key === "mentors") {
             nodes.unshift(controlledJersey());
           }
           if (section.key === "faq") {
@@ -233,7 +238,7 @@ export default async function HomeControlPage() {
         })}
       {/* Jersey fallback: both neighbours disabled but jersey still published. */}
       {showJersey &&
-      !sections.some((section) => (section.key === "our-success" || section.key === "mentors") && section.isActive)
+      !sections.some((section) => (section.key === "glance" || section.key === "mentors") && section.isActive)
         ? controlledJersey()
         : null}
       {/* If FAQ is disabled/hidden, still show Join With Us before Footer */}

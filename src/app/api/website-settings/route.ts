@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
   let showExplore: boolean | undefined;
   let showPrograms: boolean | undefined;
   let showContact: boolean | undefined;
+  let baseStudentCount: number | undefined;
 
   function asOptionalBool(value: FormDataEntryValue | string | null): boolean | undefined {
     if (value === "true") return true;
@@ -87,6 +88,11 @@ export async function POST(request: NextRequest) {
     showExplore = asOptionalBool(formData.get("show_explore"));
     showPrograms = asOptionalBool(formData.get("show_programs"));
     showContact = asOptionalBool(formData.get("show_contact"));
+    const rawBaseStudent = formData.get("base_student_count") ?? formData.get("baseStudentCount");
+    if (rawBaseStudent != null && rawBaseStudent !== "") {
+      const n = Number(rawBaseStudent);
+      if (!Number.isNaN(n) && n >= 0) baseStudentCount = Math.floor(n);
+    }
   } else {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) {
@@ -127,6 +133,11 @@ export async function POST(request: NextRequest) {
         ? String(body.show_contact)
         : (body.show_contact as string | null) ?? null,
     );
+    if (typeof body.base_student_count === "number" && body.base_student_count >= 0) {
+      baseStudentCount = Math.floor(body.base_student_count);
+    } else if (typeof body.baseStudentCount === "number" && body.baseStudentCount >= 0) {
+      baseStudentCount = Math.floor(body.baseStudentCount);
+    }
   }
 
   // Handle logo upload through the existing central logo pipeline so LogoProvider refreshes everywhere.
@@ -256,6 +267,7 @@ export async function POST(request: NextRequest) {
         showExplore,
         showPrograms,
         showContact,
+        baseStudentCount,
       },
       faviconFile,
       admin.uid,

@@ -22,6 +22,7 @@ export type WebsiteSettings = {
   showExplore: boolean;
   showPrograms: boolean;
   showContact: boolean;
+  baseStudentCount: number;
 };
 
 export const DEFAULT_WEBSITE_SETTINGS: WebsiteSettings = {
@@ -44,6 +45,7 @@ export const DEFAULT_WEBSITE_SETTINGS: WebsiteSettings = {
   showExplore: true,
   showPrograms: true,
   showContact: true,
+  baseStudentCount: 0,
 };
 
 export const MAX_FAVICON_FILE_SIZE = 5 * 1024 * 1024;

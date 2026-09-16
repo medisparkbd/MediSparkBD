@@ -30,6 +30,7 @@ type WebsiteSettingsRow = {
   show_programs?: number | boolean | null;
   show_contact?: number | boolean | null;
   other_contact_links?: string | null;
+  base_student_count?: number | null;
 };
 
 function mapRow(row: WebsiteSettingsRow, adminDisplayName: string | null): WebsiteSettings {
@@ -64,6 +65,7 @@ function mapRow(row: WebsiteSettingsRow, adminDisplayName: string | null): Websi
     showExplore: row.show_explore === undefined || row.show_explore === null ? true : Boolean(row.show_explore),
     showPrograms: row.show_programs === undefined || row.show_programs === null ? true : Boolean(row.show_programs),
     showContact: row.show_contact === undefined || row.show_contact === null ? true : Boolean(row.show_contact),
+    baseStudentCount: typeof row.base_student_count === "number" ? row.base_student_count : 0,
   };
 }
 
@@ -112,7 +114,8 @@ export async function fetchWebsiteSettings(): Promise<WebsiteSettings | null> {
     try {
       rows = await query<WebsiteSettingsRow[]>(
         `SELECT site_name, tagline, contact_email, contact_phone, facebook_url, youtube_url,
-                favicon_url, favicon_file_name, favicon_updated_at, updated_at, updated_by${FOOTER_COLUMNS}${CONTACT_COLUMNS}
+                favicon_url, favicon_file_name, favicon_updated_at, updated_at, updated_by${FOOTER_COLUMNS}${CONTACT_COLUMNS},
+                base_student_count
          FROM website_settings WHERE id = ? LIMIT 1`,
         [WEBSITE_SETTINGS_ID],
       );
@@ -159,6 +162,7 @@ type SaveInput = {
   showExplore?: boolean;
   showPrograms?: boolean;
   showContact?: boolean;
+  baseStudentCount?: number;
 };
 
 function isValidFooterHref(href: string): boolean {
@@ -347,8 +351,8 @@ export async function saveWebsiteSettings(
         (id, site_name, tagline, contact_email, contact_phone, facebook_url, youtube_url,
          favicon_url, favicon_storage_path, favicon_file_name, favicon_updated_at, updated_at, updated_by, created_at,
          copyright_text, footer_links, show_explore, show_programs, show_contact,
-         address, other_contact_links)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, NOW(), ?, ?, ?, ?, ?, ?, ?)
+         address, other_contact_links, base_student_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          site_name = VALUES(site_name),
          tagline = VALUES(tagline),
@@ -367,7 +371,8 @@ export async function saveWebsiteSettings(
          show_programs = VALUES(show_programs),
          show_contact = VALUES(show_contact),
          address = VALUES(address),
-         other_contact_links = VALUES(other_contact_links)`,
+         other_contact_links = VALUES(other_contact_links),
+         base_student_count = VALUES(base_student_count)`,
       [
         WEBSITE_SETTINGS_ID,
         siteName,
@@ -387,6 +392,7 @@ export async function saveWebsiteSettings(
         showContact ? 1 : 0,
         address || null,
         otherContactLinksJson,
+        typeof input.baseStudentCount === "number" ? input.baseStudentCount : (existingRow?.base_student_count ?? 0),
       ],
     );
   } catch (error) {
@@ -456,6 +462,7 @@ export async function saveWebsiteSettings(
     showExplore,
     showPrograms,
     showContact,
+    baseStudentCount: typeof input.baseStudentCount === "number" ? input.baseStudentCount : (existingRow?.base_student_count ?? 0),
   };
 }
 
@@ -533,6 +540,7 @@ export async function removeFavicon(adminUid: string): Promise<WebsiteSettings> 
       existingRow?.show_contact === undefined || existingRow?.show_contact === null
         ? true
         : Boolean(existingRow.show_contact),
+    baseStudentCount: typeof existingRow?.base_student_count === "number" ? existingRow.base_student_count : 0,
   };
 }
 

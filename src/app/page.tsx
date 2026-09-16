@@ -2,6 +2,7 @@ import BannerSlider from "@/components/home/BannerSlider";
 import Hero from "@/components/home/Hero";
 import FeaturedCourses from "@/components/home/FeaturedCourses";
 import WhyMediSpark from "@/components/home/WhyMediSpark";
+import GlanceSection from "@/components/home/GlanceSection";
 import OurSuccess from "@/components/home/OurSuccess";
 import JerseyGallery from "@/components/home/JerseyGallery";
 import Mentors from "@/components/home/Mentors";
@@ -37,6 +38,8 @@ function renderSection(section: HomepageSection) {
       return <FeaturedCourses key={section.key} {...textProps} />;
     case "why-medispark":
       return <WhyMediSpark key={section.key} {...textProps} />;
+    case "glance":
+      return <GlanceSection key={section.key} />;
     case "our-success":
       return <OurSuccess key={section.key} {...textProps} />;
     case "mentors":
@@ -78,7 +81,7 @@ export default async function HomePage() {
 
   // Jersey visibility is driven by Admin → Content → Jersey (MySQL `jerseys`
   // table): the section renders only while an active jersey with an image
-  // exists, and always sits exactly between Our Success and Mentors.
+  // exists, and always sits exactly between Glance and Mentors.
   const jerseySection = sections.find((section) => section.key === "jersey");
   const showJersey = Boolean(jerseySection?.isActive) && activeJerseys.length > 0;
 
@@ -121,8 +124,8 @@ export default async function HomePage() {
     />
   );
 
-  const ourSuccessActive = activeSections.some(
-    (section) => section.key === "our-success",
+  const glanceActive = activeSections.some(
+    (section) => section.key === "glance",
   );
 
   // Join With Us Now! — immediately after FAQ, before Footer (admin-managed social_links)
@@ -143,12 +146,12 @@ export default async function HomePage() {
         .filter((section) => section.key !== "jersey")
         .flatMap((section) => {
           const nodes = [renderHomeSection(section)];
-          // Exact order: Our Success → Jersey → Mentors.
-          if (showJersey && section.key === "our-success") {
+          // Exact order: Glance → Jersey → Mentors.
+          if (showJersey && section.key === "glance") {
             nodes.push(jerseyNode);
           } else if (
             showJersey &&
-            !ourSuccessActive &&
+            !glanceActive &&
             section.key === "mentors"
           ) {
             nodes.unshift(jerseyNode);
@@ -163,7 +166,7 @@ export default async function HomePage() {
       {showJersey &&
         !activeSections.some(
           (section) =>
-            section.key === "our-success" || section.key === "mentors",
+            section.key === "glance" || section.key === "mentors",
         ) &&
         jerseyNode}
       {/* If FAQ is disabled/hidden, still show Join With Us before Footer */}
