@@ -161,7 +161,9 @@ export default function ExamPaperEditor({
       const data = (await res.json()) as { questions?: ExamQuestion[] };
       if (version === loadVersionRef.current) setQuestions(data.questions ?? []);
     } catch {
-      if (version === loadVersionRef.current) setQuestions([]);
+      // Never blank the visible list on a failed fetch — keep showing the
+      // current questions/counters and let an explicit refresh retry.
+      if (version === loadVersionRef.current) setQuestions((prev) => prev ?? []);
     }
   }, [exam.id, authHeaders, langVersion, setLabel]);
 
@@ -520,15 +522,45 @@ export default function ExamPaperEditor({
     setTimeout(() => setNotice(null), 5000);
   }
 
-  /** Global Refresh (top button — the only refresh control on this page) — reload saved data, discard unsaved drafts. */
-  function handleRefresh() {
-    setDrafts({});
-    setDetectWarnings({});
-    setDetectExistingMap({});
+  /** Global Refresh (top button — the only refresh control on this page).
+   * Fetches the latest saved data, then displays it. Never clears anything
+   * beforehand: the current list and counters stay visible during the fetch,
+   * drafts are replaced only after fresh data arrives, and a failed fetch
+   * keeps everything as it was. Completely separate from Remove All (which
+   * never touches the database). */
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    const v = langVersion;
+    const s = setLabel;
+    const token = ++loadVersionRef.current;
+    setRefreshing(true);
     setError(null);
-    setNotice(null);
-    void load();
-    void loadCoverage();
+    try {
+      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${v}&set=${s}`, {
+        cache: "no-store",
+        headers: authHeaders,
+      });
+      if (!res.ok) throw new Error("refresh failed");
+      const data = (await res.json()) as { questions?: ExamQuestion[] };
+      if (token !== loadVersionRef.current) return;
+      if (workspaceRef.current.v !== v || workspaceRef.current.s !== s) return;
+      const fresh = data.questions ?? [];
+      setQuestions(fresh);
+      const next: Record<number, SlotDraft> = {};
+      for (let i = 0; i < totalSlots; i++) {
+        next[i] = draftFromQuestion(i < fresh.length ? fresh[i] : null);
+      }
+      setDrafts(next);
+      setDetectWarnings({});
+      setDetectExistingMap({});
+      setNotice(null);
+      void loadCoverage();
+    } catch {
+      setError("Refresh failed — showing current data. Please try again.");
+    } finally {
+      if (token === loadVersionRef.current) setRefreshing(false);
+    }
   }
 
   async function handleCorrectChange(slotIndex: number, newIdx: number) {
@@ -696,7 +728,7 @@ export default function ExamPaperEditor({
 
         <div className="flex items-center justify-between gap-2 border-t border-[#eef4ff] pt-3 admin-dark:border-[#1e3a65]/60">
           <p className="text-xs font-extrabold text-slate-600 admin-dark:text-slate-300">{progressText} <span className="font-semibold capitalize">({langVersion} Set {setLabel})</span></p>
-          <button type="button" disabled={busy} onClick={handleRefresh} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
+          <button type="button" disabled={busy || refreshing} onClick={() => void handleRefresh()} className={buttonSecondaryClass} title="Refresh">{refreshing ? "Refreshing…" : "↻ Refresh"}</button>
         </div>
       </div>
     </div>
