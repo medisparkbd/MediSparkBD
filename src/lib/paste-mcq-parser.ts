@@ -390,7 +390,166 @@ function mapAnswerPayloadToIndex(payload: string, options: [string, string, stri
   return null;
 }
 
-// ── statement detection ────────────────────────────────────────────────────
+// ── answer-key section detection (trailing "Answer Key:" block) ─────────────
+// The pasted content may end with a separate Answer Key section, e.g.:
+//   Answer Key:
+//   1. B
+//   2. C
+//   ...
+// This section must NOT be parsed as questions/options. It is stripped before
+// question parsing, then each entry is mapped back to its question by the
+// ORIGINAL question number (before the system renumbers Q01..QNN).
+
+function answerKeyHeadingRemainder(line: string): string | null {
+  // Strip decorative borders like "--- Answer Key ---" / "*** উত্তরমালা ***"
+  let t = line.trim();
+  if (!t) return null;
+  t = t.replace(/^[\-\=*_#~•\s]+/, "").replace(/[\-\=*_#~•\s]+$/, "").trim();
+  if (!t) return null;
+  // Heading prefix — longer alternatives first (উত্তরমালা before উত্তর, etc.)
+  const m = t.match(
+    /^(Answer\s*Keys?|Answers?\s*(?:Key|Sheet|List)|Correct\s*Answers?|Ans(?:wer)?s?\s*Key|Ans(?:wer)?s?|উত্তর\s*মালা|উত্তরমালা|উত্তরপত্র|উত্তর\s*সমূহ|উত্তরসমূহ|সঠিক\s*উত্তর\s*মালা|সঠিক\s*উত্তর\s*সমূহ|সঠিক\s*উত্তর|উত্তর)\s*[:\-=—ঃ.]?\s*(.*)$/i,
+  );
+  if (!m) return null;
+  const remainder = (m[2] ?? "").trim().replace(/^[:\-=—ঃ.\s]+/, "").trim();
+  return remainder;
+}
+
+// True when a string is just a single answer label (per-question "Answer: B"),
+// which must NOT be treated as an answer-key heading.
+function isSingleAnswerLabel(s: string): boolean {
+  const c = s.trim().replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
+  if (/^[A-Da-d]$/.test(c)) return true;
+  if (/^[কখগঘ]$/.test(c)) return true;
+  if (/^[1-4]$/.test(c) || /^[১-৪]$/.test(c)) return true;
+  if (/^(i{1,3}|iv|I{1,3}|IV)$/.test(c)) return true;
+  // "Option B" style single answer
+  if (/^(?:option|অপশন)\s*[A-Da-d]$/.test(c.trim())) return true;
+  return false;
+}
+
+function answerKeyLabelToIndex(label: string): number | null {
+  const c = label.trim().replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]]$/g, "").trim();
+  if (/^[A-Da-d]$/.test(c)) return c.toUpperCase().charCodeAt(0) - 65;
+  if (/^[কখগঘ]$/.test(c)) return BN_OPT_MAP[c];
+  if (/^[1-4]$/.test(c)) return parseInt(c, 10) - 1;
+  if (/^[১-৪]$/.test(c)) return parseInt(bnDigitsToAscii(c), 10) - 1;
+  const r = romanToIndex(c);
+  if (r !== null) return r;
+  return null;
+}
+
+// Parse "1. B", "2-C", "3: A", "4) D", "Q5: b", "১. খ" etc. from key block text.
+// Multiple entries per line ("1. B 2. C", "1-B, 2-C") are all captured.
+function parseAnswerKeyEntries(keyText: string): Map<number, string> {
+  const out = new Map<number, string>();
+  if (!keyText.trim()) return out;
+  const re =
+    /(?:^|[\s,;|।]+)(?:Q(?:uestion)?\s*|প্রশ্ন\s*(?:নং\.?|No\.?)?\s*)?(\d+|[০-৯]+)\s*[\.\)\]:\-–—=ঃ]+\s*\(?\s*([A-Da-d]|[কখগঘ]|[1-4]|[১-৪]|iv|IV|i{1,3}|I{1,3})\s*\)?(?![A-Za-z\u0980-\u09FF0-9])/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(keyText)) !== null) {
+    const numAscii = bnDigitsToAscii(m[1]);
+    const qNum = parseInt(numAscii, 10);
+    if (!Number.isFinite(qNum) || qNum <= 0 || qNum > 1000) continue;
+    if (out.has(qNum)) continue; // first entry wins, never guess on duplicates
+    const label = (m[2] ?? "").trim();
+    if (answerKeyLabelToIndex(label) === null) continue;
+    out.set(qNum, label);
+  }
+  return out;
+}
+
+function splitAnswerKeySection(text: string): {
+  mainText: string;
+  keyEntries: Map<number, string>;
+  keyFound: boolean;
+} {
+  const empty = { mainText: text, keyEntries: new Map<number, string>(), keyFound: false };
+  const lines = text.split("\n");
+  // Collect heading candidates
+  const candidates: { idx: number; remainder: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const rem = answerKeyHeadingRemainder(lines[i]);
+    if (rem === null) continue;
+    if (rem !== "" && isSingleAnswerLabel(rem)) continue; // per-question "Answer: B"
+    candidates.push({ idx: i, remainder: rem });
+  }
+  if (candidates.length === 0) return empty;
+  // Prefer the LAST heading that yields ≥1 entry (key lives at the very end)
+  for (let c = candidates.length - 1; c >= 0; c--) {
+    const { idx, remainder } = candidates[c];
+    const tail = (remainder ? remainder + "\n" : "") + lines.slice(idx + 1).join("\n");
+    if (!tail.trim()) continue;
+    const entries = parseAnswerKeyEntries(tail);
+    if (entries.size === 0) continue;
+    const mainText = lines.slice(0, idx).join("\n").trim();
+    if (!mainText) continue; // no questions before key — ignore
+    return { mainText, keyEntries: entries, keyFound: true };
+  }
+  return empty;
+}
+
+function originalHeaderToNumber(header: string | null | undefined): number | null {
+  if (!header) return null;
+  const ascii = bnDigitsToAscii(header);
+  const m = ascii.match(/\d+/);
+  if (!m) return null;
+  const n = parseInt(m[0], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Apply trailing answer-key entries to parsed questions by ORIGINAL number.
+// Key is authoritative: a confident key entry overrides any inline answer.
+// Questions with no key entry keep their inline answer (if any); if the final
+// correct answer is still unknown the question is flagged for manual review.
+function applyAnswerKey(
+  parsed: ParsedPasteMcq[],
+  keyEntries: Map<number, string>,
+): ParsedPasteMcq[] {
+  if (keyEntries.size === 0) return parsed;
+  // Original number → question index (first unused wins on duplicates)
+  const numToIdx = new Map<number, number>();
+  parsed.forEach((p, i) => {
+    const n = originalHeaderToNumber(p.originalNumber) ?? i + 1;
+    if (!numToIdx.has(n)) numToIdx.set(n, i);
+  });
+  const assigned = new Set<number>();
+  keyEntries.forEach((label, qNum) => {
+    const targetIdx = numToIdx.get(qNum);
+    if (targetIdx === undefined) return; // no matching question — ignore, never guess
+    const optIdx = answerKeyLabelToIndex(label);
+    if (optIdx === null || optIdx < 0 || optIdx > 3) return;
+    parsed[targetIdx].correctIndex = optIdx;
+    assigned.add(targetIdx);
+  });
+  // Recompute issues/flags per question
+  return parsed.map((p, i) => {
+    const issues = (p.issues ?? []).filter(
+      (x) => x !== "Answer could not be confidently detected — please verify.",
+    );
+    if (p.correctIndex === null || p.correctIndex === undefined) {
+      issues.push("No answer-key entry found for this question — please verify.");
+    } else if (!p.options[p.correctIndex]?.trim()) {
+      issues.push(
+        `Correct answer ${String.fromCharCode(65 + (p.correctIndex ?? 0))} is empty — please verify.`,
+      );
+    }
+    // De-dupe while preserving order
+    const seen = new Set<string>();
+    const deduped = issues.filter((x) => (seen.has(x) ? false : (seen.add(x), true)));
+    const needsReview = deduped.length > 0;
+    return {
+      ...p,
+      issues: deduped,
+      needsReview,
+      confidence: needsReview
+        ? p.options.filter((o) => o.trim()).length >= 2 && p.question.length >= 3
+          ? 0.75
+          : 0.4
+        : 0.96,
+    };
+  });
+}
 function isStatementLine(line: string): boolean {
   const t = line.trim();
   if (!t) return false;
@@ -466,6 +625,12 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
   let explanationRaw: string | null = null;
   for (let i = 0; i < linesRaw.length; i++) {
     const line = linesRaw[i];
+    // Defense-in-depth: a bare answer-key heading that survived section
+    // splitting must never become question/option text.
+    const keyRem = answerKeyHeadingRemainder(line);
+    if (keyRem !== null && (keyRem === "" || parseAnswerKeyEntries(keyRem).size > 0 || parseAnswerKeyEntries(line).size > 0)) {
+      if (keyRem === "" || !isSingleAnswerLabel(keyRem)) continue;
+    }
     const payload = extractAnswerPayload(line);
     if (payload !== null) {
       // This line is answer
@@ -934,6 +1099,18 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     const line = rawLines[idx];
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    // Defense-in-depth: stray answer-key heading/entries never become questions.
+    // (Only when the remainder is empty or actually parses as key entries —
+    // a question that merely starts with the word "Answers" must survive.)
+    const keyRemScan = answerKeyHeadingRemainder(line);
+    if (
+      keyRemScan !== null &&
+      (keyRemScan === "" ||
+        (!isSingleAnswerLabel(keyRemScan) && parseAnswerKeyEntries(keyRemScan).size > 0))
+    ) {
+      current?.rawLines.push(line);
+      continue;
+    }
     if (isMarkLine(line)) {
       if (!current) continue;
       // Fixed mark = 1 — skip line, keep marks = 1
@@ -1089,8 +1266,14 @@ export function parsePastedMcqs(pastedText: string): ParsedPasteMcq[] {
   const normalized = pastedText.replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
 
+  // ── Separate trailing Answer Key section (never parsed as questions) ──
+  const { mainText, keyEntries, keyFound } = splitAnswerKeySection(normalized);
+  const text = keyFound ? mainText : normalized;
+  const finish = (list: ParsedPasteMcq[]): ParsedPasteMcq[] =>
+    keyFound ? applyAnswerKey(list, keyEntries) : list;
+
   // Try numbered split first
-  const numberedBlocks = splitByNumbering(normalized);
+  const numberedBlocks = splitByNumbering(text);
   if (numberedBlocks && numberedBlocks.length > 0) {
     const parsed: ParsedPasteMcq[] = [];
     for (const block of numberedBlocks) {
@@ -1116,11 +1299,11 @@ export function parsePastedMcqs(pastedText: string): ParsedPasteMcq[] {
       }
     }
     const avgFilled = parsed.reduce((acc, p) => acc + p.options.filter((o) => o.trim()).length, 0) / (parsed.length || 1);
-    if (avgFilled >= 2) return parsed;
+    if (avgFilled >= 2) return finish(parsed);
     // otherwise fallback
   }
 
-  const viaLines = parseViaLineScan(normalized);
+  const viaLines = parseViaLineScan(text);
   if (viaLines.length > 0) {
     const enhanced = viaLines.map((b) => {
       if (b.options.filter((o) => o.trim()).length < 2) {
@@ -1135,14 +1318,14 @@ export function parsePastedMcqs(pastedText: string): ParsedPasteMcq[] {
     });
     // Filter out blocks that still have <2 options (likely false splits) unless they're the only block
     const filtered = enhanced.filter((b) => b.options.filter((o) => o.trim()).length >= 2 || b.question.length >= 10);
-    if (filtered.length > 0) return filtered;
-    return enhanced;
+    if (filtered.length > 0) return finish(filtered);
+    return finish(enhanced);
   }
 
-  const single = parseSingleBlock(normalized);
-  const inlineSingle = parseSingleBlockInline(normalized);
-  if (inlineSingle && inlineSingle.options.filter((o) => o.trim()).length >= 2) return [inlineSingle];
-  return [single];
+  const single = parseSingleBlock(text);
+  const inlineSingle = parseSingleBlockInline(text);
+  if (inlineSingle && inlineSingle.options.filter((o) => o.trim()).length >= 2) return finish([inlineSingle]);
+  return finish([single]);
 }
 
 export function recomputeParsedMcq(mcq: ParsedPasteMcq): ParsedPasteMcq {
