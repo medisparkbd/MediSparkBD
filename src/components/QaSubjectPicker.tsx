@@ -111,30 +111,34 @@ export default function QaSubjectPicker({
               key={subject.id}
               className="group flex min-w-0 flex-col rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5"
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-800 text-white shadow-md shadow-primary-900/20 transition group-hover:shadow-primary-800/50">
-                {subjectIcons[subject.id]}
-              </span>
-
-              <h3 className="mt-4 truncate font-bold text-heading transition group-hover:text-primary-400">
-                {subject.name}
-              </h3>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                    Total Questions
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-800 text-white shadow-md shadow-primary-900/20 transition group-hover:shadow-primary-800/50">
+                    {subjectIcons[subject.id]}
                   </span>
-                  <span className="shrink-0 text-sm font-bold text-heading">
-                    {subjectStats?.total ?? "—"}
-                  </span>
+
+                  <h3 className="mt-3 truncate font-bold text-heading transition group-hover:text-primary-400">
+                    {subject.name}
+                  </h3>
                 </div>
-                <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                    Answered
-                  </span>
-                  <span className="shrink-0 text-sm font-bold text-emerald-400">
-                    {subjectStats?.answered ?? "—"}
-                  </span>
+
+                <div className="w-36 shrink-0 space-y-2 sm:w-44">
+                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                      Total Questions
+                    </span>
+                    <span className="shrink-0 text-sm font-bold text-heading">
+                      {subjectStats?.total ?? "—"}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                      Answered
+                    </span>
+                    <span className="shrink-0 text-sm font-bold text-emerald-400">
+                      {subjectStats?.answered ?? "—"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
