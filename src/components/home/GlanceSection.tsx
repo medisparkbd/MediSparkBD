@@ -124,17 +124,20 @@ export default async function GlanceSection() {
                 className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-950/60 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:gap-5 sm:p-5"
               >
                 <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary-600/70 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600/15 text-primary-400 transition duration-300 group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-primary-900/50 sm:h-12 sm:w-12">
-                  <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                <span className="min-w-[72px] shrink-0 bg-gradient-to-br from-primary-400 to-primary-600 bg-clip-text text-center text-3xl font-extrabold tabular-nums tracking-tight text-transparent sm:min-w-[88px] sm:text-4xl">
+                  {card.value.toLocaleString()}
                 </span>
-                <div className="min-w-0">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-heading sm:text-sm">
-                    {card.headline}
-                  </h3>
-                  <p className="mt-1 bg-gradient-to-br from-primary-400 to-primary-600 bg-clip-text text-2xl font-extrabold tabular-nums tracking-tight text-transparent sm:text-3xl">
-                    {card.value.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-[11px] leading-snug text-neutral-400 sm:text-xs">
+                <span className="w-px shrink-0 self-stretch bg-ink/10" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-600/15 text-primary-400 transition group-hover:bg-primary-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-primary-900/50">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <h3 className="truncate text-sm font-bold text-heading sm:text-base">
+                      {card.headline}
+                    </h3>
+                  </span>
+                  <p className="mt-1.5 text-[11px] leading-snug text-neutral-400 sm:text-xs">
                     {card.description}
                   </p>
                 </div>
