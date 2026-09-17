@@ -45,19 +45,19 @@ export type HomeCard = {
 
 const SEED_WHY_CARDS: Array<Omit<HomeCard, "key" | "section" | "isActive">> = [
   {
-    title: "Expert Teacher Panel",
-    description:
-      "অভিজ্ঞ শিক্ষকদের guidance-এর মাধ্যমে তোমার পড়াশোনার সঠিক direction ও expert support পেতে পারবে।",
-    value: null,
-    icon: "teacher",
-    order: 1,
-  },
-  {
     title: "Structured Courses",
     description:
       "পরিকল্পিতভাবে সাজানো কোর্সের মাধ্যমে প্রতিটি বিষয় ধাপে ধাপে শিখতে পারবে।",
     value: null,
     icon: "book",
+    order: 1,
+  },
+  {
+    title: "Experienced Teachers Panel",
+    description:
+      "অভিজ্ঞ শিক্ষকদের guidance ও support-এর মাধ্যমে পড়াশোনার সঠিক direction ধরে রাখতে পারবে।",
+    value: null,
+    icon: "teacher",
     order: 2,
   },
   {
@@ -69,12 +69,20 @@ const SEED_WHY_CARDS: Array<Omit<HomeCard, "key" | "section" | "isActive">> = [
     order: 3,
   },
   {
+    title: "Study Materials",
+    description:
+      "প্রয়োজনীয় notes, study materials ও resources এক জায়গা থেকে পেতে পারবে।",
+    value: null,
+    icon: "document",
+    order: 4,
+  },
+  {
     title: "Live & Practice Exams",
     description:
       "Live ও Practice Exam-এর মাধ্যমে নিয়মিত পরীক্ষা দিয়ে তোমার প্রস্তুতি আরও শক্তিশালী করতে পারবে।",
     value: null,
     icon: "exam",
-    order: 4,
+    order: 5,
   },
   {
     title: "Expert Q&A Support",
@@ -82,14 +90,6 @@ const SEED_WHY_CARDS: Array<Omit<HomeCard, "key" | "section" | "isActive">> = [
       "যেকোনো প্রশ্ন করে expert guidance-এর মাধ্যমে তোমার confusion দূর করতে পারবে।",
     value: null,
     icon: "chat",
-    order: 5,
-  },
-  {
-    title: "Study Materials",
-    description:
-      "প্রয়োজনীয় notes, study materials ও resources এক জায়গা থেকে পেতে পারবে।",
-    value: null,
-    icon: "document",
     order: 6,
   },
   {
@@ -103,7 +103,7 @@ const SEED_WHY_CARDS: Array<Omit<HomeCard, "key" | "section" | "isActive">> = [
   {
     title: "Win a Gift",
     description:
-      "ভালো ফলাফল করে MediSpark-এর পক্ষ থেকে সহজেই আকর্ষণীয় পুরস্কার বা gift জিতে নিতে পারবে।",
+      "তোমাদের উৎসাহিত করতে বিভিন্ন পরীক্ষায় ভালো ফলাফল করলে আমরা আকর্ষণীয় gift দিয়ে থাকি।",
     value: null,
     icon: "gift",
     order: 8,
