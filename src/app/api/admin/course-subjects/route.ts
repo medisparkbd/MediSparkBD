@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 
 /** GET → { subjects: [{ id, name, isActive, assignedCourseSlugs }], courses: [{ slug, name }] }. */
 export async function GET(request: NextRequest) {
-  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
+  // Read-only subject/course options are also needed inside Public Exam
+  // Control's exam form (Category → Exam → Manage pickers). Inherit the
+  // parent control's permission: managePublicExam|manageExams may READ.
+  // Writes below stay restricted to course managers.
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent", "manageExams", "managePublicExam"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

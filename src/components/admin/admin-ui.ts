@@ -202,6 +202,17 @@ export function useAdminGate(): AdminGate {
             if (!cancelled) setToken((prev) => (prev === t ? prev : t));
           })
           .catch(() => undefined);
+        // ...and ALWAYS re-check role/permissions server-side so a
+        // full-page refresh picks up recent permission changes
+        // (grant/revoke, logout/login, another device) instead of trusting
+        // the 5-minute session cache blindly. Instant paint is preserved;
+        // the UI self-corrects when the fresh result lands. Concurrent
+        // hook instances share one in-flight request (see fetchSharedGate).
+        if (cached.isAdmin) {
+          void fetchSharedGate(user).then((result) => {
+            if (!cancelled && result) applyResult(result);
+          });
+        }
       }
       return () => {
         cancelled = true;
@@ -291,6 +302,97 @@ export function hasAdminPermission(
   // Admin always has all permissions.
   if (gate.role === "admin") return true;
   return gate.permissions.includes(permission);
+}
+
+/**
+ * Public Exam Control entry permission — the SAME pair enforced by the
+ * backend (requireAnyPermission(["manageExams", "managePublicExam"])) and
+ * the ADMIN_CONTROL_PERMISSIONS maps. Category → Exam → Exam Management
+ * pages must inherit this parent grant: a manager holding either permission
+ * keeps full allowed management access inside the control.
+ */
+export const PUBLIC_EXAM_PERMISSIONS = [
+  "managePublicExam",
+  "manageExams",
+] as const;
+
+export function hasPublicExamAccess(
+  gate: Pick<AdminGate, "role" | "permissions">,
+): boolean {
+  if (gate.role === "admin") return true;
+  return PUBLIC_EXAM_PERMISSIONS.some((perm) =>
+    gate.permissions.includes(perm),
+  );
+}
+
+/**
+ * Admin Panel control → required permissions (client-safe mirror of
+ * src/lib/administration.ts ADMIN_CONTROL_PERMISSIONS).
+ *
+ * Subtree inheritance: Category → Exam → Exam Management pages resolve to
+ * their parent control via longest-prefix match (see
+ * resolveControlPermissions), so a manager holding the parent grant
+ * (e.g. managePublicExam) is never denied inside the subtree.
+ */
+export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly string[]> = {
+  "/admin/website-information": ["manageContent"],
+  "/admin/enrollment-control": ["manageStudents", "manageCourses"],
+  "/admin/home-control": ["manageContent"],
+  "/admin/course-control": ["manageCourses"],
+  "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
+  "/admin/material-pdf": ["manageCourses", "manageCourseContent", "manageExams"],
+  "/admin/public-exam-control": ["managePublicExam", "manageExams"],
+  // Canonical Public Exam Control subtree (hub + Category → Exam pages).
+  "/admin/public-exam": ["managePublicExam", "manageExams"],
+  // Exam Management page (/admin/exams/[id]/manage) belongs to the Public
+  // Exam Control flow — inherit the same parent grant.
+  "/admin/exams": ["managePublicExam", "manageExams"],
+  // Enrolled-exam lists are course-assigned; course managers keep read
+  // access here (backend writes still enforce their own permission pairs).
+  "/admin/exams/enrolled": ["managePublicExam", "manageExams", "manageCourses"],
+  "/admin/qa-control": ["manageQa", "manageContent"],
+  "/admin/dashboard-control": ["manageSystem", "manageContent"],
+  "/admin/student-control": ["manageStudents"],
+  "/admin/result-control": ["manageResults", "manageExams"],
+  "/admin/notification-control": ["manageContent", "manageSystem"],
+  "/admin/admin-center": ["manageAdmins"],
+};
+
+/**
+ * Longest-prefix match of a pathname against ADMIN_CONTROL_PERMISSIONS.
+ * Returns the matched control href, or null when the path is outside every
+ * controlled subtree (unknown routes stay accessible).
+ */
+export function resolveControlPermissions(pathname: string): {
+  control: string;
+  required: readonly string[];
+} | null {
+  let matched: string | null = null;
+  for (const href of Object.keys(ADMIN_CONTROL_PERMISSIONS)) {
+    if (pathname === href || pathname.startsWith(href + "/")) {
+      if (!matched || href.length > matched.length) matched = href;
+    }
+  }
+  if (!matched) return null;
+  return { control: matched, required: ADMIN_CONTROL_PERMISSIONS[matched] };
+}
+
+/**
+ * Client-side control access check with subtree inheritance.
+ * Admin always passes; /admin (home) is open to every signed-in admin;
+ * unknown routes stay accessible; everything else requires at least one of
+ * the resolved control permissions.
+ */
+export function hasControlAccess(
+  role: string | null | undefined,
+  permissions: string[],
+  href: string,
+): boolean {
+  if (role === "admin") return true;
+  if (href === "/admin") return true;
+  const resolved = resolveControlPermissions(href);
+  if (!resolved) return true;
+  return resolved.required.some((perm) => permissions.includes(perm));
 }
 
 export type Notice = { kind: "success" | "error"; text: string };

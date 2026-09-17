@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
   useAdminGate,
+  hasPublicExamAccess,
   noticeClass,
   cardClass,
   inputClass,
@@ -275,6 +276,25 @@ export default function ExamManager({
       <AccessMessage title="Administrators only" message="Exam management is restricted to authorized administrators." actionLabel="Back to Admin Home" actionHref="/admin" />
     ) : (
       <AccessLoading label="Loading exams…" />
+    );
+  }
+
+  // Public Exam Control inheritance (Category → exam list): when scoped to
+  // one Public Exam Control category, require the SAME managePublicExam |
+  // manageExams entry permission as the parent category page and the exam
+  // APIs. Admin always passes; a moderator/teacher holding either permission
+  // keeps full management access (list, add, edit, delete, questions);
+  // anyone without both is denied here instead of hitting per-action
+  // failures deeper in the flow. Other ExamManager contexts (Course Content
+  // Control chapters, enrolled batches, legacy pages) keep their own gates.
+  if (fixedCategory && !hasPublicExamAccess(gate)) {
+    return (
+      <AccessMessage
+        title="No Permission"
+        message="Public Exam Control access is required to manage this category's exams. Contact an Admin to grant it."
+        actionLabel="Back to Admin Home"
+        actionHref="/admin"
+      />
     );
   }
 

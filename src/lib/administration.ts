@@ -240,6 +240,14 @@ export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly AdminPermission[
   "/admin/course-control": ["manageCourses"],
   "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
   "/admin/public-exam-control": ["managePublicExam", "manageExams"],
+  // Canonical Public Exam Control subtree (redirect target of the control):
+  // hub (/admin/public-exam) and Category → Exam pages inherit the parent.
+  "/admin/public-exam": ["managePublicExam", "manageExams"],
+  // Exam Management page (/admin/exams/[id]/manage) belongs to the Public
+  // Exam Control flow — Category → Exam → Manage inherits the parent grant.
+  "/admin/exams": ["managePublicExam", "manageExams"],
+  // Enrolled-exam lists are course-assigned; course managers keep access.
+  "/admin/exams/enrolled": ["managePublicExam", "manageExams", "manageCourses"],
   "/admin/qa-control": ["manageQa", "manageContent"],
   "/admin/dashboard-control": ["manageSystem", "manageContent"],
   "/admin/student-control": ["manageStudents"],
@@ -255,8 +263,17 @@ export function hasControlAccess(
 ): boolean {
   // Admin always has full access.
   if (role === "admin") return true;
-  const required = ADMIN_CONTROL_PERMISSIONS[href];
-  if (!required) return true; // unknown route → allow for non-restricted pages
+  if (href === "/admin") return true;
+  // Longest-prefix match so Category → Exam → Exam Management sub-routes
+  // inherit their parent control's grant.
+  let matched: string | null = null;
+  for (const control of Object.keys(ADMIN_CONTROL_PERMISSIONS)) {
+    if (href === control || href.startsWith(control + "/")) {
+      if (!matched || control.length > matched.length) matched = control;
+    }
+  }
+  if (!matched) return true; // unknown route → allow for non-restricted pages
+  const required = ADMIN_CONTROL_PERMISSIONS[matched];
   return required.some((perm) => permissions.includes(perm));
 }
 

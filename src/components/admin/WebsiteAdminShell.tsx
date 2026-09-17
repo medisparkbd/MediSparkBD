@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { useAdminGate } from "@/components/admin/admin-ui";
+import { hasControlAccess, useAdminGate } from "@/components/admin/admin-ui";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 import AdminToastProvider from "@/components/admin/AdminToastProvider";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/AdminThemeProvider";
@@ -30,36 +30,6 @@ const ADMIN_NAV = [
   { label: "Notification Control", href: "/admin/notification-control" },
   { label: "Admin Center", href: "/admin/admin-center" },
 ] as const;
-
-// Flexible RBAC mapping — mirrors src/lib/administration.ts ADMIN_CONTROL_PERMISSIONS
-// Client-safe duplicate to avoid pulling server MySQL deps into the bundle.
-const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly string[]> = {
-  "/admin/website-information": ["manageContent"],
-  "/admin/enrollment-control": ["manageStudents", "manageCourses"],
-  "/admin/home-control": ["manageContent"],
-  "/admin/course-control": ["manageCourses"],
-  "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
-  "/admin/public-exam-control": ["managePublicExam", "manageExams"],
-  "/admin/qa-control": ["manageQa", "manageContent"],
-  "/admin/dashboard-control": ["manageSystem", "manageContent"],
-  "/admin/student-control": ["manageStudents"],
-  "/admin/result-control": ["manageResults", "manageExams"],
-  "/admin/notification-control": ["manageContent", "manageSystem"],
-  "/admin/admin-center": ["manageAdmins"],
-};
-
-function hasControlAccess(
-  role: string | null,
-  permissions: string[],
-  href: string,
-): boolean {
-  // Admin always has full access.
-  if (role === "admin") return true;
-  if (href === "/admin") return true;
-  const required = ADMIN_CONTROL_PERMISSIONS[href];
-  if (!required) return true;
-  return required.some((perm) => permissions.includes(perm));
-}
 
 export default function WebsiteAdminShell({
   children,
@@ -115,21 +85,11 @@ function WebsiteAdminShellInner({
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
-  // Route-level RBAC: block direct navigation to controls the role cannot access
-  const isDeniedByRole = (() => {
-    if (gate.role === "admin") return false;
-    if (pathname === "/admin") return false;
-    // Longest prefix match among ADMIN_CONTROL_PERMISSIONS
-    let matched: string | null = null;
-    for (const href of Object.keys(ADMIN_CONTROL_PERMISSIONS)) {
-      if (pathname === href || pathname.startsWith(href + "/")) {
-        if (!matched || href.length > matched.length) matched = href;
-      }
-    }
-    if (!matched) return false;
-    const required = ADMIN_CONTROL_PERMISSIONS[matched];
-    return !required.some((perm) => gate.permissions.includes(perm));
-  })();
+  // Route-level RBAC with parent → subtree inheritance (shared helper —
+  // same check as AdminShell and the exam API pairs). Only enforced once
+  // the gate resolves; unknown routes stay accessible.
+  const isDeniedByRole =
+    gate.ready && !hasControlAccess(gate.role, gate.permissions, pathname);
 
   async function handleLogout() {
     try {

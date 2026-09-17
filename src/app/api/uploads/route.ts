@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { saveFile, isLocalUpload, removeFile } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +24,12 @@ const ALLOWED_EXTENSIONS = [
 
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 
-/** Generic admin media upload: multipart { file, dir?, previousUrl? }. */
+/** Generic admin media upload: multipart { file, dir?, previousUrl? }.
+ * Public Exam Control inheritance: exam managers (managePublicExam or the
+ * legacy broad manageExams) may upload exam banners and question images from
+ * Exam Management — same entry permission as the parent control. */
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
+  const admin = await requireAnyPermission(request, ["manageContent", "manageExams", "managePublicExam"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

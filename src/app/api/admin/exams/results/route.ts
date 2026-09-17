@@ -5,9 +5,12 @@ import { fetchResults, deleteResult } from "@/lib/exams-admin";
 
 export const dynamic = "force-dynamic";
 
-/** ?examId=... — submitted results for an exam (or all). */
+/** ?examId=... — submitted results for an exam (or all).
+ * Public Exam Control inheritance: a manager holding managePublicExam may
+ * view this exam's results from Exam Management (Category → Exam → Results),
+ * mirroring the parent control's managePublicExam|manageExams entry check. */
 export async function GET(request: NextRequest) {
-  const admin = await requireAnyPermission(request, ["manageExams", "manageResults"]);
+  const admin = await requireAnyPermission(request, ["manageExams", "manageResults", "managePublicExam"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const admin = await requireAnyPermission(request, ["manageExams", "manageResults"]);
+  const admin = await requireAnyPermission(request, ["manageExams", "manageResults", "managePublicExam"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

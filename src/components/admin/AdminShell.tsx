@@ -31,7 +31,7 @@ import { AdminThemeProvider, useAdminTheme } from "@/components/admin/AdminTheme
 import AdminThemeToggle from "@/components/admin/AdminThemeToggle";
 import AdminToastProvider from "@/components/admin/AdminToastProvider";
 import AdminSearch from "@/components/admin/AdminSearch";
-import { useAdminGate } from "@/components/admin/admin-ui";
+import { hasControlAccess, useAdminGate } from "@/components/admin/admin-ui";
 import { useAuth } from "@/lib/auth-context";
 
 const SIDEBAR_STORAGE_KEY = "medispark-admin-sidebar-collapsed";
@@ -53,34 +53,6 @@ const ADMIN_NAV = [
   { label: "Notification Control", href: "/admin/notification-control", icon: MegaphoneIcon },
   { label: "Admin Center", href: "/admin/admin-center", icon: UserShieldIcon },
 ] as const;
-
-const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly string[]> = {
-  "/admin/website-information": ["manageContent"],
-  "/admin/enrollment-control": ["manageStudents", "manageCourses"],
-  "/admin/home-control": ["manageContent"],
-  "/admin/course-control": ["manageCourses"],
-  "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
-  "/admin/material-pdf": ["manageCourses", "manageCourseContent", "manageExams"],
-  "/admin/public-exam-control": ["managePublicExam", "manageExams"],
-  "/admin/qa-control": ["manageQa", "manageContent"],
-  "/admin/dashboard-control": ["manageSystem", "manageContent"],
-  "/admin/student-control": ["manageStudents"],
-  "/admin/result-control": ["manageResults", "manageExams"],
-  "/admin/notification-control": ["manageContent", "manageSystem"],
-  "/admin/admin-center": ["manageAdmins"],
-};
-
-function hasControlAccess(
-  role: string | null,
-  permissions: string[],
-  href: string,
-): boolean {
-  if (role === "admin" || role === "moderator" || role === "teacher") return true;
-  if (href === "/admin") return true;
-  const required = ADMIN_CONTROL_PERMISSIONS[href];
-  if (!required) return true;
-  return required.some((perm) => permissions.includes(perm));
-}
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   return (
@@ -182,6 +154,14 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     () => visibleNav.filter((i) => i.href !== "/admin"),
     [visibleNav],
   );
+
+  // Route-level RBAC with parent → subtree inheritance (Public Exam Control
+  // → Category → Exam → Exam Management resolve to the parent control via
+  // longest-prefix match). Only enforced once the gate resolves; while
+  // loading, pages render normally and show their own loaders. Unknown
+  // routes stay accessible; Admin bypasses every check.
+  const isDeniedByRole =
+    gate.ready && !hasControlAccess(gate.role, gate.permissions, pathname);
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(href + "/");
@@ -459,7 +439,31 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          {isDeniedByRole ? (
+            <div className="mx-auto max-w-lg px-4 py-16 text-center sm:px-6">
+              <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8">
+                <p className="text-lg font-extrabold text-yellow-700 admin-dark:text-yellow-300">
+                  Access denied for your role
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-600 admin-dark:text-slate-400">
+                  Your current role (<span className="font-bold capitalize">{gate.role ?? "unknown"}</span>) does
+                  not have permission to access{" "}
+                  <span className="font-mono text-xs font-bold">{pathname}</span>. Contact an Admin to grant
+                  access.
+                </p>
+                <Link
+                  href="/admin"
+                  className="mt-6 inline-block rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-primary-700"
+                >
+                  Back to Admin Home
+                </Link>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
+        </main>
       </div>
       </div>
     </AdminToastProvider>

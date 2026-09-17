@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
   useAdminGate,
+  hasPublicExamAccess,
   cardClass,
   inputClass,
   labelClass,
@@ -469,6 +470,24 @@ export default function ExamManageClient({ examId }: { examId: string }) {
       <AccessMessage title="Administrators only" message="Exam management is restricted to authorized administrators." actionLabel="Back to Admin Home" actionHref="/admin" />
     ) : (
       <AccessLoading label="Loading exam…" />
+    );
+  }
+
+  // Parent permission inheritance (Public Exam Control → Category → Exam →
+  // Exam Management): same managePublicExam | manageExams pair the exam APIs
+  // enforce. A manager holding either keeps full allowed management access
+  // (info, questions, rules, participants, results); anyone without both is
+  // denied here with a clear message instead of per-tab failures.
+  if (!hasPublicExamAccess(gate)) {
+    return (
+      <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+        <AccessMessage
+          title="No Permission"
+          message="Exam management requires Public Exam Control access. Contact an Admin to grant it."
+          actionLabel="Back to Public Exams"
+          actionHref="/admin/public-exam"
+        />
+      </section>
     );
   }
 

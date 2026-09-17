@@ -12,7 +12,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
+  // Read-only chapter list is also needed inside Public Exam Control's exam
+  // form (Category → Exam → Manage chapter picker). Inherit the parent
+  // control's permission: managePublicExam|manageExams may READ chapters.
+  // Writes below stay restricted to course-content managers.
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent", "manageExams", "managePublicExam"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
