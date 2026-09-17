@@ -95,8 +95,7 @@ function ExamExitModal({
           Are you sure you want to exit the exam?
         </h2>
         <p className="mt-2 text-center text-sm leading-relaxed text-neutral-400">
-          If you exit now, your exam may be submitted and you may not be able
-          to attempt this exam again.
+          If you want to exit the exam, your exam will be automatically submitted.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -111,7 +110,7 @@ function ExamExitModal({
             onClick={onExit}
             className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-extrabold text-red-300 transition hover:bg-red-500/20 active:scale-[0.98]"
           >
-            Exit Exam
+            Exit &amp; Submit Exam
           </button>
         </div>
       </div>

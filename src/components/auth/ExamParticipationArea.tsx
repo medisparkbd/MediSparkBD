@@ -152,6 +152,64 @@ export default function ExamParticipationArea({
   const submittedRef = useRef(false);
   const answersRef = useRef<Record<number, number>>({});
   const tokenRef = useRef<string | null>(null);
+  // Marks an attempt that began in THIS tab. Survives reload in the same tab,
+  // so a refresh/reopen can never resume it — it is submitted instead.
+  const aliveKey = `exam-alive-${examId}`;
+  const reentryRef = useRef(false);
+  const begunRef = useRef(false);
+
+  const submit = useCallback(async () => {
+    // Duplicate guard: one submission per attempt — concurrent triggers
+    // (button, timer expiry, exit handler, visibility hide, reentry) collapse
+    // into a single POST. The backend is idempotent on top of this.
+    if (submittedRef.current || !user) return;
+    submittedRef.current = true;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/exams/${encodeURIComponent(examId)}/submit`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            answers: Object.fromEntries(
+              Object.entries(answersRef.current).map(([key, value]) => [
+                key,
+                value,
+              ]),
+            ),
+          }),
+        },
+      );
+      const data = (await response.json().catch(() => ({}))) as
+        | SubmissionOutcome
+        | { error?: string };
+      if ("score" in data) {
+        // Timer, answers and attempt are untouched — the attempt is finalized
+        // server-side and the existing result/Answer Card flow takes over.
+        try {
+          window.sessionStorage.removeItem(aliveKey);
+        } catch {
+          // ignore
+        }
+        setOutcome(data);
+      } else {
+        // Allow retry on failure — the exam stays exactly as it was.
+        submittedRef.current = false;
+        setSubmitError("error" in data && data.error ? data.error : "Submission failed. Please try again.");
+      }
+    } catch {
+      submittedRef.current = false;
+      setSubmitError("Submission failed. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [examId, user, aliveKey]);
   // Exam Fixed Header — measured offset so it stays directly below the normal website header
   const [headerOffset, setHeaderOffset] = useState(64);
 
@@ -166,6 +224,12 @@ export default function ExamParticipationArea({
       answersRef.current = {};
       setAnswers({});
       setBegun(true);
+      begunRef.current = true;
+      try {
+        window.sessionStorage.setItem(aliveKey, "1");
+      } catch {
+        // ignore — refresh detection is best-effort
+      }
       // Fresh session — clear any leftover answers from a terminated one.
       // Prefer server-computed remaining time when available (authoritative clock).
       const initial =
@@ -227,16 +291,27 @@ export default function ExamParticipationArea({
         setQuestionVersion(version);
       }
       activateSession(data.sessionToken ?? null, exam.durationMinutes, data.secondsLeft ?? null);
+      // Refresh/reopen in the same tab can never resume — submit at once.
+      if (reentryRef.current) {
+        reentryRef.current = false;
+        void submit();
+      }
     } catch {
       setLoadError("Failed to start the exam. Check your connection.");
     } finally {
       setBeginning(false);
     }
-  }, [beginning, begun, exam, examId, user, activateSession, timerType, questionVersion, versionFromUrl]);
+  }, [beginning, begun, exam, examId, user, activateSession, timerType, questionVersion, versionFromUrl, submit]);
 
   // Load the exam meta + sanitized questions first (no answers, no attempt).
   useEffect(() => {
     if (authLoading || profileLoading || !user) return;
+    // Same-tab refresh/reopen with a live attempt → submit, never resume.
+    try {
+      reentryRef.current = window.sessionStorage.getItem(aliveKey) === "1";
+    } catch {
+      reentryRef.current = false;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -351,6 +426,11 @@ export default function ExamParticipationArea({
                 data.exam.durationMinutes,
                 startData.secondsLeft ?? null,
               );
+              // Refresh/reopen in the same tab can never resume — submit at once.
+              if (!cancelled && reentryRef.current) {
+                reentryRef.current = false;
+                void submit();
+              }
             } else if (startResponse.status === 403 && (startData as { alreadyAttempted?: boolean }).alreadyAttempted) {
               // Backend enforced one-attempt — show View Result
               setAlreadyAttempted(true);
@@ -382,54 +462,20 @@ export default function ExamParticipationArea({
     return () => {
       cancelled = true;
     };
-  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl]);
+  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl, submit]);
 
-  const submit = useCallback(async () => {
-    // Duplicate guard: one submission per attempt — concurrent triggers
-    // (button, timer expiry, exit handler) collapse into a single POST.
-    if (submittedRef.current || !user) return;
-    submittedRef.current = true;
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const token = await user.getIdToken();
-      const response = await fetch(
-        `/api/exams/${encodeURIComponent(examId)}/submit`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            answers: Object.fromEntries(
-              Object.entries(answersRef.current).map(([key, value]) => [
-                key,
-                value,
-              ]),
-            ),
-          }),
-        },
-      );
-      const data = (await response.json().catch(() => ({}))) as
-        | SubmissionOutcome
-        | { error?: string };
-      if ("score" in data) {
-        // Timer, answers and attempt are untouched — the attempt is finalized
-        // server-side and the existing result/Answer Card flow takes over.
-        setOutcome(data);
-      } else {
-        // Allow retry on failure — the exam stays exactly as it was.
-        submittedRef.current = false;
-        setSubmitError("error" in data && data.error ? data.error : "Submission failed. Please try again.");
+  // Attempt over (result shown or session terminated elsewhere) — the tab
+  // no longer hosts a live attempt; a reload from here starts clean.
+  useEffect(() => {
+    if (outcome || terminatedNotice) {
+      try {
+        window.sessionStorage.removeItem(aliveKey);
+      } catch {
+        // ignore
       }
-    } catch {
-      submittedRef.current = false;
-      setSubmitError("Submission failed. Check your connection and try again.");
-    } finally {
-      setSubmitting(false);
     }
-  }, [examId, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outcome, terminatedNotice]);
 
   // ── Exam Navigation Lock: hide BottomNav + block navigation during active attempt ──
   // Also locked while the begin=1 flow is preparing the paper, so no exam
@@ -628,6 +674,20 @@ export default function ExamParticipationArea({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted]);
+
+  // Tab/app switch → immediate auto-submit. Hidden means the student left
+  // the exam (another tab, another app, minimized, screen locked) — the
+  // attempt is finalized at once from saved + local answers. Single-submit
+  // guarded (submit() collapses races); pagehide keepalive stays as backup.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (!begunRef.current || submittedRef.current) return;
+      void submit();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [submit]);
 
   /** Select an answer — allowed only once per question, no changing later. */
   async function chooseOption(question: TakingQuestion, optionIndex: number) {
