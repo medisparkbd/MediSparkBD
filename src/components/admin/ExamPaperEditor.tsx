@@ -101,6 +101,46 @@ export default function ExamPaperEditor({
   // from a previous workspace discard their results instead of overwriting the
   // current workspace's questions state.
   const loadVersionRef = useRef(0);
+  // Tracks the currently visible workspace so async save continuations never
+  // write results into a different workspace the admin switched to mid-save.
+  // (No automatic refetch happens on save — the Refresh button is the only
+  // manual refresh; saves merge into local state instead.)
+  const workspaceRef = useRef<{ v: LangVersion; s: SetLabel }>({ v: langVersion, s: setLabel });
+  workspaceRef.current = { v: langVersion, s: setLabel };
+
+  // Merge a successfully saved slot into local state (no refetch, no reload)
+  // so typing, edits, drafts and scroll position are never lost on save.
+  const applySavedSlot = useCallback((slotIndex: number, saved: {
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+    questionImage?: string | null;
+    id?: number | null;
+  }) => {
+    setQuestions((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      while (next.length <= slotIndex) next.push(null as unknown as ExamQuestion);
+      const existing = next[slotIndex];
+      const opts = [...saved.options];
+      while (opts.length < 4) opts.push("");
+      next[slotIndex] = {
+        id: saved.id ?? existing?.id ?? null,
+        examId: exam.id,
+        subject: existing?.subject || exam.subject || "",
+        question: saved.question,
+        questionImage: saved.questionImage !== undefined ? saved.questionImage : (existing?.questionImage ?? null),
+        options: opts.slice(0, 4),
+        correctIndex: saved.correctIndex,
+        explanation: saved.explanation || existing?.explanation || null,
+        marks: (existing?.marks ?? Number(exam.marksPerQuestion ?? 1) ?? 1) || 1,
+        isActive: true,
+        hasVariant: true,
+      };
+      return next;
+    });
+  }, [exam.id, exam.subject, exam.marksPerQuestion]);
 
   const load = useCallback(async (forVersion?: LangVersion, forSet?: SetLabel) => {
     const v = forVersion ?? langVersion;
@@ -287,13 +327,20 @@ export default function ExamPaperEditor({
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(body),
       });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      const data = (await res.json().catch(() => null)) as { error?: string; id?: number } | null;
       if (!res.ok) {
         // Only surface error if slot has meaningful content
         if (qText.length >= 2 || anyOption) setError(data?.error ?? "Failed to save.");
         return;
       }
-      await load();
+      // Update local state only — no refetch, so typing/editing never triggers a reload.
+      applySavedSlot(slotIndex, {
+        question: qText,
+        options: finalOptions,
+        correctIndex: ci,
+        explanation: draft.explanation || "",
+        id: typeof data?.id === "number" ? data.id : (existing?.id ?? null),
+      });
       void loadCoverage();
       onChanged?.();
     } finally {
@@ -306,8 +353,8 @@ export default function ExamPaperEditor({
     setNotice(null);
     setDetectWarnings({});
     setDetectExistingMap({});
-    // Capture workspace at call time — if user switches tabs mid-detect,
-    // the final load() still refreshes the correct workspace.
+    // Capture workspace at call time for the status message below.
+    // Detection never refetches — saves merge into local state instead.
     const detectVersion = langVersion;
     const detectSet = setLabel;
     if (!bulkText.trim()) {
@@ -384,7 +431,8 @@ export default function ExamPaperEditor({
         await persistSlotWithData(i, draft);
         persisted += 1;
       }
-      await load(detectVersion, detectSet);
+      // No refetch here — each persist already merged into local state, so the
+      // page keeps its scroll position, drafts and notices without any reload.
       onChanged?.();
       void loadCoverage();
       let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${detectVersion} Set ${detectSet}.`;
@@ -412,11 +460,14 @@ export default function ExamPaperEditor({
     const marksPerQ = Number((exam.marksPerQuestion ?? 1) as number) || 1;
     const finalOptions = [...draft.options];
     while (finalOptions.length < 4) finalOptions.push("");
+    // Capture workspace at call time — the admin may switch tabs mid-save.
+    const saveVersion = langVersion;
+    const saveSet = setLabel;
     const body: Record<string, unknown> = {
       ...(existing && existing.id !== null ? { id: existing.id } : {}),
       examId: exam.id,
-      version: langVersion,
-      set: setLabel,
+      version: saveVersion,
+      set: saveSet,
       subject: existing?.subject || exam.subject || "",
       question: draft.question.trim(),
       questionImage: null,
@@ -433,8 +484,19 @@ export default function ExamPaperEditor({
       headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(body),
     });
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const data = (await res.json().catch(() => null)) as { error?: string; id?: number } | null;
     if (!res.ok) throw new Error(data?.error ?? "Failed to save detected question.");
+    // Sync local state only — no refetch, so the page never reloads on save.
+    // Skip if the admin already switched to another workspace mid-save.
+    if (workspaceRef.current.v === saveVersion && workspaceRef.current.s === saveSet) {
+      applySavedSlot(slotIndex, {
+        question: draft.question.trim(),
+        options: finalOptions.slice(0, 4),
+        correctIndex: draft.correctIndex,
+        explanation: draft.explanation || "",
+        id: typeof data?.id === "number" ? data.id : (existing?.id ?? null),
+      });
+    }
   }
 
   async function handleCorrectChange(slotIndex: number, newIdx: number) {
@@ -444,20 +506,17 @@ export default function ExamPaperEditor({
       delete next[slotIndex];
       return next;
     });
-    // Persist immediately
+    // Persist in the background; the save merges into local state itself,
+    // so selecting a correct answer never reloads the page.
     const draft = drafts[slotIndex];
     if (!draft) return;
     const updated = { ...draft, correctIndex: newIdx };
     setDrafts((prev) => ({ ...prev, [slotIndex]: updated }));
-    // Capture workspace — setTimeout runs async, user may have switched tabs
-    const cv = langVersion;
-    const cs = setLabel;
     // slight delay to ensure state, then persist
     setTimeout(() => {
       setDrafts((curr) => {
         const cur = curr[slotIndex];
         if (cur) void persistSlotWithData(slotIndex, cur).then(() => {
-          void load(cv, cs);
           void loadCoverage();
           onChanged?.();
         }).catch(() => setError("Failed to update correct answer."));
@@ -525,9 +584,20 @@ export default function ExamPaperEditor({
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(body),
       });
-      const saveData = (await saveRes.json().catch(() => null)) as { error?: string } | null;
+      const saveData = (await saveRes.json().catch(() => null)) as { error?: string; id?: number } | null;
       if (!saveRes.ok) throw new Error(saveData?.error || "Failed to save image.");
-      await load();
+      // Update local state only — attaching an image never reloads the page.
+      const savedSlot = displaySlots[slotIndex];
+      const savedQ = savedSlot?.q;
+      const slotDraft = drafts[slotIndex];
+      applySavedSlot(slotIndex, {
+        question: slotDraft?.question?.trim() || savedQ?.question || `Question ${pad(slotIndex + 1)}`,
+        options: (slotDraft ? slotDraft.options.map((o) => o.trim()) : savedQ?.options ?? [...EMPTY_OPTIONS]).slice(0, 4),
+        correctIndex: slotDraft?.correctIndex ?? savedQ?.correctIndex ?? 0,
+        explanation: slotDraft?.explanation ?? savedQ?.explanation ?? "",
+        questionImage: data.url,
+        id: typeof saveData?.id === "number" ? saveData.id : (savedQ?.id ?? null),
+      });
       void loadCoverage();
       onChanged?.();
       setNotice("Image uploaded.");
