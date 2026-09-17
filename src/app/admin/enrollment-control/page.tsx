@@ -46,22 +46,31 @@ export default function EnrollmentControlPage() {
         Manage Free and Paid Course enrollments course-by-course.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {CARDS.map((card) => (
           <Link
             key={card.href}
             href={card.href}
-            className="group relative flex min-h-[110px] flex-col justify-center gap-2 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:min-h-[140px] sm:p-6"
+            className="group relative flex min-h-[190px] flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-[#dbeafe] bg-white p-6 text-center shadow-md shadow-[#0b1e3a]/5 transition duration-300 hover:-translate-y-1 hover:border-primary-600/50 hover:shadow-xl hover:shadow-primary-900/10 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:shadow-black/30 admin-dark:hover:shadow-primary-900/30"
           >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-8 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary-600/70 to-transparent opacity-0 transition duration-300 group-hover:opacity-100"
+            />
             <PendingIndicator
               count={pendingFor[card.href] ?? 0}
               className="right-3 top-3"
             />
-            <span aria-hidden className="text-2xl sm:text-3xl">{card.icon}</span>
-            <span className="break-words text-sm font-extrabold leading-snug text-heading transition group-hover:text-[#1a3a78] sm:text-lg">
+            <span
+              aria-hidden
+              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary-600/15 bg-primary-600/10 text-[28px] leading-none shadow-sm transition duration-300 group-hover:border-primary-600/40 group-hover:bg-primary-600/15 group-hover:shadow-md group-hover:shadow-primary-900/20"
+            >
+              {card.icon}
+            </span>
+            <span className="break-words text-base font-extrabold leading-snug text-heading sm:text-lg">
               {card.title}
             </span>
-            <span className="hidden text-xs text-neutral-400 sm:block">
+            <span className="max-w-[26ch] text-xs leading-relaxed text-neutral-400">
               {card.description}
             </span>
           </Link>
