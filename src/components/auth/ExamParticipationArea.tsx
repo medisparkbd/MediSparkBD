@@ -67,6 +67,19 @@ function formatClock(seconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/** Actual time taken, e.g. "27 min 35 sec" / "32 min" / "45 sec". */
+function formatTimeTaken(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return "—";
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${m} min`;
+  if (m > 0 && s > 0) return `${m} min ${s} sec`;
+  if (m > 0) return `${m} min`;
+  return `${s} sec`;
+}
+
 function padNum(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -999,6 +1012,10 @@ export default function ExamParticipationArea({
               ) : (
                 <span className="font-extrabold text-neutral-300">0</span>
               )}
+            </li>
+            <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
+              <span className="font-semibold text-neutral-400">Time</span>
+              <span className="font-extrabold text-heading">{formatTimeTaken(outcome.timeTakenSeconds)}</span>
             </li>
             <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
               <span className="font-semibold text-neutral-400">Merit</span>
