@@ -408,7 +408,7 @@ export async function assignCourseToStudent(
     return { ok: false, error: "Unknown course." };
   }
 
-  const courseKind = course.fee > 0 ? "paid" : "free";
+  const courseKind = getPayableFee(course) > 0 ? "paid" : "free";
   const fee = getPayableFee(course);
 
   try {
@@ -668,27 +668,40 @@ export async function fetchEnrollmentControlCourses(
       name: string;
       category: string | null;
       fee: number;
+      discount_fee: number | null;
       pending_count: number;
       total: number;
     }[]
   >(
-    `SELECT c.slug, c.name, c.category, c.fee,
+    `SELECT c.slug, c.name, c.category, c.fee, c.discount_fee,
             COALESCE(SUM(CASE WHEN e.enrollment_status = 'pending' THEN 1 ELSE 0 END), 0) AS pending_count,
             COUNT(e.id) AS total
        FROM catalog_courses c
        LEFT JOIN enrollments e ON e.course_id = c.slug
        ${where}
-       GROUP BY c.slug, c.name, c.category, c.fee
+       GROUP BY c.slug, c.name, c.category, c.fee, c.discount_fee
        ORDER BY c.sort_order ASC, c.name ASC`,
     params,
   );
-  return rows.map((row) => ({
-    slug: row.slug,
-    name: row.name,
-    category: row.category ?? "",
-    kind: Number(row.fee) > 0 ? ("paid" as const) : ("free" as const),
-    fee: Number(row.fee) || 0,
-    pendingCount: Number(row.pending_count) || 0,
-    totalApplications: Number(row.total) || 0,
-  }));
+  return rows.map((row) => {
+    // Free/Paid is determined ONLY by the saved Payable Amount
+    // (discount_fee when set, otherwise fee) — never by name, category,
+    // coupon, raw fee, featured status, or any manual label. Computed live
+    // from the database on every fetch, so fee/discount edits move courses
+    // between Free and Paid automatically on refresh, login, and devices.
+    const rawFee = Number(row.fee) || 0;
+    const payable =
+      row.discount_fee === null || row.discount_fee === undefined
+        ? rawFee
+        : Number(row.discount_fee) || 0;
+    return {
+      slug: row.slug,
+      name: row.name,
+      category: row.category ?? "",
+      kind: payable > 0 ? ("paid" as const) : ("free" as const),
+      fee: payable,
+      pendingCount: Number(row.pending_count) || 0,
+      totalApplications: Number(row.total) || 0,
+    };
+  });
 }

@@ -23,7 +23,9 @@ export type Enrollment = {
 };
 
 export function getCourseKind(course: Course): CourseKind {
-  return course.fee > 0 ? "paid" : "free";
+  // Payable Amount (discount when set, else fee) is the source of truth:
+  // 0 → free, > 0 → paid.
+  return getPayableFee(course) > 0 ? "paid" : "free";
 }
 
 export function isActiveEnrollment(enrollment: Enrollment): boolean {
