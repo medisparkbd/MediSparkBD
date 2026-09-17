@@ -67,15 +67,6 @@ function formatClock(seconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
 function padNum(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -769,11 +760,6 @@ export default function ExamParticipationArea({
   /* ── Result Card ─────────────────────────────────────────────────────── */
 
   if (outcome) {
-    const percentage =
-      outcome.totalMarks > 0
-        ? Math.round((outcome.score / outcome.totalMarks) * 100)
-        : 0;
-
     if (scriptOpen && script) {
       return (
         <div className="space-y-4">
@@ -896,63 +882,29 @@ export default function ExamParticipationArea({
       );
     }
 
-    const totalQuestions = questions.length > 0 ? questions.length : outcome.correctCount + outcome.wrongCount + outcome.skippedCount;
-    const submissionStatus = outcome.autoSubmitted ? "Auto Submitted" : "Manual Submit";
     return (
       <div className="rounded-2xl border border-primary-600/30 bg-primary-600/10 p-4 text-left sm:p-8">
-        {terminatedNotice ? (
+        {terminatedNotice && (
           <p className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-center text-sm font-semibold text-yellow-300">
             This exam was started on another device — this session was submitted automatically.
           </p>
-        ) : (
-          <h3 className="text-center text-lg font-extrabold text-heading">Exam Result — Submitted 🎉</h3>
         )}
 
-        {/* Result Card — MASTER PROMPT §18: exact example format, all from common scoring service */}
+        {/* Result Card */}
         <div className="mx-auto mt-4 max-w-2xl rounded-2xl border border-ink/10 bg-dark-900 p-5 sm:p-6">
+          {/* 1. Exam Name */}
           <div className="text-center">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-neutral-500">━━━━━━━━━━━━ Exam Result ━━━━━━━━━━━━</p>
-            <div className="mt-3 grid gap-2 text-left sm:grid-cols-2">
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Student Name</p>
-                <p className="text-sm font-bold text-heading">{profile?.fullName ?? user?.displayName ?? user?.email ?? "Student"}</p>
-              </div>
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Student ID</p>
-                <p className="text-sm font-bold text-heading">{profile?.studentId ?? "—"}</p>
-              </div>
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 sm:col-span-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Exam Name</p>
-                <p className="text-sm font-bold text-heading">{outcome.examName ?? exam?.name ?? "Exam"}</p>
-              </div>
-            </div>
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:grid-cols-4">
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Total Questions</dt>
-                <dd className="text-sm font-extrabold text-heading">{totalQuestions}</dd>
-              </div>
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Total Marks</dt>
-                <dd className="text-sm font-extrabold text-heading">{outcome.totalMarks}</dd>
-              </div>
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Time Taken</dt>
-                <dd className="text-sm font-extrabold text-heading">{typeof outcome.timeTakenSeconds === "number" ? formatDuration(outcome.timeTakenSeconds) : "—"}</dd>
-              </div>
-              <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Submission Status</dt>
-                <dd className={`text-sm font-extrabold ${submissionStatus === "Auto Submitted" ? "text-amber-300" : "text-emerald-300"}`}>{submissionStatus}</dd>
-              </div>
-            </dl>
+            <h3 className="text-lg font-extrabold text-heading">{outcome.examName ?? exam?.name ?? "Exam"}</h3>
           </div>
 
+          {/* 2. Answer Summary */}
           <div className="mx-auto mt-4 grid max-w-md grid-cols-3 gap-3 text-center">
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-400">Correct</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-400">Correct Answer</p>
               <p className="mt-1 text-lg font-extrabold text-emerald-300">{outcome.correctCount}</p>
             </div>
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-red-400">Wrong</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-red-400">Wrong Answer</p>
               <p className="mt-1 text-lg font-extrabold text-red-300">{outcome.wrongCount}</p>
             </div>
             <div className="rounded-xl border border-ink/10 bg-dark-850 p-3">
@@ -961,22 +913,17 @@ export default function ExamParticipationArea({
             </div>
           </div>
 
+          {/* 3. Marks */}
           <div className="mt-4 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-neutral-400">Final Marks</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-neutral-400">Obtained Marks / Total Marks</p>
             <p className="text-5xl font-extrabold text-primary-300">
               {outcome.score}
               <span className="text-2xl text-neutral-400"> / {outcome.totalMarks}</span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-neutral-300">{percentage}%</p>
           </div>
 
+          {/* 4. Additional Result Information */}
           <ul className="mt-4 grid gap-2 text-left text-sm">
-            <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
-              <span className="font-semibold text-neutral-400">Correct Marks</span>
-              <span className="font-extrabold text-emerald-300">
-                {typeof outcome.rawMarks === "number" ? `${outcome.rawMarks} / ${outcome.totalMarks}` : `${outcome.correctCount} × marks`}
-              </span>
-            </li>
             <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
               <span className="font-semibold text-neutral-400">Negative Marking</span>
               {outcome.negativeMarks != null && outcome.negativeMarks > 0 ? (
@@ -1002,7 +949,7 @@ export default function ExamParticipationArea({
               )}
             </li>
             <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
-              <span className="font-semibold text-neutral-400">Merit Position / Rank</span>
+              <span className="font-semibold text-neutral-400">Merit</span>
               <span className="font-extrabold text-primary-300">{outcome.meritPosition != null ? `#${outcome.meritPosition}` : "—"}</span>
             </li>
             {outcome.highestMark != null && (
@@ -1012,16 +959,16 @@ export default function ExamParticipationArea({
               </li>
             )}
           </ul>
-          <p className="mt-3 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500">━━━━━━━━━━━━━━━━━━━━━━━━━━</p>
         </div>
 
+        {/* 5. Action Buttons */}
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
             type="button"
             onClick={() => void openAnswerScript()}
             className="w-full rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-500 active:scale-[0.98] sm:w-auto"
           >
-            View Answer Sheet
+            View Question Paper Details
           </button>
           <a
             href="/dashboard"
