@@ -122,6 +122,173 @@ export async function getStudentExamResultGroups(
   }
 }
 
+// ── Result cards by exam kind (Public vs Course) ───────────────────────────
+
+export type ResultCardKind = "public" | "course";
+
+export type StudentResultCardData = {
+  resultId: number;
+  examId: string;
+  examName: string;
+  kind: ResultCardKind;
+  correctCount: number;
+  wrongCount: number;
+  unansweredCount: number;
+  score: number;
+  totalMarks: number;
+  correctMarks: number;
+  negativeDeduction: number;
+  timerPenalty: number;
+  secondTimer: boolean;
+  meritPosition: number | null;
+  highestMark: number | null;
+  submittedAt: string;
+};
+
+type CardRow = {
+  result_id: number;
+  exam_id: string;
+  title: string;
+  kind: string;
+  score: string | number;
+  total_marks: string | number;
+  merit_position: number | null;
+  negative_deduction: string | number | null;
+  timer_penalty: string | number | null;
+  is_second_timer: number | null;
+  details: string | null;
+  submitted_at: Date | string;
+};
+
+/**
+ * One simplified result card per attempt of one student, filtered by the
+ * existing exam kind from the database: "public" → kind IN
+ * ('public','practice'), "course" → kind = 'enrolled'. Never mixes the two.
+ * Correct/Wrong/Unanswered + Correct Marks come from the stored
+ * per-question breakdown written at submit time; deductions, timer penalty,
+ * merit and highest mark come from the existing result records.
+ */
+export async function getStudentResultCards(
+  uid: string,
+  kind: ResultCardKind,
+): Promise<StudentResultCardData[]> {
+  try {
+    // Legacy rows predate the kind column (default 'public') — NULL counts
+    // as public so older attempts never vanish from either page.
+    const kindFilter =
+      kind === "course"
+        ? `AND ex.kind = 'enrolled'`
+        : `AND (ex.kind IS NULL OR ex.kind <> 'enrolled')`;
+    const rows = await query<CardRow[]>(
+      `SELECT r.id AS result_id, r.exam_id, ex.title, ex.kind,
+              r.score, r.total_marks, r.merit_position,
+              r.negative_deduction, r.timer_penalty, r.is_second_timer,
+              r.details, r.submitted_at
+         FROM exam_results r
+         JOIN exams ex ON ex.id = r.exam_id
+        WHERE r.student_uid = ? ${kindFilter}
+        ORDER BY r.submitted_at DESC`,
+      [uid],
+    );
+    if (rows.length === 0) return [];
+
+    // Best score per exam across ALL students — for the Highest Mark row.
+    const examIds = [...new Set(rows.map((row) => row.exam_id))];
+    const bestRows = await query<{ exam_id: string; best: string | number }[]>(
+      `SELECT exam_id, MAX(score) AS best FROM exam_results
+        WHERE exam_id IN (${examIds.map(() => "?").join(",")})
+        GROUP BY exam_id`,
+      examIds,
+    );
+    const bestByExam = new Map(
+      bestRows.map((row) => [row.exam_id, num(row.best)]),
+    );
+
+    // Active question ids per exam — breakdown rows for removed questions
+    // are skipped, mirroring the existing detail calculation.
+    const activeRows = await query<{ exam_id: string; id: number }[]>(
+      `SELECT exam_id, id FROM exam_questions
+        WHERE exam_id IN (${examIds.map(() => "?").join(",")}) AND is_active = 1`,
+      examIds,
+    );
+    const activeByExam = new Map<string, Set<number>>();
+    for (const row of activeRows) {
+      let set = activeByExam.get(row.exam_id);
+      if (!set) {
+        set = new Set<number>();
+        activeByExam.set(row.exam_id, set);
+      }
+      set.add(Number(row.id));
+    }
+
+    type DetailEntry = {
+      questionId?: number;
+      chosenIndex?: number | null;
+      correctIndex?: number;
+      obtained?: number | null;
+    };
+
+    return rows.map((row) => {
+      let rawDetails: unknown = null;
+      try {
+        rawDetails = row.details ? JSON.parse(row.details) : null;
+      } catch {
+        rawDetails = null;
+      }
+      const details = Array.isArray(rawDetails)
+        ? (rawDetails as DetailEntry[])
+        : [];
+      const activeIds = activeByExam.get(row.exam_id);
+
+      let correct = 0;
+      let wrong = 0;
+      let unanswered = 0;
+      let correctMarks = 0;
+      for (const entry of details) {
+        if (
+          typeof entry.questionId === "number" &&
+          activeIds &&
+          !activeIds.has(entry.questionId)
+        ) {
+          continue;
+        }
+        if (typeof entry.chosenIndex !== "number") {
+          unanswered += 1;
+        } else if (entry.chosenIndex === entry.correctIndex) {
+          correct += 1;
+          correctMarks += Number(entry.obtained ?? 0) || 0;
+        } else {
+          wrong += 1;
+        }
+      }
+
+      return {
+        resultId: Number(row.result_id),
+        examId: row.exam_id,
+        examName: row.title,
+        kind,
+        correctCount: correct,
+        wrongCount: wrong,
+        unansweredCount: unanswered,
+        score: num(row.score),
+        totalMarks: num(row.total_marks),
+        correctMarks: Math.round(correctMarks * 100) / 100,
+        negativeDeduction: num(row.negative_deduction),
+        timerPenalty: num(row.timer_penalty),
+        secondTimer: (row.is_second_timer ?? 0) === 1,
+        meritPosition:
+          row.merit_position === null || row.merit_position === undefined
+            ? null
+            : Number(row.merit_position),
+        highestMark: bestByExam.get(row.exam_id) ?? null,
+        submittedAt: toIso(row.submitted_at),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 // ── Single exam result detail ─────────────────────────────────────────────
 
 export type StudentExamResultDetail = {
