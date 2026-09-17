@@ -165,10 +165,10 @@ export function ControlCourseCard({
         {kind === "paid" ? "💳" : "🆓"}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-extrabold text-heading transition group-hover:text-[#1a3a78] sm:text-base">
+        <p className="truncate text-sm font-extrabold text-[#0b1e3a] transition group-hover:text-[#1a3a78] admin-dark:text-white admin-dark:group-hover:text-[#93c5fd] sm:text-base">
           {course.name}
         </p>
-        <p className="truncate text-[11px] text-neutral-500">
+        <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
           {[course.category, kind === "paid" && course.fee > 0 ? `৳${course.fee}` : "Free"]
             .filter(Boolean)
             .join(" · ")}

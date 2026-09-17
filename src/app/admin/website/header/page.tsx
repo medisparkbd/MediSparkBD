@@ -260,7 +260,7 @@ export default function HeaderNavbarManagementPage() {
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 admin-dark:bg-zinc-900">
+                <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400 admin-dark:bg-zinc-900">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div className="ml-auto flex items-center gap-1">
@@ -303,7 +303,7 @@ export default function HeaderNavbarManagementPage() {
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="block">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Name</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Name</span>
                   <input
                     type="text"
                     value={item.label}
@@ -313,7 +313,7 @@ export default function HeaderNavbarManagementPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">URL / Route</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">URL / Route</span>
                   <input
                     type="text"
                     value={item.href ?? ""}

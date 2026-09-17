@@ -316,7 +316,7 @@ export default function SocialLinksManagementPage() {
     "rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 p-5 transition-colors duration-300 sm:p-6 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]";
   const inputClass =
     "mt-1 w-full rounded-xl border border-neutral-200 bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-400 focus:border-[#2f6bce]/60 focus:bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100";
-  const labelClass = "text-[11px] font-bold uppercase tracking-wider text-slate-400";
+  const labelClass = "text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400";
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
@@ -360,7 +360,7 @@ export default function SocialLinksManagementPage() {
                 placeholder="e.g. Facebook, TikTok, Discord"
                 className={inputClass}
               />
-              {addForm.label.trim() && <p className="mt-1 text-[10px] text-slate-400">Key: {slugifyLabel(addForm.label) || "(invalid)"}</p>}
+              {addForm.label.trim() && <p className="mt-1 text-[10px] text-slate-500 admin-dark:text-slate-400">Key: {slugifyLabel(addForm.label) || "(invalid)"}</p>}
             </label>
             <label className="block">
               <span className={labelClass}>Platform Icon</span>
@@ -370,7 +370,7 @@ export default function SocialLinksManagementPage() {
                 placeholder="Emoji, image URL or SVG path (optional, leave empty for auto)"
                 className={inputClass}
               />
-              <p className="mt-1 text-[10px] text-slate-400">Leave empty to use default brand icon. Supports emoji (🔥), image URL (https://...) or SVG path.</p>
+              <p className="mt-1 text-[10px] text-slate-500 admin-dark:text-slate-400">Leave empty to use default brand icon. Supports emoji (🔥), image URL (https://...) or SVG path.</p>
             </label>
             <label className="block">
               <span className={labelClass}>Link / URL *</span>
@@ -443,7 +443,7 @@ export default function SocialLinksManagementPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-sm font-extrabold text-[#0b1e3a] admin-dark:text-zinc-100">{link.label}</h3>
-                  <p className="truncate text-xs text-slate-500">key: {link.key} · {link.url || "no URL"}</p>
+                  <p className="truncate text-xs text-slate-500 admin-dark:text-slate-400">key: {link.key} · {link.url || "no URL"}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -488,7 +488,7 @@ export default function SocialLinksManagementPage() {
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${link.isActive ? "bg-emerald-500/15 text-emerald-600" : "bg-zinc-200 text-zinc-500"}`}>
                         {link.isActive ? "Active" : "Inactive"}
                       </span>
-                      {link.icon && <span className="truncate text-slate-400">icon: {link.icon.slice(0, 40)}</span>}
+                      {link.icon && <span className="truncate text-slate-500 admin-dark:text-slate-400">icon: {link.icon.slice(0, 40)}</span>}
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -576,7 +576,7 @@ export default function SocialLinksManagementPage() {
         </p>
       )}
 
-      <p className="mt-6 text-xs leading-relaxed text-slate-400">
+      <p className="mt-6 text-xs leading-relaxed text-slate-500 admin-dark:text-slate-400">
         Tip: Reorder with ▲/▼ then click “Save Order”. Toggle Active/Inactive switches live immediately. Add any platform — WhatsApp, TikTok, Discord, etc. — via “+ Add Social Media”.
       </p>
     </section>

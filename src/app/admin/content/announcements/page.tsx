@@ -25,9 +25,9 @@ function toLocalInput(iso: string | null): string {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60";
+  "w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60";
 const labelClass =
-  "text-xs font-semibold uppercase tracking-wide text-neutral-500";
+  "text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400";
 
 /**
  * Admin → Content → Announcements. Full CRUD against /api/announcements →
@@ -201,8 +201,8 @@ export default function AnnouncementsAdminPage() {
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-heading">Announcements</h1>
-          <p className="mt-1 text-sm text-neutral-400">
+          <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Announcements</h1>
+          <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
             Published announcements appear on the Main Website announcement bar.
           </p>
         </div>
@@ -219,7 +219,7 @@ export default function AnnouncementsAdminPage() {
 
       {editingId !== null && (
         <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
             {editingId === "new" ? "New" : "Edit"} Announcement
           </h2>
           <div className="mt-4 grid gap-3">
@@ -286,7 +286,7 @@ export default function AnnouncementsAdminPage() {
                 onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
                 className="h-4 w-4 accent-emerald-500"
               />
-              <span className="text-xs font-semibold text-neutral-300">Active</span>
+              <span className="text-xs font-semibold text-slate-600 admin-dark:text-slate-300">Active</span>
             </label>
             <div className="flex gap-2">
               <button
@@ -300,7 +300,7 @@ export default function AnnouncementsAdminPage() {
               <button
                 type="button"
                 onClick={() => setEditingId(null)}
-                className="rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-bold text-neutral-300 hover:border-[#93c5fd]"
+                className="rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-bold text-slate-600 hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-300 admin-dark:hover:text-white"
               >
                 Cancel
               </button>
@@ -313,7 +313,7 @@ export default function AnnouncementsAdminPage() {
         {items === null ? (
           <AccessLoading label="Loading…" />
         ) : items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
+          <p className="rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">
             No announcements yet — add the first one.
           </p>
         ) : (
@@ -323,19 +323,19 @@ export default function AnnouncementsAdminPage() {
               className="flex flex-wrap items-center gap-3 rounded-xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-heading">
+                <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                   {item.title}{" "}
                   {!item.isActive && (
-                    <span className="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-300">
+                    <span className="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-700 admin-dark:text-yellow-300">
                       off
                     </span>
                   )}
                 </p>
                 {item.description && (
-                  <p className="truncate text-xs text-neutral-400">{item.description}</p>
+                  <p className="truncate text-xs text-slate-500 admin-dark:text-slate-400">{item.description}</p>
                 )}
                 {(item.startAt || item.endAt) && (
-                  <p className="text-[11px] text-neutral-500">
+                  <p className="text-[11px] text-slate-500 admin-dark:text-slate-400">
                     {item.startAt ? new Date(item.startAt).toLocaleString("en-GB") : "—"} →{" "}
                     {item.endAt ? new Date(item.endAt).toLocaleString("en-GB") : "—"}
                   </p>
@@ -358,14 +358,14 @@ export default function AnnouncementsAdminPage() {
               <button
                 type="button"
                 onClick={() => openEdit(item)}
-                className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+                className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white"
               >
                 Edit
               </button>
               <button
                 type="button"
                 onClick={() => void remove(item)}
-                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-500/20 admin-dark:text-red-400"
               >
                 Delete
               </button>

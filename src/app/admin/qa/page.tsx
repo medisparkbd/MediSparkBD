@@ -460,7 +460,7 @@ export default function AdminQaControlPage() {
                 <input
                   value={askCardDraft.title}
                   onChange={(e) => setAskCardDraft((p) => (p ? { ...p, title: e.target.value } : p))}
-                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   placeholder="Ask a Question"
                 />
               </label>
@@ -470,7 +470,7 @@ export default function AdminQaControlPage() {
                   value={askCardDraft.subtitle}
                   onChange={(e) => setAskCardDraft((p) => (p ? { ...p, subtitle: e.target.value } : p))}
                   rows={2}
-                  className="mt-1.5 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                  className="mt-1.5 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   placeholder="Select your category, enrolled course and subject..."
                 />
               </label>
@@ -479,7 +479,7 @@ export default function AdminQaControlPage() {
                 <input
                   value={askCardDraft.placeholder}
                   onChange={(e) => setAskCardDraft((p) => (p ? { ...p, placeholder: e.target.value } : p))}
-                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   placeholder="Type your question here..."
                 />
               </label>
@@ -488,7 +488,7 @@ export default function AdminQaControlPage() {
                 <input
                   value={askCardDraft.guidelineText}
                   onChange={(e) => setAskCardDraft((p) => (p ? { ...p, guidelineText: e.target.value } : p))}
-                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                  className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   placeholder="Be specific — mention the chapter..."
                 />
               </label>
@@ -498,7 +498,7 @@ export default function AdminQaControlPage() {
                   <input
                     value={askCardDraft.submitLabel}
                     onChange={(e) => setAskCardDraft((p) => (p ? { ...p, submitLabel: e.target.value } : p))}
-                    className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                    className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   />
                 </label>
                 <label className="block">
@@ -506,7 +506,7 @@ export default function AdminQaControlPage() {
                   <input
                     value={askCardDraft.cancelLabel}
                     onChange={(e) => setAskCardDraft((p) => (p ? { ...p, cancelLabel: e.target.value } : p))}
-                    className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-heading outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
+                    className="mt-1.5 w-full rounded-xl border border-ink/15 bg-[#f8fbff] px-3.5 py-2.5 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 admin-dark:bg-[#0f2547]"
                   />
                 </label>
               </div>

@@ -74,40 +74,40 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href="/admin/course-content-control" className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]">
+      <Link href="/admin/course-content-control" className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
         ← Course Content Control
       </Link>
-      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-heading">
+      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         {decodeURIComponent(slug).replace(/-/g, " ")}
       </h1>
-      <p className="mt-1 text-xs text-neutral-500">Legacy flows 1-3 — content-control hierarchy (kept unchanged).</p>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Legacy flows 1-3 — content-control hierarchy (kept unchanged).</p>
 
       {!scope.subjectId && !scope.paperId && structure.mode === "subjects" && (
         <>
-          <h2 className="mt-6 text-lg font-bold text-heading">Select Subject</h2>
+          <h2 className="mt-6 text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Select Subject</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {(structure.subjects ?? []).map((subject) => (
               <button key={subject.id} type="button"
                 onClick={() => setScope({ subjectId: subject.id, label: subject.name })}
                 className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-5 text-left transition hover:border-primary-600/60">
                 <span aria-hidden>📗</span>
-                <span className="break-words font-extrabold text-heading">{subject.name}</span>
+                <span className="break-words font-extrabold text-[#0b1e3a] admin-dark:text-white">{subject.name}</span>
               </button>
             ))}
           </div>
-          <p className="mt-3 text-xs text-neutral-500">Subjects sync from Course Control.</p>
+          <p className="mt-3 text-xs text-slate-500 admin-dark:text-slate-400">Subjects sync from Course Control.</p>
         </>
       )}
       {structure.mode === "papers" && !scope.paperId && !scope.subjectId && (
         <>
-          <h2 className="mt-6 text-lg font-bold text-heading">Select Paper</h2>
+          <h2 className="mt-6 text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Select Paper</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {(structure.papers ?? []).map((paper) => (
               <button key={paper.id} type="button"
                 onClick={() => setScope({ paperId: paper.id, subjectId: paper.subjectId, label: paper.name })}
                 className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-5 text-left transition hover:border-primary-600/60">
                 <span aria-hidden>📄</span>
-                <span className="break-words font-extrabold text-heading">{paper.name}</span>
+                <span className="break-words font-extrabold text-[#0b1e3a] admin-dark:text-white">{paper.name}</span>
               </button>
             ))}
           </div>
@@ -117,9 +117,9 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
       {(structure.mode === "direct" || scope.subjectId || scope.paperId) && (
         <>
           {scope.label && (
-            <p className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-500/40 bg-primary-600/10 px-3 py-1 text-xs font-bold text-primary-300">
+            <p className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary-500/40 bg-primary-600/10 px-3 py-1 text-xs font-bold text-primary-700 admin-dark:text-primary-300">
               {scope.label}
-              <button type="button" aria-label="Clear selection" onClick={() => setScope({})} className="rounded-full px-1 text-[11px] font-extrabold text-primary-200 hover:text-white">✕</button>
+              <button type="button" aria-label="Clear selection" onClick={() => setScope({})} className="rounded-full px-1 text-[11px] font-extrabold text-primary-500 hover:text-primary-700 admin-dark:text-primary-200 admin-dark:hover:text-white">✕</button>
             </p>
           )}
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -128,19 +128,19 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
                 href={`/admin/course-content-control/course/${encodeURIComponent(slug)}/${type.typeKey}?${baseQuery.toString()}`}
                 className="group flex min-h-[84px] items-center gap-3 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-primary-600/60">
                 <span aria-hidden className="text-xl">{TYPE_ICONS[type.typeKey] ?? "📁"}</span>
-                <span className="flex-1 break-words font-extrabold text-heading group-hover:text-[#1a3a78]">{type.name}</span>
+                <span className="flex-1 break-words font-extrabold text-[#0b1e3a] group-hover:text-[#1a3a78] admin-dark:text-white">{type.name}</span>
               </Link>
             ))}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setEditingKey(editingKey === null ? "__list__" : null)} className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2 text-xs font-bold text-heading hover:border-[#93c5fd]">[ Edit ]</button>
+            <button type="button" onClick={() => setEditingKey(editingKey === null ? "__list__" : null)} className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white">[ Edit ]</button>
             <button type="button" onClick={() => setAddingType((v) => !v)} className="rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:bg-primary-700">[ + Add ]</button>
           </div>
           {addingType && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <input value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} placeholder="New content type name (e.g. Quiz)" className="min-w-0 flex-1 rounded-xl border border-primary-500/40 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none" />
+              <input value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} placeholder="New content type name (e.g. Quiz)" className="min-w-0 flex-1 rounded-xl border border-primary-500/40 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white" />
               <button type="button" onClick={async () => { if (await post({ action: "add-type", name: newTypeName }, "Content type added.")) { setNewTypeName(""); setAddingType(false); } }} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700">Save</button>
-              <button type="button" onClick={() => setAddingType(false)} className="rounded-xl border border-ink/15 px-4 py-2.5 text-xs font-bold text-heading">Cancel</button>
+              <button type="button" onClick={() => setAddingType(false)} className="rounded-xl border border-ink/15 px-4 py-2.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white">Cancel</button>
             </div>
           )}
           {editingKey === "__list__" && (
@@ -149,13 +149,13 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
                 <li key={type.typeKey} className="flex flex-wrap items-center gap-2 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-3">
                   {editingKey === type.typeKey ? (
                     <>
-                      <input value={editName} onChange={(e) => setEditName(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-primary-500/40 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none" />
+                      <input value={editName} onChange={(e) => setEditName(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-primary-500/40 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] outline-none admin-dark:text-white" />
                       <button type="button" onClick={async () => { if (await post({ action: "rename-type", typeKey: type.typeKey, name: editName }, "Renamed.")) setEditingKey(null); }} className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-bold text-white">Save</button>
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 break-words text-sm font-semibold text-heading">{type.name}</span>
-                      <button type="button" onClick={() => { setEditingKey(type.typeKey); setEditName(type.name); }} className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading">Rename</button>
+                      <span className="flex-1 break-words text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">{type.name}</span>
+                      <button type="button" onClick={() => { setEditingKey(type.typeKey); setEditName(type.name); }} className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white">Rename</button>
                     </>
                   )}
                 </li>

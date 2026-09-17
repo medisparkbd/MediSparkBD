@@ -149,7 +149,7 @@ export default function PushManager() {
 
       <div className={`${cardClass} mt-5 p-4 text-sm`}>
         <span className="font-bold">{count === null ? "…" : count}</span>{" "}
-        <span className="text-slate-500">device(s) currently subscribed in total.</span>
+        <span className="text-slate-500 admin-dark:text-slate-400">device(s) currently subscribed in total.</span>
       </div>
 
       <div className={`${cardClass} mt-5 space-y-4 p-5`}>
@@ -191,7 +191,7 @@ export default function PushManager() {
               placeholder="student@example.com"
             />
             {targetError && (
-              <p className="mt-1.5 text-xs font-semibold text-red-500">{targetError}</p>
+              <p className="mt-1.5 text-xs font-semibold text-red-600 admin-dark:text-red-400">{targetError}</p>
             )}
             {!targetError && targetCount !== null && (
               <p className="mt-1.5 text-xs font-semibold text-emerald-600 admin-dark:text-emerald-400">

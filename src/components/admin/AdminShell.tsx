@@ -351,16 +351,16 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           <div className="min-w-0 flex-1">
             {displayBreadcrumbs.length > 1 && (
               <nav aria-label="Breadcrumb" className="hidden sm:block">
-                <ol className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500">
+                <ol className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500 admin-dark:text-zinc-400">
                   {displayBreadcrumbs.slice(0, -1).map((crumb, index) => (
                     <li key={crumb.href + index} className="flex items-center gap-1.5">
                       <Link
                         href={crumb.href}
-                        className="transition hover:text-primary-400"
+                        className="transition hover:text-[#1a3a78] admin-dark:hover:text-primary-400"
                       >
                         {crumb.label}
                       </Link>
-                      <span className="text-zinc-700">/</span>
+                      <span className="text-zinc-400 admin-dark:text-zinc-600">/</span>
                     </li>
                   ))}
                 </ol>

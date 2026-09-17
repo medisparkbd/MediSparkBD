@@ -28,13 +28,13 @@ export default function PaidEnrollmentPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Paid Course Enrollment</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Paid Course Enrollment</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Manual enrollment only — review and accept paid course applications.
       </p>
 
-      <h2 className="mt-8 text-lg font-bold text-heading">All Paid Courses</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <h2 className="mt-8 text-lg font-bold text-[#0b1e3a] admin-dark:text-white">All Paid Courses</h2>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         One unified list — sorted by highest pending applications first. Pending counts update automatically.
       </p>
 
@@ -45,7 +45,7 @@ export default function PaidEnrollmentPage() {
       ) : courses === null ? (
         <AccessLoading label="Loading paid courses…" />
       ) : paidCourses.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
+        <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">
           No paid courses published yet.
         </p>
       ) : (

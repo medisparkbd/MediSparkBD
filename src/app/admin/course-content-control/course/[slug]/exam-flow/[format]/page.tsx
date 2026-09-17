@@ -28,10 +28,10 @@ export default function FormatExamsPage({
   if (!isFlow5Format(format) || !FINAL_FORMATS.includes(format as Flow5Format)) {
     return (
       <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <Link href={base} className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]">
+        <Link href={base} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
           ← {courseName}
         </Link>
-        <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm text-red-400">
+        <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm text-red-600 admin-dark:text-red-400">
           Unknown exam category.
         </p>
       </section>
@@ -43,11 +43,11 @@ export default function FormatExamsPage({
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-        <Link href="/admin/course-content-control" className="font-semibold text-neutral-400 hover:text-[#1a3a78]">
+        <Link href="/admin/course-content-control" className="font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
           Course Content Control
         </Link>
-        <span className="text-neutral-600">/</span>
-        <Link href={base} className="font-semibold capitalize text-neutral-400 hover:text-[#1a3a78]">
+        <span className="text-slate-400 admin-dark:text-slate-500">/</span>
+        <Link href={base} className="font-semibold capitalize text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
           {courseName}
         </Link>
       </div>

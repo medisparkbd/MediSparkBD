@@ -106,15 +106,15 @@ export default function ResultControlPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Result Control</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Result Control</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Public Exam results and the Course Exam Result sheet.
       </p>
 
       {/* Public exam results */}
       <div className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">Public Exam Result</h2>
-        <p className="mt-1 text-xs text-neutral-400">
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Public Exam Result</h2>
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           All submitted public exam results with scores and answer sheets.
         </p>
         <Link
@@ -127,20 +127,20 @@ export default function ResultControlPage() {
 
       {/* Course exam result flow */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">Course Exam Result</h2>
-        <p className="mt-1 text-xs text-neutral-500">
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Course Exam Result</h2>
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Flow: Category → Course → Result Sheet
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               1 · Category
             </span>
             <select
               value={categoryId}
               onChange={(event) => selectCategory(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60"
             >
               <option value="">Select a category…</option>
               {categories.map((category) => (
@@ -151,14 +151,14 @@ export default function ResultControlPage() {
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               2 · Course
             </span>
             {coursesState === "loading" ? (
-              <p className="mt-1 text-sm text-neutral-400">Loading courses…</p>
+              <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">Loading courses…</p>
             ) : coursesState === "error" ? (
               <div className="mt-1 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5">
-                <p className="text-sm text-red-400">Could not load courses.</p>
+                <p className="text-sm text-red-600 admin-dark:text-red-400">Could not load courses.</p>
                 <button
                   type="button"
                   onClick={() => void loadCourses(categoryId)}
@@ -172,7 +172,7 @@ export default function ResultControlPage() {
                 value={courseSlug}
                 onChange={(event) => setCourseSlug(event.target.value)}
                 disabled={!categoryId || courses.length === 0}
-                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60 disabled:opacity-50"
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60 disabled:opacity-50"
               >
                 <option value="">
                   {categoryId ? "Select a course…" : "Select a category first…"}
@@ -185,7 +185,7 @@ export default function ResultControlPage() {
               </select>
             )}
             {categoryId && coursesState === "ready" && courses.length === 0 && (
-              <p className="mt-2 text-xs text-neutral-500">
+              <p className="mt-2 text-xs text-slate-500 admin-dark:text-slate-400">
                 No courses found in this category.
               </p>
             )}
@@ -193,11 +193,11 @@ export default function ResultControlPage() {
         </div>
 
         {courseSlug && loading && (
-          <p className="mt-4 text-sm text-neutral-400">Loading result sheet…</p>
+          <p className="mt-4 text-sm text-slate-500 admin-dark:text-slate-400">Loading result sheet…</p>
         )}
 
         {courseSlug && !loading && sheets !== null && sheets.length === 0 && (
-          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-slate-500 admin-dark:text-slate-400">
             No exams or results found for this course yet.
           </p>
         )}
@@ -206,13 +206,13 @@ export default function ResultControlPage() {
           <div className="mt-6 space-y-6">
             {sheets.map((sheet) => (
               <div key={sheet.examId} className="overflow-x-auto">
-                <h3 className="text-sm font-bold text-heading">{sheet.title}</h3>
+                <h3 className="text-sm font-bold text-[#0b1e3a] admin-dark:text-white">{sheet.title}</h3>
                 {sheet.results.length === 0 ? (
-                  <p className="mt-2 text-xs text-neutral-500">No submissions yet.</p>
+                  <p className="mt-2 text-xs text-slate-500 admin-dark:text-slate-400">No submissions yet.</p>
                 ) : (
                   <table className="mt-2 w-full min-w-[560px] text-left text-xs">
                     <thead>
-                      <tr className="border-b border-ink/10 text-neutral-500">
+                      <tr className="border-b border-ink/10 text-slate-500 admin-dark:text-slate-400">
                         <th className="py-2 pr-3 font-semibold uppercase tracking-wide">Merit</th>
                         <th className="py-2 pr-3 font-semibold uppercase tracking-wide">Student</th>
                         <th className="py-2 pr-3 font-semibold uppercase tracking-wide">Exam Name</th>
@@ -225,14 +225,14 @@ export default function ResultControlPage() {
                       {sheet.results.map((result) => (
                         <tr
                           key={`${sheet.examId}-${result.studentUid}`}
-                          className="border-b border-ink/5 text-neutral-300"
+                          className="border-b border-ink/5 text-slate-600 admin-dark:text-slate-300"
                         >
-                          <td className="py-2 pr-3 font-bold text-primary-400">#{result.position}</td>
+                          <td className="py-2 pr-3 font-bold text-[#1a3a78] admin-dark:text-primary-400">#{result.position}</td>
                           <td className="py-2 pr-3">{result.studentName}</td>
                           <td className="py-2 pr-3">{sheet.title}</td>
                           <td className="py-2 pr-3">{sheet.totalMarks}</td>
-                          <td className="py-2 pr-3 font-bold text-heading">{result.obtained}</td>
-                          <td className="py-2 font-bold text-emerald-400">{sheet.highestMark}</td>
+                          <td className="py-2 pr-3 font-bold text-[#0b1e3a] admin-dark:text-white">{result.obtained}</td>
+                          <td className="py-2 font-bold text-emerald-700 admin-dark:text-emerald-400">{sheet.highestMark}</td>
                         </tr>
                       ))}
                     </tbody>

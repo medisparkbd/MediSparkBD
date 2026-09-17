@@ -110,8 +110,8 @@ export default function ViewTeachersPage() {
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-heading">Teacher Users</h1>
-          <p className="mt-1 text-sm text-neutral-400">
+          <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Teacher Users</h1>
+          <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
             All staff members with the Teacher role.
           </p>
         </div>
@@ -125,11 +125,11 @@ export default function ViewTeachersPage() {
 
       {loadError ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Failed to load teacher users.</p>
+          <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load teacher users.</p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white"
           >
             Retry
           </button>
@@ -138,7 +138,7 @@ export default function ViewTeachersPage() {
         <AccessLoading label="Loading teacher users…" />
       ) : staff.length === 0 ? (
         <div className={`${cardClass} p-8 text-center`}>
-          <p className="text-sm text-neutral-500">No teacher users found.</p>
+          <p className="text-sm text-slate-500 admin-dark:text-slate-400">No teacher users found.</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -159,21 +159,21 @@ export default function ViewTeachersPage() {
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-heading">
+                <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                   {member.displayName || member.email}
                 </p>
-                <p className="truncate text-[11px] text-neutral-500">
+                <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
                   {member.email}
                   {member.uid && ` · UID: ${member.uid.slice(0, 8)}…`}
                 </p>
               </div>
-              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400">
+              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700 admin-dark:text-emerald-400">
                 Teacher
               </span>
               <span className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
                 Number(member.isActive) === 1
-                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
-                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-700 hover:bg-yellow-500/20 admin-dark:text-yellow-400"
+                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 admin-dark:text-emerald-400"
               }`}>
                 {Number(member.isActive) === 1 ? "Active" : "Inactive"}
               </span>
@@ -183,7 +183,7 @@ export default function ViewTeachersPage() {
       )}
 
       <form onSubmit={(e) => void handleAdd(e)} className={`${cardClass} mt-6 p-4`}>
-        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">+ Add Teacher</p>
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">+ Add Teacher</p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             type="email"
@@ -205,7 +205,7 @@ export default function ViewTeachersPage() {
           </button>
         </div>
         {addMsg && (
-          <p className={`mt-2 text-xs font-semibold ${addMsg.kind === "ok" ? "text-emerald-500" : "text-red-400"}`}>
+          <p className={`mt-2 text-xs font-semibold ${addMsg.kind === "ok" ? "text-emerald-600 admin-dark:text-emerald-400" : "text-red-600 admin-dark:text-red-400"}`}>
             {addMsg.text}
           </p>
         )}

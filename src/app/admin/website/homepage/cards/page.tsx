@@ -185,8 +185,8 @@ export default function HomePageCardsManager() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Homepage Cards</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Homepage Cards</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Manage the &ldquo;Why MediSpark&rdquo; benefit cards and the
         &ldquo;Our Success&rdquo; stat cards shown on the Main Website.
       </p>
@@ -201,8 +201,8 @@ export default function HomePageCardsManager() {
             aria-pressed={section === item}
             className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
               section === item
-                ? "border-primary-500/60 bg-primary-600/10 text-primary-300"
-                : "border-ink/10 bg-white admin-dark:bg-[#112544] text-heading hover:border-primary-500/40"
+                ? "border-primary-500/60 bg-primary-600/10 text-primary-700 admin-dark:text-primary-300"
+                : "border-ink/10 bg-white admin-dark:bg-[#112544] text-[#0b1e3a] hover:border-primary-500/40 admin-dark:text-white"
             }`}
           >
             {item === "why" ? "Why MediSpark" : "Our Success"}
@@ -212,51 +212,51 @@ export default function HomePageCardsManager() {
 
       {/* + Add Card */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">+ Add Card</h2>
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">+ Add Card</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Title{section === "success" ? " / Stat label" : ""}
             </span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder={section === "why" ? "e.g. Live Classes" : "e.g. Students Guided"}
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             />
           </label>
           {section === "success" && (
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
                 Stat Value
               </span>
               <input
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 placeholder="e.g. 500+"
-                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
               />
             </label>
           )}
           <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Description
             </span>
             <input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Short helper text shown on the card"
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             />
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Icon
             </span>
             <select
               value={iconOptions.includes(icon as never) ? icon : iconOptions[0]}
               onChange={(event) => setIcon(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm capitalize text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm capitalize text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             >
               {iconOptions.map((option) => (
                 <option key={option} value={option}>
@@ -280,23 +280,23 @@ export default function HomePageCardsManager() {
 
       {/* Card list */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">
           Cards ({sectionCards.length})
         </h2>
 
         {loadError ? (
           <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-            <p className="text-sm text-red-400">Failed to load the cards.</p>
+            <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load the cards.</p>
             <button
               type="button"
               onClick={() => void load()}
-              className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+              className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd]"
             >
               Retry
             </button>
           </div>
         ) : sectionCards.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-slate-500 admin-dark:text-slate-400">
             No cards in this section yet — add one above.
           </p>
         ) : (
@@ -311,16 +311,16 @@ export default function HomePageCardsManager() {
                 >
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-heading">
+                      <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                         {card.title}
                         {card.value ? ` — ${card.value}` : ""}{" "}
                         {!card.isActive && (
-                          <span className="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-300">
+                          <span className="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-700 admin-dark:text-yellow-300">
                             hidden
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-[11px] text-neutral-500">
+                      <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
                         {card.description} · icon: {card.icon}
                       </p>
                     </div>
@@ -348,7 +348,7 @@ export default function HomePageCardsManager() {
                       type="button"
                       onClick={() => (isEditing ? setEditKey(null) : startEdit(card))}
                       disabled={busy}
-                      className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-50"
+                      className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd] disabled:opacity-50"
                     >
                       {isEditing ? "Cancel" : "Edit"}
                     </button>
@@ -356,7 +356,7 @@ export default function HomePageCardsManager() {
                       type="button"
                       onClick={() => void deleteCard(card)}
                       disabled={busy}
-                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-500/20 disabled:opacity-50 admin-dark:text-red-400"
                     >
                       Delete
                     </button>
@@ -370,7 +370,7 @@ export default function HomePageCardsManager() {
                           setEdit({ ...edit, title: event.target.value })
                         }
                         placeholder="Title"
-                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                       />
                       {section === "success" && (
                         <input
@@ -379,7 +379,7 @@ export default function HomePageCardsManager() {
                             setEdit({ ...edit, value: event.target.value })
                           }
                           placeholder="Stat value (e.g. 90%)"
-                          className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                          className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                         />
                       )}
                       <input
@@ -388,7 +388,7 @@ export default function HomePageCardsManager() {
                           setEdit({ ...edit, description: event.target.value })
                         }
                         placeholder="Description"
-                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                       />
                       <div className="flex gap-2">
                         <select
@@ -400,7 +400,7 @@ export default function HomePageCardsManager() {
                           onChange={(event) =>
                             setEdit({ ...edit, icon: event.target.value })
                           }
-                          className="w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm capitalize text-heading outline-none focus:border-[#2f6bce]/60"
+                          className="w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm capitalize text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                         >
                           {iconOptions.map((option) => (
                             <option key={option} value={option}>

@@ -41,8 +41,8 @@ export default function EnrollmentControlPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Enrollment Control</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Enrollment Control</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Manage Free and Paid Course enrollments course-by-course.
       </p>
 
@@ -67,10 +67,10 @@ export default function EnrollmentControlPage() {
             >
               {card.icon}
             </span>
-            <span className="break-words text-base font-extrabold leading-snug text-heading sm:text-lg">
+            <span className="break-words text-base font-extrabold leading-snug text-[#0b1e3a] admin-dark:text-white sm:text-lg">
               {card.title}
             </span>
-            <span className="max-w-[26ch] text-xs leading-relaxed text-neutral-400">
+            <span className="max-w-[26ch] text-xs leading-relaxed text-slate-500 admin-dark:text-slate-400">
               {card.description}
             </span>
           </Link>

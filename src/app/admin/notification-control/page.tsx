@@ -189,8 +189,8 @@ export default function NotificationControlPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Notification Control</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Notification Control</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Send and manage notifications for all students, enrolled students or a
         specific student.
       </p>
@@ -209,10 +209,10 @@ export default function NotificationControlPage() {
                 : "border-ink/10 bg-white admin-dark:bg-[#112544] hover:border-primary-500/40"
             }`}
           >
-            <p className={`text-sm font-bold ${mode === item.key ? "text-primary-300" : "text-heading"}`}>
+            <p className={`text-sm font-bold ${mode === item.key ? "text-primary-700 admin-dark:text-primary-300" : "text-[#0b1e3a] admin-dark:text-white"}`}>
               {item.label}
             </p>
-            <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500 admin-dark:text-slate-400">
               {item.description}
             </p>
           </button>
@@ -221,28 +221,28 @@ export default function NotificationControlPage() {
 
       {/* Compose */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
           {MODES.find((m) => m.key === mode)?.label} Notification
         </h2>
         <div className="mt-4 grid gap-3">
           <label className="block">
-            <span className="text-xs font-semibold text-neutral-500">Title</span>
+            <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Title</span>
             <input
               type="text"
               value={title}
               maxLength={120}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Notification title…"
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60"
             />
           </label>
           {mode === "specific" && (
             <label className="block">
-              <span className="text-xs font-semibold text-neutral-500">Select Student</span>
+              <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Select Student</span>
               <select
                 value={studentEmail}
                 onChange={(event) => setStudentEmail(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60"
               >
                 <option value="">Choose a student…</option>
                 {students.map((student) => (
@@ -254,14 +254,14 @@ export default function NotificationControlPage() {
             </label>
           )}
           <label className="block">
-            <span className="text-xs font-semibold text-neutral-500">Message</span>
+            <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Message</span>
             <textarea
               value={message}
               rows={3}
               maxLength={500}
               onChange={(event) => setMessage(event.target.value)}
               placeholder="Write the notification message…"
-              className="mt-1 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60"
             />
           </label>
           <button
@@ -277,11 +277,11 @@ export default function NotificationControlPage() {
 
       {/* Sent notifications list */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-        <h2 className="text-lg font-bold text-heading">Sent Notifications</h2>
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Sent Notifications</h2>
         {notifications === null ? (
           <AccessLoading label="Loading notifications…" />
         ) : notifications.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-slate-500 admin-dark:text-slate-400">
             No notifications sent yet.
           </p>
         ) : (
@@ -292,18 +292,18 @@ export default function NotificationControlPage() {
                 className="flex items-start gap-3 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 px-4 py-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-heading">
+                  <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                     {notification.title}
                   </p>
-                  <p className="line-clamp-2 text-xs text-neutral-400">{notification.message}</p>
-                  <span className="mt-1 inline-block rounded-md bg-ink/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-neutral-400">
+                  <p className="line-clamp-2 text-xs text-slate-500 admin-dark:text-slate-400">{notification.message}</p>
+                  <span className="mt-1 inline-block rounded-md bg-ink/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
                     {notification.audience}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => void removeNotification(notification.id)}
-                  className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs font-bold text-red-400 transition hover:bg-red-500/15"
+                  className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-500/15 admin-dark:text-red-400"
                 >
                   Delete
                 </button>

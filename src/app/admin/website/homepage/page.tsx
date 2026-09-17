@@ -173,7 +173,7 @@ export default function HomepageManagementPage() {
               className={`${cardClass} ${section.isActive ? "" : "opacity-70"}`}
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-lg bg-[#f1f5f9] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 admin-dark:bg-[#132a4f]">
+                <span className="rounded-lg bg-[#f1f5f9] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400 admin-dark:bg-[#132a4f]">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <h3 className="min-w-0 flex-1 truncate text-sm font-extrabold text-[#0b1e3a] admin-dark:text-zinc-100">
@@ -224,7 +224,7 @@ export default function HomepageManagementPage() {
               {config.editableText ? (
                 <div className="mt-4 grid gap-3">
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Section Title
                     </span>
                     <input
@@ -239,7 +239,7 @@ export default function HomepageManagementPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Section Description
                     </span>
                     <textarea
@@ -255,7 +255,7 @@ export default function HomepageManagementPage() {
                   </label>
                 </div>
               ) : (
-                <p className="mt-3 text-[11px] font-semibold text-slate-500">
+                <p className="mt-3 text-[11px] font-semibold text-slate-500 admin-dark:text-slate-400">
                   Visibility and order only — content is managed separately.
                 </p>
               )}

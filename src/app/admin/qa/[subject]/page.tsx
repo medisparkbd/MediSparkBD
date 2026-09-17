@@ -220,14 +220,14 @@ export default function SubjectQuestionsPage({
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <Link
         href="/admin/qa"
-        className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]"
+        className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
       >
         ← Q&A Control
       </Link>
 
       {state === "invalid" && (
         <div className="mt-6 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-6 text-center">
-          <p className="text-sm font-bold text-yellow-300">
+          <p className="text-sm font-bold text-yellow-700 admin-dark:text-yellow-300">
             Invalid subject / Subject not found
           </p>
           <Link
@@ -241,7 +241,7 @@ export default function SubjectQuestionsPage({
 
       {state === "error" && (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Something went wrong while loading questions.</p>
+          <p className="text-sm text-red-600 admin-dark:text-red-400">Something went wrong while loading questions.</p>
           <button
             type="button"
             onClick={() => void loadSubject()}
@@ -254,10 +254,10 @@ export default function SubjectQuestionsPage({
 
       {state === "ready" && subject && (
         <>
-          <h1 className="mt-3 break-words text-2xl font-extrabold uppercase text-heading">
+          <h1 className="mt-3 break-words text-2xl font-extrabold uppercase text-[#0b1e3a] admin-dark:text-white">
             {subject.name}
           </h1>
-          <p className="mt-1 text-sm text-neutral-400">
+          <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
             Only this subject&apos;s questions are shown — Category → Enrolled
             Course → Subject stays attached to every question.
           </p>
@@ -271,8 +271,8 @@ export default function SubjectQuestionsPage({
                 onClick={() => switchTab(key)}
                 className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
                   tab === key
-                    ? "border-primary-500/60 bg-primary-600/15 text-primary-300"
-                    : "border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 text-neutral-400 hover:border-primary-500/40 hover:text-neutral-200"
+                    ? "border-primary-500/60 bg-primary-600/15 text-primary-700 admin-dark:text-primary-300"
+                    : "border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 text-slate-500 hover:border-primary-500/40 hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
                 }`}
               >
                 {label}
@@ -291,7 +291,7 @@ export default function SubjectQuestionsPage({
               <AccessLoading label="Loading questions…" />
             </div>
           ) : questions.length === 0 ? (
-            <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
+              <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">
               {EMPTY_TEXT[tab]}
             </p>
           ) : (
@@ -305,28 +305,28 @@ export default function SubjectQuestionsPage({
                     className="rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="min-w-0 flex-1 text-sm font-semibold text-heading">
+                      <p className="min-w-0 flex-1 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                         {question.text}
                       </p>
                       <span
                         className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                           question.status === "answered"
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : "bg-yellow-500/15 text-yellow-300"
+                            ? "bg-emerald-500/15 text-emerald-700 admin-dark:text-emerald-300"
+                            : "bg-yellow-500/15 text-yellow-700 admin-dark:text-yellow-300"
                         }`}
                       >
                         {question.status}
                       </span>
                     </div>
 
-                    <p className="mt-1 text-[11px] text-neutral-500">
+                    <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">
                       {question.studentName} · {question.createdAt}
                     </p>
 
                     {(question.categoryName ||
                       question.courseName ||
                       question.subjectName) && (
-                      <p className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] font-semibold text-primary-300/80">
+                      <p className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] font-semibold text-primary-700/80 admin-dark:text-primary-300/80">
                         {[
                           question.categoryName ?? question.categoryId,
                           question.courseName ?? question.courseId,
@@ -335,7 +335,7 @@ export default function SubjectQuestionsPage({
                           .filter((part) => Boolean(part))
                           .map((part, index) => (
                             <span key={`${part}-${index}`} className="flex items-center gap-1">
-                              {index > 0 && <span className="text-neutral-600">→</span>}
+                              {index > 0 && <span className="text-slate-400 admin-dark:text-slate-600">→</span>}
                               <span>{part}</span>
                             </span>
                           ))}
@@ -352,8 +352,8 @@ export default function SubjectQuestionsPage({
                     )}
 
                     {question.answer && !answering && (
-                      <div className="mt-2 rounded-lg bg-ink/5 px-3 py-2 text-xs leading-relaxed text-neutral-300">
-                        <span className="font-bold text-primary-400">
+                      <div className="mt-2 rounded-lg bg-ink/5 px-3 py-2 text-xs leading-relaxed text-slate-600 admin-dark:text-slate-300">
+                        <span className="font-bold text-primary-700 admin-dark:text-primary-400">
                           {question.answer.teacherName}
                           {question.answer.answeredAt
                             ? ` · ${question.answer.answeredAt}`
@@ -380,14 +380,14 @@ export default function SubjectQuestionsPage({
                               ? "Edit the answer…"
                               : "Write a teacher answer…"
                           }
-                          className="mt-3 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                          className="mt-3 w-full resize-none rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60"
                         />
                         <div className="mt-2 flex justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => setAnswerFor(null)}
                             disabled={busy}
-                            className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-neutral-400 transition hover:text-neutral-200 disabled:opacity-50"
+                            className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -409,7 +409,7 @@ export default function SubjectQuestionsPage({
                           type="button"
                           onClick={() => void deleteQuestion(question)}
                           disabled={busy}
-                          className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                            className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-500/20 disabled:opacity-50 admin-dark:text-red-400"
                         >
                           Delete
                         </button>
@@ -417,11 +417,11 @@ export default function SubjectQuestionsPage({
                           type="button"
                           onClick={() => setAnswerFor(question.id)}
                           disabled={busy}
-                          className={`rounded-lg px-4 py-1.5 text-xs font-bold text-white transition disabled:opacity-50 ${
-                            question.status === "answered"
-                              ? "border border-emerald-500/30 bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
-                              : "bg-primary-600 hover:bg-primary-700"
-                          }`}
+                            className={`rounded-lg px-4 py-1.5 text-xs font-bold text-white transition disabled:opacity-50 ${
+                              question.status === "answered"
+                                ? "border border-emerald-500/30 bg-emerald-600/20 text-emerald-800 hover:bg-emerald-600/30 admin-dark:text-emerald-300"
+                                : "bg-primary-600 hover:bg-primary-700"
+                            }`}
                         >
                           {question.status === "answered" ? "View / Edit Answer" : "Answer"}
                         </button>

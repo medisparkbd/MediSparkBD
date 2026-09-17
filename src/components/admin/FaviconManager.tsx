@@ -216,8 +216,8 @@ export default function FaviconManager() {
 
   return (
     <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-      <h2 className="text-lg font-bold text-heading">Favicon</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Favicon</h2>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         The small icon shown in the browser tab and bookmarks.
       </p>
 
@@ -231,10 +231,10 @@ export default function FaviconManager() {
           />
         ) : (
           <div className="text-center">
-            <p className="text-sm font-semibold text-heading">
+            <p className="text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
               Default MediSpark favicon
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
               Upload a custom favicon to replace it.
             </p>
           </div>
@@ -243,34 +243,34 @@ export default function FaviconManager() {
 
       <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-xs text-neutral-500">Status</dt>
+          <dt className="text-xs text-slate-500 admin-dark:text-slate-400">Status</dt>
           <dd
             className={
               activeFaviconUrl
-                ? "mt-0.5 font-semibold text-primary-400"
-                : "mt-0.5 font-semibold text-heading"
+                ? "mt-0.5 font-semibold text-[#1a3a78] admin-dark:text-primary-400"
+                : "mt-0.5 font-semibold text-[#0b1e3a] admin-dark:text-white"
             }
           >
             {activeFaviconUrl ? "Custom favicon" : "Default favicon"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-500">File</dt>
-          <dd className="mt-0.5 font-mono text-xs text-neutral-400">
+          <dt className="text-xs text-slate-500 admin-dark:text-slate-400">File</dt>
+          <dd className="mt-0.5 font-mono text-xs text-slate-600 admin-dark:text-slate-400">
             {activeFaviconUrl ? settings.faviconFileName : "favicon.ico"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-500">Last updated</dt>
-          <dd className="mt-0.5 text-neutral-400">
+          <dt className="text-xs text-slate-500 admin-dark:text-slate-400">Last updated</dt>
+          <dd className="mt-0.5 text-slate-600 admin-dark:text-slate-400">
             {activeFaviconUrl && settings.faviconUpdatedAt
               ? new Date(settings.faviconUpdatedAt).toLocaleString()
               : "Never (using default)"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-neutral-500">Updated by</dt>
-          <dd className="mt-0.5 text-neutral-400">
+          <dt className="text-xs text-slate-500 admin-dark:text-slate-400">Updated by</dt>
+          <dd className="mt-0.5 text-slate-600 admin-dark:text-slate-400">
             {activeFaviconUrl && settings.updatedBy ? settings.updatedBy : "—"}
           </dd>
         </div>
@@ -278,7 +278,7 @@ export default function FaviconManager() {
 
       <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-ink/20 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-6 py-10 text-center transition hover:border-primary-500/50 hover:bg-primary-500/5">
         <svg
-          className="h-8 w-8 text-neutral-500"
+          className="h-8 w-8 text-slate-500 admin-dark:text-slate-400"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
@@ -290,10 +290,10 @@ export default function FaviconManager() {
           <path d="M17 8l-5-5-5 5" />
           <path d="M12 3v12" />
         </svg>
-        <span className="mt-3 text-sm font-semibold text-heading">
+        <span className="mt-3 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
           {busy === "save" ? "Saving…" : selected ? selected.name : "Click to choose a favicon image"}
         </span>
-        <span className="mt-1 text-xs text-neutral-500">
+        <span className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           {selected
             ? `${(selected.size / 1024).toFixed(1)} KB`
             : "ICO, PNG, JPG, WebP, GIF or SVG — max 5 MB"}
@@ -311,8 +311,8 @@ export default function FaviconManager() {
         <p
           className={
             notice.kind === "success"
-              ? "mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-400"
-              : "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400"
+              ? "mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 admin-dark:text-emerald-400"
+              : "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-600 admin-dark:text-red-400"
           }
           role="status"
         >
@@ -334,7 +334,7 @@ export default function FaviconManager() {
             type="button"
             onClick={handleRemove}
             disabled={busy !== null}
-            className="rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl border border-red-500/40 bg-red-500/10 px-6 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 admin-dark:text-red-400"
           >
             {busy === "remove" ? "Restoring…" : "Restore Default Favicon"}
           </button>

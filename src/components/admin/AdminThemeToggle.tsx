@@ -52,7 +52,7 @@ export default function AdminThemeToggle() {
       <span
         aria-hidden
         className={`relative z-10 flex h-8 w-8 items-center justify-center transition-colors duration-300 ${
-          isDark ? "text-white" : "text-slate-400"
+          isDark ? "text-white" : "text-slate-500 admin-dark:text-slate-400"
         }`}
       >
         <svg

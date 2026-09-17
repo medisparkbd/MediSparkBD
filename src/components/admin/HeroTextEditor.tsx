@@ -118,7 +118,7 @@ export default function HeroTextEditor() {
 
             <div className="mt-5 grid gap-4">
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                   Main Heading Line 1
                 </span>
                 <input
@@ -132,7 +132,7 @@ export default function HeroTextEditor() {
                 />
               </label>
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                   Main Heading Line 2
                 </span>
                 <input
@@ -146,7 +146,7 @@ export default function HeroTextEditor() {
                 />
               </label>
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                   Hero Description (বাংলা)
                 </span>
                 <textarea

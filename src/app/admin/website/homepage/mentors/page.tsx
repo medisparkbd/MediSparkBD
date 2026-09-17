@@ -191,7 +191,7 @@ export default function MentorSectionPage() {
   }
 
   const inputClass =
-    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
 
   return (
     <main className="flex-1 bg-[#f1f5f9] admin-dark:bg-[#0a162e]">
@@ -200,10 +200,10 @@ export default function MentorSectionPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Website
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">
             Mentor Section
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Control the mentors section on the homepage — show or hide it,
             edit its title, choose which mentors appear and in what order.
             Changes are saved to MySQL and go live immediately.
@@ -211,7 +211,7 @@ export default function MentorSectionPage() {
         </header>
 
         {!mentorsSection || !mentors ? (
-          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400">
             Failed to load the current settings. Please refresh the page.
           </p>
         ) : (
@@ -219,13 +219,13 @@ export default function MentorSectionPage() {
             <div className="mt-8 space-y-6">
               {/* Visibility */}
               <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-                <h2 className="text-lg font-bold text-heading">Visibility</h2>
+                <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Visibility</h2>
                 <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-4 py-3.5">
                   <span>
-                    <span className="block text-sm font-semibold text-heading">
+                    <span className="block text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                       Show mentors section on the homepage
                     </span>
-                    <span className="mt-0.5 block text-xs text-neutral-500">
+                    <span className="mt-0.5 block text-xs text-slate-500 admin-dark:text-slate-400">
                       When off, the entire mentors section is hidden from visitors.
                     </span>
                   </span>
@@ -254,11 +254,11 @@ export default function MentorSectionPage() {
 
               {/* Section text */}
               <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-                <h2 className="text-lg font-bold text-heading">Section Text</h2>
+                <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Section Text</h2>
 
                 <div className="mt-6 grid gap-5">
                   <label className="block">
-                    <span className="text-xs font-semibold text-neutral-500">Title</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Title</span>
                     <input
                       type="text"
                       value={mentorsSection.title ?? ""}
@@ -270,7 +270,7 @@ export default function MentorSectionPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold text-neutral-500">
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                       Description
                     </span>
                     <textarea
@@ -288,8 +288,8 @@ export default function MentorSectionPage() {
 
               {/* Mentors */}
               <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-                <h2 className="text-lg font-bold text-heading">Mentors</h2>
-                <p className="mt-1 text-xs text-neutral-500">
+                <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Mentors</h2>
+                <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                   Tick the mentors that appear on the homepage and use the
                   arrows to change their display order.
                 </p>
@@ -323,10 +323,10 @@ export default function MentorSectionPage() {
                         {mentor.initials}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-heading">
+                        <span className="block truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                           {mentor.name}
                         </span>
-                        <span className="block truncate text-xs text-neutral-500">
+                        <span className="block truncate text-xs text-slate-500 admin-dark:text-slate-400">
                           {mentor.subject}
                         </span>
                       </span>
@@ -336,7 +336,7 @@ export default function MentorSectionPage() {
                           onClick={() => moveMentor(index, -1)}
                           disabled={index === 0}
                           aria-label={`Move ${mentor.name} up`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink/15 text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink/15 text-slate-500 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                         >
                           ↑
                         </button>
@@ -345,7 +345,7 @@ export default function MentorSectionPage() {
                           onClick={() => moveMentor(index, 1)}
                           disabled={index === mentors.length - 1}
                           aria-label={`Move ${mentor.name} down`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink/15 text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink/15 text-slate-500 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                         >
                           ↓
                         </button>
@@ -359,8 +359,8 @@ export default function MentorSectionPage() {
                 <p
                   className={
                     notice.kind === "success"
-                      ? "rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                      : "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                      ? "rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                      : "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
                   }
                   role="status"
                 >

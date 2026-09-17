@@ -58,8 +58,8 @@ export default function CourseExamAdminPage() {
   if (!course) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-center">
-        <p className="text-sm font-semibold text-red-400">Course not found.</p>
-        <Link href="/admin/exams" className="mt-4 inline-block text-sm font-semibold text-primary-400 hover:underline">
+        <p className="text-sm font-semibold text-red-600 admin-dark:text-red-400">Course not found.</p>
+        <Link href="/admin/exams" className="mt-4 inline-block text-sm font-semibold text-[#1a3a78] hover:underline admin-dark:text-primary-400">
           ← Back to Exams
         </Link>
       </div>
@@ -72,12 +72,12 @@ export default function CourseExamAdminPage() {
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/admin/exams"
-          className="text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
+          className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
         >
           ← Exams
         </Link>
-        <span className="text-neutral-600">/</span>
-        <h1 className="text-2xl font-extrabold text-heading">Course Exams</h1>
+        <span className="text-slate-400 admin-dark:text-slate-500">/</span>
+        <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Course Exams</h1>
       </div>
 
       {/* Course info card */}
@@ -86,10 +86,10 @@ export default function CourseExamAdminPage() {
           <span className="inline-block rounded-md border border-violet-500/40 bg-dark-950/80 px-2.5 py-1 text-xs font-bold text-violet-400">
             {course.category}
           </span>
-          <h2 className="text-lg font-bold text-heading">{course.name}</h2>
-          <span className="text-xs text-neutral-500">({course.slug})</span>
+          <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">{course.name}</h2>
+          <span className="text-xs text-slate-500 admin-dark:text-slate-400">({course.slug})</span>
         </div>
-        <p className="mt-2 text-sm text-neutral-400">
+        <p className="mt-2 text-sm text-slate-500 admin-dark:text-slate-400">
           Manage exams for this course. Exams are linked to chapters and accessible only to enrolled students.
         </p>
       </div>

@@ -172,14 +172,14 @@ export function MediaUploadField({
           {uploading ? "Uploading…" : "⬆ Upload"}
         </button>
         {uploading && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1a3a78] admin-dark:text-[#93c5fd]">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" aria-hidden />
             Uploading…
           </span>
         )}
       </div>
       {error ? (
-        <p className="mt-1 text-xs font-semibold text-red-500" role="alert">{error}</p>
+        <p className="mt-1 text-xs font-semibold text-red-600 admin-dark:text-red-400" role="alert">{error}</p>
       ) : null}
       {showPreview ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -198,7 +198,7 @@ export function MediaUploadField({
         />
       ) : null}
       {preview && value && !isImageUrl(value) && !localPreview && value.startsWith("http") ? (
-        <p className="mt-1 text-xs text-neutral-500">Preview unavailable — file will open on click.</p>
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Preview unavailable — file will open on click.</p>
       ) : null}
     </div>
   );

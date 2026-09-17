@@ -25,10 +25,10 @@ type Application = {
 };
 
 const statusStyles: Record<string, string> = {
-  active: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-  pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  cancelled: "bg-red-500/10 text-red-400 border-red-500/30",
-  completed: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  active: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 admin-dark:text-emerald-400",
+  pending: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30 admin-dark:text-yellow-400",
+  cancelled: "bg-red-500/10 text-red-600 border-red-500/30 admin-dark:text-red-400",
+  completed: "bg-blue-500/10 text-blue-700 border-blue-500/30 admin-dark:text-blue-400",
 };
 
 export default function CourseApplicationsPage({
@@ -133,15 +133,15 @@ export default function CourseApplicationsPage({
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <Link
         href={`/admin/enrollment-control/${kind}`}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-[#1a3a78]"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
       >
         ← {kind === "free" ? "Free Course" : "Paid Course"} Enrollment
       </Link>
 
-      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-heading">
+      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         Applications
       </h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Course-wise enrollment applications for this specific course. Verify
         each payment manually against your bKash/Nagad statement before
         accepting.
@@ -156,8 +156,8 @@ export default function CourseApplicationsPage({
             aria-pressed={filter === value}
             className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
               filter === value
-                ? "border-primary-500/60 bg-primary-600/15 text-primary-300"
-                : "border-ink/15 bg-ink/5 text-neutral-300 hover:border-primary-500/50 hover:text-heading"
+                ? "border-primary-500/60 bg-primary-600/15 text-primary-700 admin-dark:text-primary-300"
+                : "border-ink/15 bg-ink/5 text-slate-600 hover:border-primary-500/50 hover:text-[#1a3a78] admin-dark:text-slate-300 admin-dark:hover:text-white"
             }`}
           >
             {value === "pending" ? "Pending Applications" : "All Applications"}
@@ -166,7 +166,7 @@ export default function CourseApplicationsPage({
       </div>
 
       {error ? (
-        <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <p           className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400">
           Failed to load applications.{" "}
           <button type="button" onClick={() => void load()} className="font-bold underline">
             Retry
@@ -176,10 +176,10 @@ export default function CourseApplicationsPage({
         <AccessLoading label="Loading applicants…" />
       ) : applications.length === 0 ? (
         <div className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-10 text-center">
-          <p className="text-sm font-semibold text-heading">
+          <p className="text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
             No {filter === "pending" ? "pending " : ""}applications
           </p>
-          <p className="mx-auto mt-1 max-w-sm text-xs text-neutral-500">
+          <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 admin-dark:text-slate-400">
             {filter === "pending"
               ? "When a student applies for this course, their application appears here with a badge on the course card."
               : "No applications recorded for this course yet."}
@@ -200,16 +200,16 @@ export default function CourseApplicationsPage({
                   👨‍🎓
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-heading">
+                  <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                     {application.studentName || application.studentUid}
                   </p>
-                  <p className="truncate text-[11px] text-neutral-500">
+                  <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
                     {[application.studentId, application.studentEmail]
                       .filter(Boolean)
                       .join(" · ") || application.studentUid}
                   </p>
                   {application.enrollmentDate ? (
-                    <p className="mt-0.5 text-[11px] text-neutral-600">
+                      <p className="mt-0.5 text-[11px] text-slate-600 admin-dark:text-slate-400">
                       Applied: {new Date(application.enrollmentDate).toLocaleDateString("en-GB")}
                     </p>
                   ) : null}
@@ -217,7 +217,7 @@ export default function CourseApplicationsPage({
                 <span
                   className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${
                     statusStyles[application.status] ??
-                    "border-ink/10 bg-ink/5 text-neutral-300"
+                    "border-ink/10 bg-ink/5 text-slate-500 admin-dark:text-slate-400"
                   }`}
                 >
                   {application.status}
@@ -233,10 +233,10 @@ export default function CourseApplicationsPage({
                 application.paymentSender) && (
                 <dl className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-3 text-xs sm:grid-cols-4">
                   <div className="min-w-0">
-                    <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Payment Method
                     </dt>
-                    <dd className="mt-0.5 truncate font-semibold text-heading">
+                    <dd className="mt-0.5 truncate font-semibold text-[#0b1e3a] admin-dark:text-white">
                       {application.paymentMethod === "bkash"
                         ? "bKash"
                         : application.paymentMethod === "nagad"
@@ -245,28 +245,28 @@ export default function CourseApplicationsPage({
                     </dd>
                   </div>
                   <div className="min-w-0">
-                    <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Transaction ID
                     </dt>
-                    <dd className="mt-0.5 truncate font-mono font-semibold text-heading">
+                    <dd className="mt-0.5 truncate font-mono font-semibold text-[#0b1e3a] admin-dark:text-white">
                       {application.paymentTransactionId || "—"}
                     </dd>
                   </div>
                   <div className="min-w-0">
-                    <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Paid Amount
                     </dt>
-                    <dd className="mt-0.5 truncate font-mono font-semibold text-heading">
+                    <dd className="mt-0.5 truncate font-mono font-semibold text-[#0b1e3a] admin-dark:text-white">
                       {application.paymentAmount != null
                         ? `৳ ${application.paymentAmount}`
                         : "—"}
                     </dd>
                   </div>
                   <div className="min-w-0">
-                    <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
                       Sender Mobile
                     </dt>
-                    <dd className="mt-0.5 truncate font-mono font-semibold text-heading">
+                    <dd className="mt-0.5 truncate font-mono font-semibold text-[#0b1e3a] admin-dark:text-white">
                       {application.paymentSender || "—"}
                     </dd>
                   </div>
@@ -291,7 +291,7 @@ export default function CourseApplicationsPage({
                     type="button"
                     onClick={() => setRejectTarget(application)}
                     disabled={busyId === application.id}
-                    className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/15 disabled:opacity-50"
+                    className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-500/15 disabled:opacity-50 admin-dark:text-red-400"
                   >
                     Reject
                   </button>
@@ -303,7 +303,7 @@ export default function CourseApplicationsPage({
                       void setStatus(application, { status: "cancelled" })
                     }
                     disabled={busyId === application.id}
-                    className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2 text-xs font-bold text-yellow-400 transition hover:bg-yellow-500/15 disabled:opacity-50"
+                    className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2 text-xs font-bold text-yellow-700 transition hover:bg-yellow-500/15 disabled:opacity-50 admin-dark:text-yellow-400"
                   >
                     Revoke Access
                   </button>
@@ -323,13 +323,13 @@ export default function CourseApplicationsPage({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
         >
           <div className="w-full max-w-sm rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-heading">Reject this application?</h2>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              <span className="font-bold text-heading">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Reject this application?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
+              <span className="font-bold text-[#0b1e3a] admin-dark:text-white">
                 {rejectTarget.studentName || rejectTarget.studentUid}
               </span>{" "}
               will be rejected for{" "}
-              <span className="font-semibold text-neutral-200">
+              <span className="font-semibold text-slate-700 admin-dark:text-slate-200">
                 {rejectTarget.courseName}
               </span>
               . No course access will be granted and the application will be
@@ -340,7 +340,7 @@ export default function CourseApplicationsPage({
                 type="button"
                 onClick={() => setRejectTarget(null)}
                 disabled={busyId === rejectTarget.id}
-                className="rounded-xl border border-ink/20 px-5 py-2.5 text-sm font-bold text-neutral-300 transition hover:border-ink/40 hover:text-heading disabled:opacity-50"
+                className="rounded-xl border border-ink/20 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:border-ink/40 hover:text-[#0b1e3a] disabled:opacity-50 admin-dark:text-slate-300 admin-dark:hover:text-white"
               >
                 Cancel
               </button>

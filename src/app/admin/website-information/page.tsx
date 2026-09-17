@@ -49,7 +49,7 @@ const cardTitleClass =
 const inputClass =
   "w-full rounded-xl border border-neutral-200 bg-[#f8fbff] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-400 focus:border-[#2f6bce]/60 focus:bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:focus:bg-[#112544]";
 const labelClass =
-  "block text-[11px] font-bold uppercase tracking-wider text-slate-400 admin-dark:text-slate-500";
+  "block text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400";
 
 export default function WebsiteInformationPage() {
   const toast = useAdminToast();
@@ -452,7 +452,7 @@ export default function WebsiteInformationPage() {
       {/* ── 1. Branding ─────────────────────────────────────────────────── */}
       <section id="branding" className={`${cardClass} mt-6`}>
         <h2 className={cardTitleClass}>Branding</h2>
-        <p className="mt-1 text-xs text-slate-400 admin-dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Name, tagline and visual identity of the website.
         </p>
 
@@ -512,7 +512,7 @@ export default function WebsiteInformationPage() {
                     className="max-h-full max-w-full object-contain p-1"
                   />
                 ) : (
-                  <span className="px-2 text-center text-[10px] text-neutral-500">
+                  <span className="px-2 text-center text-[10px] text-slate-500">
                     No {mode} logo
                   </span>
                 )}
@@ -526,7 +526,7 @@ export default function WebsiteInformationPage() {
                   if (file) void uploadLogo(file, mode);
                 }}
                 disabled={uploading !== null}
-                className="mt-2 w-full cursor-pointer rounded-lg border border-ink/15 bg-[#f8fbff] px-2 py-1.5 text-[11px] text-neutral-300 outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary-600 file:px-2.5 file:py-1 file:text-[10px] file:font-bold file:text-white disabled:opacity-60 admin-dark:bg-[#0f2547]"
+                className="mt-2 w-full cursor-pointer rounded-lg border border-ink/15 bg-[#f8fbff] px-2 py-1.5 text-[11px] text-slate-600 outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary-600 file:px-2.5 file:py-1 file:text-[10px] file:font-bold file:text-white disabled:opacity-60 admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
               />
             </div>
           ))}
@@ -543,7 +543,7 @@ export default function WebsiteInformationPage() {
                   className="max-h-full max-w-full object-contain p-1.5"
                 />
               ) : (
-                <span className="px-2 text-center text-[10px] text-neutral-500">
+                <span className="px-2 text-center text-[10px] text-slate-500">
                   Browser tab icon
                 </span>
               )}
@@ -578,7 +578,7 @@ export default function WebsiteInformationPage() {
       {/* ── 2. Contact Information ──────────────────────────────────────── */}
       <section id="contact" className={`${cardClass} mt-6`}>
         <h2 className={cardTitleClass}>Contact Information</h2>
-        <p className="mt-1 text-xs text-slate-400 admin-dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Shown in the website footer Contact column.
         </p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -619,7 +619,7 @@ export default function WebsiteInformationPage() {
       {/* ── 3. Social Links ─────────────────────────────────────────────── */}
       <section id="social" className={`${cardClass} mt-6`}>
         <h2 className={cardTitleClass}>Social Links</h2>
-        <p className="mt-1 text-xs text-slate-400 admin-dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Links for the “Join With Us Now !!” section and the footer. Each can be enabled or disabled.
         </p>
         <ul className="mt-5 space-y-3">
@@ -689,7 +689,7 @@ export default function WebsiteInformationPage() {
       {/* ── 4. SEO ──────────────────────────────────────────────────────── */}
       <section id="seo" className={`${cardClass} mt-6`}>
         <h2 className={cardTitleClass}>SEO</h2>
-        <p className="mt-1 text-xs text-slate-400 admin-dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Search engine + social sharing metadata.
         </p>
         <div className="mt-5 space-y-4">
@@ -727,7 +727,7 @@ export default function WebsiteInformationPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span className="px-2 text-center text-[11px] text-neutral-500">
+                  <span className="px-2 text-center text-[11px] text-slate-500 admin-dark:text-slate-400">
                     No share image
                   </span>
                 )}
@@ -742,9 +742,9 @@ export default function WebsiteInformationPage() {
                     if (file) void uploadOgImage(file);
                   }}
                   disabled={uploading !== null}
-                  className="w-full cursor-pointer rounded-xl border border-ink/15 bg-[#f8fbff] px-3 py-2.5 text-xs text-neutral-300 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white disabled:opacity-60 admin-dark:bg-[#0f2547]"
+                  className="w-full cursor-pointer rounded-xl border border-ink/15 bg-[#f8fbff] px-3 py-2.5 text-xs text-slate-600 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white disabled:opacity-60 admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
                 />
-                <p className="mt-1.5 text-[11px] text-slate-400 admin-dark:text-slate-500">
+                <p className="mt-1.5 text-[11px] text-slate-500 admin-dark:text-slate-400">
                   Preview shown when the website is shared on social media.
                 </p>
               </div>
@@ -756,7 +756,7 @@ export default function WebsiteInformationPage() {
       {/* ── 5. Footer ───────────────────────────────────────────────────── */}
       <section id="footer" className={`${cardClass} mt-6`}>
         <h2 className={cardTitleClass}>Footer</h2>
-        <p className="mt-1 text-xs text-slate-400 admin-dark:text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           Bottom section description and copyright line.
         </p>
         <div className="mt-5 space-y-4">

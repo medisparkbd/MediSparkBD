@@ -341,7 +341,7 @@ export default function HeroBannerManagementPage() {
         </h3>
         <div className="mt-4 grid gap-3">
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Image *</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Image *</span>
             <input
               ref={newFileRef}
               type="file"
@@ -352,7 +352,7 @@ export default function HeroBannerManagementPage() {
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Title</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Title</span>
               <input
                 type="text"
                 value={newTitle}
@@ -363,7 +363,7 @@ export default function HeroBannerManagementPage() {
               />
             </label>
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Link (optional)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Link (optional)</span>
               <input
                 type="text"
                 value={newHref}
@@ -404,10 +404,10 @@ export default function HeroBannerManagementPage() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-[10px] text-slate-400">{banner.id}</p>
+                  <p className="truncate font-mono text-[10px] text-slate-500 admin-dark:text-slate-400">{banner.id}</p>
                   <div className="mt-2 grid gap-3 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Title</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Title</span>
                       <input
                         type="text"
                         value={banner.title}
@@ -419,7 +419,7 @@ export default function HeroBannerManagementPage() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Link</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Link</span>
                       <input
                         type="text"
                         value={banner.href}

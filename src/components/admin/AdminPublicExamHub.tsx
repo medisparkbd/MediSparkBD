@@ -30,8 +30,8 @@ export default function AdminPublicExamHub() {
       <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-600/30 bg-white admin-dark:bg-[#112544] p-4 shadow-lg shadow-black/20 sm:p-5">
           <div>
-            <h1 className="text-lg font-extrabold text-heading">Public Exams — Admin</h1>
-            <p className="mt-0.5 text-sm text-neutral-400">
+            <h1 className="text-lg font-extrabold text-[#0b1e3a] admin-dark:text-white">Public Exams — Admin</h1>
+            <p className="mt-0.5 text-sm text-slate-500 admin-dark:text-slate-400">
               Same pages students see — plus full management controls.
             </p>
           </div>

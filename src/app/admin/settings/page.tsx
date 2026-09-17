@@ -38,7 +38,7 @@ const EMPTY_FORM: SettingsForm = {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
 
 export default function GeneralSettingsPage() {
   const { user, authLoading } = useAuth();
@@ -174,8 +174,8 @@ export default function GeneralSettingsPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Website
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">General Settings</h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">General Settings</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Manage your website name, tagline, contact details and social links.
             Changes are saved to MySQL and applied immediately across the live
             website. Only authorized administrators can update these settings.
@@ -185,12 +185,12 @@ export default function GeneralSettingsPage() {
         <div className="mt-8 space-y-6">
           {/* Website Identity */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Website Identity</h2>
-            <p className="mt-1 text-xs text-neutral-500">Basic branding that appears across the website.</p>
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Website Identity</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Basic branding that appears across the website.</p>
 
             <div className="mt-6 grid gap-5">
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Website Name *</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Website Name *</span>
                 <input
                   type="text"
                   value={form.siteName}
@@ -201,7 +201,7 @@ export default function GeneralSettingsPage() {
               </label>
 
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Website Tagline</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Website Tagline</span>
                 <textarea
                   value={form.tagline}
                   onChange={(e) => setForm((prev) => ({ ...prev, tagline: e.target.value }))}
@@ -215,12 +215,12 @@ export default function GeneralSettingsPage() {
 
           {/* Contact */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Contact Information</h2>
-            <p className="mt-1 text-xs text-neutral-500">Displayed in the footer and contact areas.</p>
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Contact Information</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Displayed in the footer and contact areas.</p>
 
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Contact Email</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Contact Email</span>
                 <input
                   type="email"
                   value={form.contactEmail}
@@ -230,7 +230,7 @@ export default function GeneralSettingsPage() {
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Contact Phone Number</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Contact Phone Number</span>
                 <input
                   type="tel"
                   value={form.contactPhone}
@@ -244,12 +244,12 @@ export default function GeneralSettingsPage() {
 
           {/* Social Links */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Social Links</h2>
-            <p className="mt-1 text-xs text-neutral-500">Links shown in the footer.</p>
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Social Links</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Links shown in the footer.</p>
 
             <div className="mt-6 grid gap-5">
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Facebook Page URL</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Facebook Page URL</span>
                 <input
                   type="url"
                   value={form.facebookUrl}
@@ -259,7 +259,7 @@ export default function GeneralSettingsPage() {
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">YouTube Channel URL</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">YouTube Channel URL</span>
                 <input
                   type="url"
                   value={form.youtubeUrl}
@@ -275,8 +275,8 @@ export default function GeneralSettingsPage() {
             <p
               className={
                 notice.kind === "success"
-                  ? "rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                  : "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                  ? "rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                  : "rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
               }
               role="status"
             >

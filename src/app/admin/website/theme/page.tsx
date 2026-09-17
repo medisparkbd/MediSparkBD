@@ -158,7 +158,7 @@ export default function ThemeAppearancePage() {
   }
 
   const inputClass =
-    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
 
   const effectivePrimary = settings?.primaryColor || DEFAULT_PRIMARY;
   const effectiveSecondary = settings?.secondaryColor || DEFAULT_SECONDARY;
@@ -170,10 +170,10 @@ export default function ThemeAppearancePage() {
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Website
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">
             Theme &amp; Appearance
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Control the public website&apos;s colors, button style, border
             radius and default light/dark mode. These settings apply to the
             live website only — the Admin Panel keeps its own look.
@@ -181,22 +181,22 @@ export default function ThemeAppearancePage() {
         </header>
 
         {!settings ? (
-          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400">
             Failed to load the current theme settings. Please refresh the page.
           </p>
         ) : (
           <>
             {/* Colors */}
             <section className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Colors</h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Colors</h2>
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 Pick a base color — lighter and darker shades are generated
                 automatically across the website.
               </p>
 
               <div className="mt-6 grid gap-6 sm:grid-cols-2">
                 <div>
-                  <span className="text-xs font-semibold text-neutral-500">
+                  <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Primary color
                   </span>
                   <div className="mt-2 flex items-center gap-3">
@@ -227,14 +227,14 @@ export default function ThemeAppearancePage() {
                   <button
                     type="button"
                     onClick={() => patch({ primaryColor: "" })}
-                    className="mt-2 text-xs font-medium text-neutral-500 transition hover:text-heading"
+                    className="mt-2 text-xs font-medium text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
                   >
                     Reset to default red
                   </button>
                 </div>
 
                 <div>
-                  <span className="text-xs font-semibold text-neutral-500">
+                  <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Secondary color
                   </span>
                   <div className="mt-2 flex items-center gap-3">
@@ -265,7 +265,7 @@ export default function ThemeAppearancePage() {
                   <button
                     type="button"
                     onClick={() => patch({ secondaryColor: "" })}
-                    className="mt-2 text-xs font-medium text-neutral-500 transition hover:text-heading"
+                    className="mt-2 text-xs font-medium text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
                   >
                     Reset to default blue
                   </button>
@@ -274,7 +274,7 @@ export default function ThemeAppearancePage() {
 
               {/* Live preview strip */}
               <div className="mt-6 flex items-center gap-3 rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] p-4">
-                <span className="text-xs font-medium text-neutral-500">
+                <span className="text-xs font-medium text-slate-500 admin-dark:text-slate-400">
                   Preview:
                 </span>
                 <span
@@ -304,7 +304,7 @@ export default function ThemeAppearancePage() {
 
             {/* Button style */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Button Style</h2>
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Button Style</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {BUTTON_STYLE_OPTIONS.map((option) => (
                   <label
@@ -323,10 +323,10 @@ export default function ThemeAppearancePage() {
                       className="mt-1 h-4 w-4 shrink-0 accent-primary-600"
                     />
                     <span>
-                      <span className="block text-sm font-semibold text-heading">
+                      <span className="block text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                         {option.label}
                       </span>
-                      <span className="mt-0.5 block text-xs text-neutral-500">
+                      <span className="mt-0.5 block text-xs text-slate-500 admin-dark:text-slate-400">
                         {option.hint}
                       </span>
                     </span>
@@ -337,7 +337,7 @@ export default function ThemeAppearancePage() {
 
             {/* Border radius */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Border Radius</h2>
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Border Radius</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-4">
                 {RADIUS_OPTIONS.map((option) => (
                   <label
@@ -356,10 +356,10 @@ export default function ThemeAppearancePage() {
                       className="mt-1 h-4 w-4 shrink-0 accent-primary-600"
                     />
                     <span>
-                      <span className="block text-sm font-semibold text-heading">
+                      <span className="block text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                         {option.label}
                       </span>
-                      <span className="mt-0.5 block text-xs text-neutral-500">
+                      <span className="mt-0.5 block text-xs text-slate-500 admin-dark:text-slate-400">
                         {option.hint}
                       </span>
                     </span>
@@ -370,19 +370,19 @@ export default function ThemeAppearancePage() {
 
             {/* Light / Dark — SINGLE toggle */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">
                 Website Theme Mode
               </h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 The default mode for visitors. Visitors can still switch modes
                 with the website theme toggle.
               </p>
               <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-[#f8fbff] p-4 admin-dark:bg-[#0f2547] admin-dark:border-[#1e3a65]">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-heading">
+                  <p className="text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                     {settings.themeMode === "dark" ? "Dark Mode" : "Light Mode"} active
                   </p>
-                  <p className="mt-0.5 text-xs text-neutral-500">
+                  <p className="mt-0.5 text-xs text-slate-500 admin-dark:text-slate-400">
                     {settings.themeMode === "dark"
                       ? "Visitors start in dark mode"
                       : "Visitors start in light mode"}
@@ -431,8 +431,8 @@ export default function ThemeAppearancePage() {
               <p
                 className={
                   notice.kind === "success"
-                    ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                    : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                  ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                  : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
                 }
                 role="status"
               >

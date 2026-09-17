@@ -46,7 +46,7 @@ export default function SectionToggle({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 admin-dark:text-slate-500">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
         {isActive ? "ON" : "OFF"}
       </span>
       <button

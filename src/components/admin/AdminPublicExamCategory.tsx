@@ -116,14 +116,14 @@ export default function AdminPublicExamCategory({
       <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
         <Link
           href="/admin/exams/public"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-[#1a3a78]"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
         >
           ← All Categories
         </Link>
-        <h1 className="mt-3 text-2xl font-extrabold text-heading sm:text-3xl">
+        <h1 className="mt-3 text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white sm:text-3xl">
           {categoryLabels[category]} Public Exams
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
           Live, upcoming and previous exams — click a card to open the same
           details page students see, with management controls.
         </p>
@@ -146,7 +146,7 @@ export default function AdminPublicExamCategory({
               type="button"
               disabled={busy}
               onClick={() => void togglePublish(exam)}
-              className="flex-1 rounded-lg border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs font-bold text-neutral-300 transition hover:border-primary-500/50 hover:text-heading disabled:opacity-50"
+              className="flex-1 rounded-lg border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-primary-500/50 hover:text-[#0b1e3a] admin-dark:text-slate-300 admin-dark:hover:text-white disabled:opacity-50"
             >
               {exam.published ? "Unpublish" : "Publish"}
             </button>
@@ -155,7 +155,7 @@ export default function AdminPublicExamCategory({
               disabled={busy}
               onClick={() => void remove(exam)}
               aria-label={`Delete ${exam.name}`}
-              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
+              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-500/20 disabled:opacity-50 admin-dark:text-red-300"
             >
               Delete
             </button>
@@ -172,7 +172,7 @@ export default function AdminPublicExamCategory({
         <p
           role="status"
           className={`mx-auto max-w-6xl px-4 pb-8 text-sm font-semibold sm:px-6 ${
-            notice.kind === "error" ? "text-red-400" : "text-emerald-400"
+            notice.kind === "error" ? "text-red-600 admin-dark:text-red-400" : "text-emerald-700 admin-dark:text-emerald-400"
           }`}
         >
           {notice.text}

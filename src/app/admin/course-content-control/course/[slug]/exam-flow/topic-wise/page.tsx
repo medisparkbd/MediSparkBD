@@ -48,14 +48,14 @@ export default function TopicSubjectsPage({ params }: { params: Promise<{ slug: 
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href={`${base}`} className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]">
+      <Link href={`${base}`} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
         ← {courseName}
       </Link>
-      <p className="mt-3 text-xs font-bold uppercase tracking-widest text-primary-400">Topic-wise Exam</p>
-      <h1 className="mt-1 break-words text-2xl font-extrabold capitalize text-heading">
+      <p className="mt-3 text-xs font-bold uppercase tracking-widest text-primary-500">Topic-wise Exam</p>
+      <h1 className="mt-1 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         Select Subject
       </h1>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         Same 8 subjects students see on the Main Website. Open a subject to Add / Edit / Delete / Manage its topic-wise exams and questions.
       </p>
 
@@ -69,11 +69,11 @@ export default function TopicSubjectsPage({ params }: { params: Promise<{ slug: 
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-600/15 text-sm font-black text-primary-400 transition group-hover:bg-primary-600 group-hover:text-white">
               {String(index + 1).padStart(2, "0")}
             </span>
-            <span className="text-sm font-extrabold leading-snug text-heading group-hover:text-[#1a3a78]">
+            <span className="text-sm font-extrabold leading-snug text-[#0b1e3a] group-hover:text-[#1a3a78] admin-dark:text-white">
               {subject.title}
             </span>
             {counts && (
-              <span className="rounded-full border border-ink/10 bg-ink/5 px-2.5 py-0.5 text-[11px] font-bold text-neutral-400">
+              <span className="rounded-full border border-ink/10 bg-ink/5 px-2.5 py-0.5 text-[11px] font-bold text-slate-500 admin-dark:text-slate-400">
                 {(counts[subject.key] ?? 0)} exam{(counts[subject.key] ?? 0) === 1 ? "" : "s"}
               </span>
             )}

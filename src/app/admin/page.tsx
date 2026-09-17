@@ -80,7 +80,7 @@ export default function AdminHomePage() {
       {ready && visibleCards.length === 0 && (
         <div className="mt-8 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-6 text-center">
           <p className="text-sm font-bold text-yellow-600 admin-dark:text-yellow-300">No accessible controls for your role.</p>
-          <p className="mt-1 text-xs text-neutral-500">Contact an Admin to grant permissions.</p>
+          <p className="mt-1 text-xs text-yellow-800/70 admin-dark:text-yellow-200/70">Contact an Admin to grant permissions.</p>
         </div>
       )}
       {ready && gate.role === "teacher" && (

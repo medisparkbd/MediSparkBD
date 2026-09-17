@@ -462,7 +462,7 @@ export default function ReviewsManagementPage() {
         <div className="mt-4 grid gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Student Name *</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Student Name *</span>
               <input
                 type="text"
                 value={addForm.studentName}
@@ -472,7 +472,7 @@ export default function ReviewsManagementPage() {
               />
             </label>
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Rating *</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Rating *</span>
               <div className="mt-2">
                 <Stars
                   value={addForm.rating}
@@ -482,7 +482,7 @@ export default function ReviewsManagementPage() {
             </label>
           </div>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Review Text *</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Review Text *</span>
             <textarea
               value={addForm.text}
               rows={3}
@@ -493,7 +493,7 @@ export default function ReviewsManagementPage() {
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Course (optional)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Course (optional)</span>
               <input
                 type="text"
                 value={addForm.courseName}
@@ -504,7 +504,7 @@ export default function ReviewsManagementPage() {
               />
             </label>
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Batch (optional)</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Batch (optional)</span>
               <input
                 type="text"
                 value={addForm.batchLabel}
@@ -516,7 +516,7 @@ export default function ReviewsManagementPage() {
             </label>
           </div>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Student Photo</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Student Photo</span>
             <input
               ref={addPhotoRef}
               type="file"
@@ -563,7 +563,7 @@ export default function ReviewsManagementPage() {
       <ul className="mt-3 space-y-3">
         {reviews.length === 0 && (
           <li className={`${cardClass}`}>
-            <p className="py-4 text-center text-sm font-semibold text-slate-500">
+            <p className="py-4 text-center text-sm font-semibold text-slate-500 admin-dark:text-slate-400">
               No reviews yet. Add the first one above.
             </p>
           </li>
@@ -590,7 +590,7 @@ export default function ReviewsManagementPage() {
                   <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">
                     {review.studentName}
                   </p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-slate-500 admin-dark:text-slate-400">
                     {[review.courseName, review.batchLabel].filter(Boolean).join(" · ") || "—"}
                   </p>
                 </div>
@@ -637,7 +637,7 @@ export default function ReviewsManagementPage() {
                 <div className="mt-3 grid gap-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Student Name</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Student Name</span>
                       <input
                         type="text"
                         value={draft.studentName ?? ""}
@@ -647,7 +647,7 @@ export default function ReviewsManagementPage() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Rating</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Rating</span>
                       <div className="mt-2">
                         <Stars
                           value={draft.rating ?? review.rating}
@@ -657,7 +657,7 @@ export default function ReviewsManagementPage() {
                     </label>
                   </div>
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Review Text</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Review Text</span>
                     <textarea
                       value={draft.text ?? ""}
                       rows={3}
@@ -668,7 +668,7 @@ export default function ReviewsManagementPage() {
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Course</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Course</span>
                       <input
                         type="text"
                         value={draft.courseName ?? ""}
@@ -678,7 +678,7 @@ export default function ReviewsManagementPage() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Batch</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Batch</span>
                       <input
                         type="text"
                         value={draft.batchLabel ?? ""}
@@ -689,7 +689,7 @@ export default function ReviewsManagementPage() {
                     </label>
                   </div>
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Replace Photo</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">Replace Photo</span>
                     <input
                       ref={(el) => {
                         editPhotoRefs.current[review.id] = el;

@@ -266,7 +266,7 @@ export default function PublicExamResultDetailView({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Name, student ID or email…"
-                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"
+                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm text-[#0b1e3a] shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"
               />
             </label>
             <label className="block">
@@ -275,7 +275,7 @@ export default function PublicExamResultDetailView({
                 <select
                   value={sortField}
                   onChange={(event) => setSortField(event.target.value as SortField)}
-                  className="flex-1 rounded-xl border border-[#dbeafe] bg-white px-2 py-2 text-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"
+                  className="flex-1 rounded-xl border border-[#dbeafe] bg-white px-2 py-2 text-sm text-[#0b1e3a] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"
                 >
                   <option value="rank">Rank</option>
                   <option value="marks">Marks</option>
@@ -296,7 +296,7 @@ export default function PublicExamResultDetailView({
               <select
                 value={timerFilter}
                 onChange={(event) => setTimerFilter(event.target.value as TimerFilter)}
-                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"
+                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm text-[#0b1e3a] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"
               >
                 <option value="all">All timers</option>
                 <option value="first">First timer</option>
@@ -308,7 +308,7 @@ export default function PublicExamResultDetailView({
               <select
                 value={submissionFilter}
                 onChange={(event) => setSubmissionFilter(event.target.value as SubmissionFilter)}
-                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]"
+                className="mt-1 w-full rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm text-[#0b1e3a] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"
               >
                 <option value="all">All submissions</option>
                 <option value="manual">Manual submit</option>
@@ -323,13 +323,13 @@ export default function PublicExamResultDetailView({
       )}
 
       {results === null && !error && (
-        <p className={`${cardClass} mt-4 p-6 text-center text-sm text-slate-500`}>
+        <p className={`${cardClass} mt-4 p-6 text-center text-sm text-slate-500 admin-dark:text-slate-400`}>
           Loading…
         </p>
       )}
 
       {notFound && (
-        <p className={`${cardClass} mt-4 p-8 text-center text-sm text-slate-500`}>
+        <p className={`${cardClass} mt-4 p-8 text-center text-sm text-slate-500 admin-dark:text-slate-400`}>
           Exam not found — it may not be a Public Exam.
         </p>
       )}
@@ -344,7 +344,7 @@ export default function PublicExamResultDetailView({
       )}
 
       {results !== null && results.length === 0 && !error && (
-        <p className={`${cardClass} mt-4 p-8 text-center text-sm text-slate-500`}>
+        <p className={`${cardClass} mt-4 p-8 text-center text-sm text-slate-500 admin-dark:text-slate-400`}>
           No Participants Found
         </p>
       )}
@@ -358,12 +358,12 @@ export default function PublicExamResultDetailView({
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${
                       row.rank === 1
-                        ? "bg-amber-400/20 text-amber-600"
+                        ? "bg-amber-400/20 text-amber-600 admin-dark:text-amber-400"
                         : row.rank === 2
-                          ? "bg-zinc-500/15 text-zinc-600"
+                          ? "bg-zinc-500/15 text-zinc-600 admin-dark:text-zinc-300"
                           : row.rank === 3
-                            ? "bg-orange-500/15 text-orange-600"
-                            : "bg-zinc-500/10 text-slate-500"
+                            ? "bg-orange-500/15 text-orange-600 admin-dark:text-orange-400"
+                            : "bg-zinc-500/10 text-slate-500 admin-dark:text-slate-400"
                     }`}
                     title="Merit position"
                   >
@@ -373,7 +373,7 @@ export default function PublicExamResultDetailView({
                     <span className="block truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">
                       {row.studentName || row.studentUid}
                     </span>
-                    <span className="block truncate text-xs text-slate-500">
+                    <span className="block truncate text-xs text-slate-500 admin-dark:text-slate-400">
                       {[row.studentId, row.email].filter(Boolean).join(" · ") || row.studentUid}
                       {" · "}
                       {formatDate(row.submittedAt)}
@@ -383,8 +383,8 @@ export default function PublicExamResultDetailView({
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-extrabold ${
                       row.totalMarks > 0 && row.obtained / row.totalMarks >= 0.6
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : "bg-red-500/10 text-red-500"
+                        ? "bg-emerald-500/10 text-emerald-600 admin-dark:text-emerald-400"
+                        : "bg-red-500/10 text-red-500 admin-dark:text-red-400"
                     }`}
                   >
                     {row.obtained}/{row.totalMarks}
@@ -398,33 +398,33 @@ export default function PublicExamResultDetailView({
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700">
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 admin-dark:text-emerald-400">
                     ✓ {row.correctCount >= 0 ? row.correctCount : "?"} Correct
                   </span>
-                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-600">
+                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-600 admin-dark:text-red-400">
                     ✕ {row.wrongCount >= 0 ? row.wrongCount : "?"} Wrong
                   </span>
-                  <span className="rounded-full bg-zinc-500/10 px-2 py-0.5 text-slate-600">
+                  <span className="rounded-full bg-zinc-500/10 px-2 py-0.5 text-slate-600 admin-dark:text-slate-300">
                     ○ {row.unansweredCount >= 0 ? row.unansweredCount : "?"} Unanswered
                   </span>
                   {row.negativeDeduction > 0 && (
-                    <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-600">
+                    <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-600 admin-dark:text-red-400">
                       Negative −{row.negativeDeduction}
                     </span>
                   )}
                   {row.timerPenalty > 0 && (
-                    <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-orange-600">
+                    <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-orange-600 admin-dark:text-orange-400">
                       2nd Timer −{row.timerPenalty}
                     </span>
                   )}
-                  <span className={`rounded-full px-2 py-0.5 ${row.isSecondTimer ? "bg-orange-500/10 text-orange-600" : "bg-sky-500/10 text-sky-600"}`}>
+                  <span className={`rounded-full px-2 py-0.5 ${row.isSecondTimer ? "bg-orange-500/10 text-orange-600 admin-dark:text-orange-400" : "bg-sky-500/10 text-sky-600 admin-dark:text-sky-400"}`}>
                     {row.isSecondTimer ? "Second Timer" : "First Timer"}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 ${row.submissionType === "auto" ? "bg-amber-500/10 text-amber-700" : "bg-zinc-500/10 text-slate-600"}`}>
+                  <span className={`rounded-full px-2 py-0.5 ${row.submissionType === "auto" ? "bg-amber-500/10 text-amber-700 admin-dark:text-amber-400" : "bg-zinc-500/10 text-slate-600 admin-dark:text-slate-300"}`}>
                     {row.submissionType === "auto" ? "Auto Submitted" : "Manual Submit"}
                   </span>
                   {row.timeTakenSeconds != null && (
-                    <span className="rounded-full bg-primary-600/10 px-2 py-0.5 text-primary-600">
+                    <span className="rounded-full bg-primary-600/10 px-2 py-0.5 text-primary-600 admin-dark:text-primary-300">
                       Time {formatDurationDetailed(row.timeTakenSeconds)}
                     </span>
                   )}
@@ -465,7 +465,7 @@ export default function PublicExamResultDetailView({
             )}
             {detailError && !detailLoading && (
               <div className="mt-6 p-6 text-center">
-                <p className="text-sm font-semibold text-red-500">Something went wrong.</p>
+          <p className="text-sm font-semibold text-red-600 admin-dark:text-red-400">Something went wrong.</p>
                 <button
                   type="button"
                   onClick={() => void openDetail(openStudent)}

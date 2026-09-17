@@ -291,7 +291,7 @@ export default function StudentEnrollmentsPage() {
 
       {/* Assign course */}
       <div className={`${cardClass} mt-6 p-4 sm:p-5`}>
-        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400">
+        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
           Assign a Course
         </h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
@@ -330,7 +330,7 @@ export default function StudentEnrollmentsPage() {
             {assigning ? "Assigning…" : "Assign"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-xs text-slate-500 admin-dark:text-slate-400">
           Assigning activates the course immediately for the selected student.
         </p>
       </div>
@@ -366,7 +366,7 @@ export default function StudentEnrollmentsPage() {
       <ul className="mt-6 space-y-3">
         {enrollments?.length === 0 && (
           <li className={cardClass}>
-            <p className="py-8 text-center text-sm font-semibold text-slate-500">
+            <p className="py-8 text-center text-sm font-semibold text-slate-500 admin-dark:text-slate-400">
               No enrollments found{search ? ` for “${search}”` : ""}.
             </p>
           </li>
@@ -378,7 +378,7 @@ export default function StudentEnrollmentsPage() {
                 <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">
                   {enrollment.courseName}
                 </p>
-                <p className="truncate text-xs text-slate-500">
+                <p className="truncate text-xs text-slate-500 admin-dark:text-slate-400">
                   {enrollment.studentName} · {enrollment.studentId}
                   {enrollment.studentEmail ? ` · ${enrollment.studentEmail}` : ""}
                 </p>
@@ -387,10 +387,10 @@ export default function StudentEnrollmentsPage() {
               <span className="hidden rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase text-slate-500 sm:inline admin-dark:bg-zinc-900 admin-dark:text-zinc-300">
                 {enrollment.courseType}
               </span>
-              <span className="hidden text-xs font-semibold text-slate-500 md:inline">
+              <span className="hidden text-xs font-semibold text-slate-500 admin-dark:text-slate-400 md:inline">
                 {enrollment.fee > 0 ? formatFee(enrollment.fee) : "Free"}
               </span>
-              <span className="hidden text-xs text-slate-400 lg:inline">
+              <span className="hidden text-xs text-slate-500 admin-dark:text-slate-400 lg:inline">
                 {formatDate(enrollment.enrolledAt)}
               </span>
 

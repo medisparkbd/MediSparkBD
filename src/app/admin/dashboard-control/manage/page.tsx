@@ -223,8 +223,8 @@ export default function DashboardCardManagerPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Dashboard Control</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Dashboard Control</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Manage the cards every student sees on their dashboard — Favorites,
         Recently Viewed and any approved custom card. Changes appear on the
         student dashboard immediately.
@@ -232,49 +232,49 @@ export default function DashboardCardManagerPage() {
 
       {/* + Add Card */}
       <div className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">+ Add Card</h2>
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">+ Add Card</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Title
             </span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g. Favorites"
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             />
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Link (internal path)
             </span>
             <input
               value={href}
               onChange={(event) => setHref(event.target.value)}
               placeholder="/dashboard/favourites"
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Description
             </span>
             <input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Short helper text shown on the card"
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             />
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
               Icon
             </span>
             <select
               value={icon}
               onChange={(event) => setIcon(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm capitalize text-heading outline-none focus:border-[#2f6bce]/60"
+              className="mt-1 w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm capitalize text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
             >
               {ICON_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -298,23 +298,23 @@ export default function DashboardCardManagerPage() {
 
       {/* Card list */}
       <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">
           Cards ({cards.length})
         </h2>
 
         {loadError ? (
           <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-            <p className="text-sm text-red-400">Failed to load the cards.</p>
+            <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load the cards.</p>
             <button
               type="button"
               onClick={() => void load()}
-              className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+              className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd]"
             >
               Retry
             </button>
           </div>
         ) : cards.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-neutral-500">
+          <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-slate-500 admin-dark:text-slate-400">
             No dashboard cards yet — students will see nothing. Add one above.
           </p>
         ) : (
@@ -332,7 +332,7 @@ export default function DashboardCardManagerPage() {
                       {renderDashboardIcon(card.icon) as React.ReactNode}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-heading">
+                      <p className="truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                         {card.title}{" "}
                         {!card.isActive && (
                           <span className="ml-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-300">
@@ -340,7 +340,7 @@ export default function DashboardCardManagerPage() {
                           </span>
                         )}
                       </p>
-                      <p className="truncate text-[11px] text-neutral-500">
+                      <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
                         {card.href} · order {card.order}
                         {card.description ? ` · ${card.description}` : ""}
                       </p>
@@ -369,7 +369,7 @@ export default function DashboardCardManagerPage() {
                       type="button"
                       onClick={() => (isEditing ? setEditKey(null) : startEdit(card))}
                       disabled={busy}
-                      className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-50"
+                      className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd] disabled:opacity-50"
                     >
                       {isEditing ? "Cancel" : "Edit"}
                     </button>
@@ -380,7 +380,7 @@ export default function DashboardCardManagerPage() {
                         disabled={busy || busyKey !== null || index === 0}
                         aria-label={`Move ${card.title} up`}
                         title="Move up"
-                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-40"
+                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd] disabled:opacity-40"
                       >
                         ↑
                       </button>
@@ -390,7 +390,7 @@ export default function DashboardCardManagerPage() {
                         disabled={busy || busyKey !== null || index === cards.length - 1}
                         aria-label={`Move ${card.title} down`}
                         title="Move down"
-                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-40"
+                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white hover:border-[#93c5fd] disabled:opacity-40"
                       >
                         ↓
                       </button>
@@ -411,13 +411,13 @@ export default function DashboardCardManagerPage() {
                         value={edit.title}
                         onChange={(event) => setEdit({ ...edit, title: event.target.value })}
                         placeholder="Title"
-                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                       />
                       <input
                         value={edit.href}
                         onChange={(event) => setEdit({ ...edit, href: event.target.value })}
                         placeholder="/dashboard/…"
-                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                       />
                       <input
                         value={edit.description}
@@ -425,13 +425,13 @@ export default function DashboardCardManagerPage() {
                           setEdit({ ...edit, description: event.target.value })
                         }
                         placeholder="Description"
-                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-heading outline-none focus:border-[#2f6bce]/60"
+                        className="rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                       />
                       <div className="flex gap-2">
                         <select
                           value={edit.icon}
                           onChange={(event) => setEdit({ ...edit, icon: event.target.value })}
-                          className="w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm capitalize text-heading outline-none focus:border-[#2f6bce]/60"
+                          className="w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-sm capitalize text-[#0b1e3a] admin-dark:text-white outline-none focus:border-[#2f6bce]/60"
                         >
                           {ICON_OPTIONS.map((option) => (
                             <option key={option} value={option}>

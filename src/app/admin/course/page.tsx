@@ -38,10 +38,9 @@ export default async function AdminCourseControlPage() {
       />
 
       {categories.length === 0 ? (
-        <p className="mt-8 rounded-2xl border border-dashed border-zinc-300 p-8 text-center text-sm text-slate-500 admin-dark:border-zinc-700">
+        <p className="mt-8 rounded-2xl border border-dashed border-zinc-300 p-8 text-center text-sm text-slate-500 admin-dark:border-zinc-700 admin-dark:text-slate-400">
           No active categories found. Create one first.
-        </p>
-      ) : (
+        </p>      ) : (
         <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {categories.map((category) => (
             <Link

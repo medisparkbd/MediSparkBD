@@ -22,9 +22,9 @@ import {
  */
 
 const inputClass =
-  "w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 px-3 py-2 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce] focus:ring-2 focus:ring-primary-500/20";
+  "w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 px-3 py-2 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce] focus:ring-2 focus:ring-primary-500/20";
 const labelClass =
-  "mb-1 block text-xs font-bold uppercase tracking-wider text-neutral-400";
+  "mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400";
 
 export default function PaymentCardPage() {
   const { user, authLoading } = useAuth();
@@ -109,8 +109,8 @@ export default function PaymentCardPage() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Payment Card</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Payment Card</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Edit every element of the student payment card. The preview updates live.
       </p>
 
@@ -120,7 +120,7 @@ export default function PaymentCardPage() {
           {/* bKash */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">bKash</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">bKash</h2>
               <Toggle
                 on={config?.bkashEnabled ?? false}
                 onChange={() => toggleMethod("bkashEnabled")}
@@ -158,7 +158,7 @@ export default function PaymentCardPage() {
           {/* Nagad */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Nagad</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Nagad</h2>
               <Toggle
                 on={config?.nagadEnabled ?? false}
                 onChange={() => toggleMethod("nagadEnabled")}
@@ -196,7 +196,7 @@ export default function PaymentCardPage() {
           {/* Course Fee / Discount */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Course Fee / Discount</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Course Fee / Discount</h2>
               <Toggle
                 on={config?.feeEnabled ?? true}
                 onChange={() => patch({ feeEnabled: !config?.feeEnabled })}
@@ -232,7 +232,7 @@ export default function PaymentCardPage() {
           {/* Coupon */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Coupon</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Coupon</h2>
               <Toggle
                 on={config?.couponEnabled ?? true}
                 onChange={() => patch({ couponEnabled: !config?.couponEnabled })}
@@ -268,7 +268,7 @@ export default function PaymentCardPage() {
           {/* Payable Amount */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Payable Amount</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Payable Amount</h2>
               <Toggle
                 on={config?.payableEnabled ?? true}
                 onChange={() => patch({ payableEnabled: !config?.payableEnabled })}
@@ -306,7 +306,7 @@ export default function PaymentCardPage() {
           {/* Instructions */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Payment Instructions</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Payment Instructions</h2>
               <Toggle
                 on={config?.instructionsEnabled ?? true}
                 onChange={() => patch({ instructionsEnabled: !config?.instructionsEnabled })}
@@ -343,7 +343,7 @@ export default function PaymentCardPage() {
           {/* Transaction ID */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Transaction ID Field</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Transaction ID Field</h2>
               <Toggle
                 on={config?.txEnabled ?? true}
                 onChange={() => patch({ txEnabled: !config?.txEnabled })}
@@ -379,7 +379,7 @@ export default function PaymentCardPage() {
           {/* Payment From Number */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Payment From Number</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Payment From Number</h2>
               <Toggle
                 on={config?.senderEnabled ?? true}
                 onChange={() => patch({ senderEnabled: !config?.senderEnabled })}
@@ -415,7 +415,7 @@ export default function PaymentCardPage() {
           {/* Pending Note */}
           <Section>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-bold text-heading">Pending Validation Note</h2>
+              <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Pending Validation Note</h2>
               <Toggle
                 on={config?.pendingNoteEnabled ?? true}
                 onChange={() => patch({ pendingNoteEnabled: !config?.pendingNoteEnabled })}
@@ -438,7 +438,7 @@ export default function PaymentCardPage() {
 
           {/* Buttons */}
           <Section>
-            <h2 className="text-base font-bold text-heading">Buttons</h2>
+            <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">Buttons</h2>
             <div className="mt-3 space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
@@ -447,7 +447,7 @@ export default function PaymentCardPage() {
                     onChange={() => patch({ cancelEnabled: !config?.cancelEnabled })}
                     label="Cancel Button"
                   />
-                  <span className="text-sm text-heading">Cancel</span>
+                  <span className="text-sm text-[#0b1e3a] admin-dark:text-white">Cancel</span>
                 </div>
                 {config?.cancelEnabled && (
                   <input
@@ -465,7 +465,7 @@ export default function PaymentCardPage() {
                     onChange={() => patch({ submitEnabled: !config?.submitEnabled })}
                     label="Submit Button"
                   />
-                  <span className="text-sm text-heading">Submit</span>
+                  <span className="text-sm text-[#0b1e3a] admin-dark:text-white">Submit</span>
                 </div>
                 {config?.submitEnabled && (
                   <input

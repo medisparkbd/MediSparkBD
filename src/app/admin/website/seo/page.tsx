@@ -16,7 +16,7 @@ type SeoSettings = {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
 
 export default function SeoSettingsPage() {
   const { user, authLoading } = useAuth();
@@ -256,10 +256,10 @@ export default function SeoSettingsPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Website
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">
             SEO Settings
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Control how the website appears on search engines and when its
             pages are shared on social media. Leave a field empty to keep the
             built-in default.
@@ -274,15 +274,15 @@ export default function SeoSettingsPage() {
           <>
             {/* Search engine basics */}
             <section className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Search Engine</h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Search Engine</h2>
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 The website title and description shown in Google/Bing search
                 results and in the browser tab.
               </p>
 
               <div className="mt-6 space-y-5">
                 <div>
-                  <label htmlFor="seo-title" className="text-xs font-semibold text-neutral-500">
+                  <label htmlFor="seo-title" className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Website title
                   </label>
                   <input
@@ -297,7 +297,7 @@ export default function SeoSettingsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="seo-description" className="text-xs font-semibold text-neutral-500">
+                  <label htmlFor="seo-description" className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Meta description
                   </label>
                   <textarea
@@ -309,13 +309,13 @@ export default function SeoSettingsPage() {
                     maxLength={2000}
                     className={inputClass}
                   />
-                  <p className="mt-1 text-xs text-neutral-600">
+                  <p className="mt-1 text-xs text-slate-600 admin-dark:text-slate-400">
                     {settings.metaDescription.length} characters — around 150–160 shows best in search results.
                   </p>
                 </div>
 
                 <div>
-                  <label htmlFor="seo-keywords" className="text-xs font-semibold text-neutral-500">
+                  <label htmlFor="seo-keywords" className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Keywords
                   </label>
                   <textarea
@@ -327,22 +327,22 @@ export default function SeoSettingsPage() {
                     maxLength={1000}
                     className={inputClass}
                   />
-                  <p className="mt-1 text-xs text-neutral-600">Comma-separated keywords.</p>
+                  <p className="mt-1 text-xs text-slate-600 admin-dark:text-slate-400">Comma-separated keywords.</p>
                 </div>
               </div>
             </section>
 
             {/* Open Graph */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Social Sharing (Open Graph)</h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Social Sharing (Open Graph)</h2>
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 How the website looks when shared on Facebook, WhatsApp,
                 Messenger, X and other social platforms.
               </p>
 
               <div className="mt-6 space-y-5">
                 <div>
-                  <label htmlFor="og-title" className="text-xs font-semibold text-neutral-500">
+                  <label htmlFor="og-title" className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Open Graph title
                   </label>
                   <input
@@ -357,7 +357,7 @@ export default function SeoSettingsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="og-description" className="text-xs font-semibold text-neutral-500">
+                  <label htmlFor="og-description" className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Open Graph description
                   </label>
                   <textarea
@@ -372,10 +372,10 @@ export default function SeoSettingsPage() {
                 </div>
 
                 <div>
-                  <span className="text-xs font-semibold text-neutral-500">
+                  <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                     Social sharing image
                   </span>
-                  <p className="mt-0.5 text-xs text-neutral-600">
+                  <p className="mt-0.5 text-xs text-slate-600 admin-dark:text-slate-400">
                     Recommended: 1200×630 PNG or JPG, up to 5 MB.
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -387,7 +387,7 @@ export default function SeoSettingsPage() {
                         className="h-28 w-48 rounded-xl border border-ink/10 object-cover"
                       />
                     ) : (
-                      <span className="flex h-28 w-48 items-center justify-center rounded-xl border border-dashed border-ink/20 text-xs text-neutral-600">
+                      <span className="flex h-28 w-48 items-center justify-center rounded-xl border border-dashed border-ink/20 text-xs text-slate-600 admin-dark:text-slate-400">
                         No image selected
                       </span>
                     )}
@@ -398,7 +398,7 @@ export default function SeoSettingsPage() {
                         accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
                         onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
                         aria-label="Upload social sharing image"
-                        className="block w-full max-w-xs cursor-pointer rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs text-neutral-400 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-50"
+                        className="block w-full max-w-xs cursor-pointer rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3 py-2 text-xs text-slate-500 admin-dark:text-slate-400 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-50"
                         disabled={busy}
                       />
                       {ogImageFile && (
@@ -427,7 +427,7 @@ export default function SeoSettingsPage() {
 
             {/* Share preview */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Share Preview</h2>
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Share Preview</h2>
               <div className="mt-4 overflow-hidden rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547]">
                 {previewImageUrl && (
                   /* eslint-disable-next-line @next/next/no-img-element */
@@ -438,15 +438,15 @@ export default function SeoSettingsPage() {
                   />
                 )}
                 <div className="p-4">
-                  <p className="truncate text-sm font-semibold text-heading">
+                  <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                     {previewTitle}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-neutral-500">
+                  <p className="mt-1 line-clamp-2 text-xs text-slate-500 admin-dark:text-slate-400">
                     {settings.ogDescription ||
                       settings.metaDescription ||
                       "MediSpark is an HSC academic and medical admission preparation platform."}
                   </p>
-                  <p className="mt-2 text-[10px] uppercase tracking-wide text-neutral-600">
+                  <p className="mt-2 text-[10px] uppercase tracking-wide text-slate-600 admin-dark:text-slate-400">
                     medisparkbd.com
                   </p>
                 </div>

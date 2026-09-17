@@ -129,8 +129,8 @@ export default function PapersPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold text-heading">Papers &amp; Materials</h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Papers &amp; Materials</h1>
+        <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
           Manage ১ম/২য় পত্র per subject, assign chapters to papers and manage PDF/materials per chapter.
         </p>
       </header>
@@ -230,7 +230,7 @@ function PapersManager({
 
   return (
     <section className={cardClass}>
-      <h2 className="text-lg font-bold text-heading">Papers</h2>
+      <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Papers</h2>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="block flex-1 min-w-[200px]">
@@ -262,13 +262,13 @@ function PapersManager({
         {papers.map((paper, index) => (
           <li key={paper.id} className="rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-3.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold text-heading">{index + 1}. {paper.name}</span>
-              <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-bold uppercase text-neutral-500">
+              <span className="text-sm font-bold text-[#0b1e3a] admin-dark:text-white">{index + 1}. {paper.name}</span>
+              <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500 admin-dark:text-slate-400">
                 {paper.kind}
               </span>
               <span className="ml-auto flex items-center gap-1.5">
-                <button type="button" disabled={busy || index === 0} onClick={() => void move(paper.id, -1)} className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-neutral-300 disabled:opacity-40" aria-label="Move up">↑</button>
-                <button type="button" disabled={busy || index === papers.length - 1} onClick={() => void move(paper.id, 1)} className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-neutral-300 disabled:opacity-40" aria-label="Move down">↓</button>
+                <button type="button" disabled={busy || index === 0} onClick={() => void move(paper.id, -1)} className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-slate-600 admin-dark:text-slate-300 disabled:opacity-40" aria-label="Move up">↑</button>
+                <button type="button" disabled={busy || index === papers.length - 1} onClick={() => void move(paper.id, 1)} className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-slate-600 admin-dark:text-slate-300 disabled:opacity-40" aria-label="Move down">↓</button>
                 <button
                   type="button"
                   disabled={busy}
@@ -286,13 +286,13 @@ function PapersManager({
             {/* Chapter → paper assignment */}
             {chapters.length > 0 && (
               <div className="mt-3 border-t border-ink/10 pt-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
                   Chapters in this paper
                 </p>
                 <div className="mt-2 space-y-1.5">
                   {chapters.map((chapter) => (
                     <div key={chapter.id} className="flex items-center gap-2 text-sm">
-                      <span className="min-w-0 flex-1 truncate text-neutral-300">{chapter.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-slate-600 admin-dark:text-slate-300">{chapter.name}</span>
                       <select
                         aria-label={`Assign ${chapter.name} to a paper`}
                         value={chapter.paperId ?? ""}
@@ -304,7 +304,7 @@ function PapersManager({
                           });
                           if (ok) await reload();
                         }}
-                        className="rounded-lg border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-2 py-1 text-xs text-heading"
+                        className="rounded-lg border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-2 py-1 text-xs text-[#0b1e3a] admin-dark:text-white"
                       >
                         <option value="">— Not assigned —</option>
                         {papers.map((option) => (
@@ -322,7 +322,7 @@ function PapersManager({
         ))}
       </ul>
       {papers.length === 0 && (
-        <p className="mt-4 text-sm text-neutral-500">No papers yet — add the ১ম/২য় পত্র above.</p>
+        <p className="mt-4 text-sm text-slate-500 admin-dark:text-slate-400">No papers yet — add the ১ম/২য় পত্র above.</p>
       )}
     </section>
   );
@@ -410,7 +410,7 @@ function MaterialsManager({
 
   return (
     <section className={cardClass}>
-      <h2 className="text-lg font-bold text-heading">Materials</h2>
+      <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Materials</h2>
 
       <label className={`${labelClass} mt-4 block`}>
         Chapter
@@ -466,24 +466,24 @@ function MaterialsManager({
           {materials !== null && (
             <ul className="mt-5 space-y-2">
               {materials.length === 0 && (
-                <li className="text-sm text-neutral-500">No materials for this chapter yet.</li>
+                <li className="text-sm text-slate-500 admin-dark:text-slate-400">No materials for this chapter yet.</li>
               )}
               {materials.map((material, index) => (
                 <li key={material.id} className="flex items-center gap-3 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 px-3.5 py-2.5">
-                  <span className="min-w-0 flex-1 truncate text-sm text-neutral-200">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700 admin-dark:text-slate-200">
                     {index + 1}. {material.title}{" "}
                     <span className="inline-flex items-center rounded-full bg-primary-600/15 px-2 py-0.5 text-[10px] font-bold text-primary-400">{material.questionCount ?? 0} Questions</span>{" "}
-                    <span className="text-[10px] font-bold uppercase text-neutral-500">{material.materialType}</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-500 admin-dark:text-slate-400">{material.materialType}</span>
                   </span>
                   <span className="flex shrink-0 gap-1.5">
                     <button type="button" disabled={reorderBusy || index === 0}
                       aria-label={`Move ${material.title} up`}
                       onClick={() => void move(index, -1)}
-                      className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-neutral-300 disabled:opacity-40">↑</button>
+                      className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-slate-600 admin-dark:text-slate-300 disabled:opacity-40">↑</button>
                     <button type="button" disabled={reorderBusy || index === materials.length - 1}
                       aria-label={`Move ${material.title} down`}
                       onClick={() => void move(index, 1)}
-                      className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-neutral-300 disabled:opacity-40">↓</button>
+                      className="rounded-lg border border-ink/15 px-2 py-1 text-xs text-slate-600 admin-dark:text-slate-300 disabled:opacity-40">↓</button>
                     <button
                       type="button"
                       disabled={busy}

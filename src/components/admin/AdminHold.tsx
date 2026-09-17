@@ -166,7 +166,7 @@ export default function AdminHold({
           style={{ left: Math.max(menu.x, 4), top: menu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <p className="border-b border-ink/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+          <p className="border-b border-ink/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
             {label} · Admin
           </p>
           {onEdit || editHref ? (
@@ -178,7 +178,7 @@ export default function AdminHold({
                   setMenu(null);
                   onEdit();
                 }}
-                className="block w-full px-3 py-2 text-left text-xs font-bold text-heading transition hover:bg-primary-600/15 hover:text-primary-300"
+                className="block w-full px-3 py-2 text-left text-xs font-bold text-[#0b1e3a] transition hover:bg-primary-600/15 hover:text-primary-700 admin-dark:text-white admin-dark:hover:text-primary-300"
               >
                 ✎ Edit
               </button>
@@ -187,7 +187,7 @@ export default function AdminHold({
                 href={editHref ?? "#"}
                 role="menuitem"
                 onClick={() => setMenu(null)}
-                className="block w-full px-3 py-2 text-left text-xs font-bold text-heading transition hover:bg-primary-600/15 hover:text-primary-300"
+                className="block w-full px-3 py-2 text-left text-xs font-bold text-[#0b1e3a] transition hover:bg-primary-600/15 hover:text-primary-700 admin-dark:text-white admin-dark:hover:text-primary-300"
               >
                 ✎ Edit
               </Link>
@@ -195,13 +195,13 @@ export default function AdminHold({
           ) : null}
           {removeKind && removeId ? (
             removing ? (
-              <p className="px-3 py-2 text-xs font-bold text-neutral-500">Removing…</p>
+              <p className="px-3 py-2 text-xs font-bold text-slate-500 admin-dark:text-slate-400">Removing…</p>
             ) : (
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => setConfirming(true)}
-                className="block w-full px-3 py-2 text-left text-xs font-bold text-red-400 transition hover:bg-red-500/15"
+                className="block w-full px-3 py-2 text-left text-xs font-bold text-red-600 transition hover:bg-red-500/15 admin-dark:text-red-400"
               >
                 🗑 Remove
               </button>
@@ -213,8 +213,8 @@ export default function AdminHold({
       {confirming && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
           <div className="max-w-sm rounded-2xl border border-red-500/30 bg-white admin-dark:bg-[#112544] p-6 text-center shadow-2xl">
-            <p className="font-bold text-heading">Remove “{label}”?</p>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            <p className="font-bold text-[#0b1e3a] admin-dark:text-white">Remove “{label}”?</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
               This will be removed from MySQL and disappear from the Main
               Website immediately.
             </p>
@@ -222,7 +222,7 @@ export default function AdminHold({
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2.5 text-sm font-semibold text-heading transition hover:bg-ink/10"
+                className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2.5 text-sm font-semibold text-[#0b1e3a] transition hover:bg-ink/10 admin-dark:text-white"
               >
                 Cancel
               </button>

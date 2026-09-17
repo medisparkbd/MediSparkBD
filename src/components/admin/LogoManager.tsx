@@ -198,12 +198,12 @@ function VariantManager({
             mode === "light" ? "bg-yellow-300" : "bg-primary-500"
           }`}
         />
-        <h2 className="text-lg font-bold text-heading">{title}</h2>
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">{title}</h2>
         <span className="rounded-full bg-dark-800 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-neutral-400">
           {current ? "Custom" : "Not set"}
         </span>
       </div>
-      <p className="mt-1 text-xs text-neutral-500">{hint}</p>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">{hint}</p>
 
       {/* Preview — checkerboard makes transparent PNG visible; saved logo stays transparent */}
       <div
@@ -234,7 +234,7 @@ function VariantManager({
             className="max-h-32 w-auto object-contain"
           />
         ) : (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-slate-500">
             No {mode}-mode logo uploaded — the shared logo is shown instead.
           </p>
         )}
@@ -243,20 +243,20 @@ function VariantManager({
       {current && (
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-xs text-neutral-500">File</dt>
-            <dd className="mt-0.5 truncate font-mono text-xs text-neutral-400">
+            <dt className="text-xs text-slate-500 admin-dark:text-slate-400">File</dt>
+            <dd className="mt-0.5 truncate font-mono text-xs text-slate-600 admin-dark:text-slate-400">
               {current.fileName}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-neutral-500">Dimensions</dt>
-            <dd className="mt-0.5 text-neutral-400">
+            <dt className="text-xs text-slate-500 admin-dark:text-slate-400">Dimensions</dt>
+            <dd className="mt-0.5 text-slate-600 admin-dark:text-slate-400">
               {current.width} × {current.height}px
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-neutral-500">Updated</dt>
-            <dd className="mt-0.5 text-neutral-400">
+            <dt className="text-xs text-slate-500 admin-dark:text-slate-400">Updated</dt>
+            <dd className="mt-0.5 text-slate-600 admin-dark:text-slate-400">
               {new Date(current.updatedAt).toLocaleString()}
             </dd>
           </div>
@@ -278,7 +278,7 @@ function VariantManager({
         aria-label="Choose logo image"
       >
         <svg
-          className="h-7 w-7 text-neutral-500"
+          className="h-7 w-7 text-slate-500 admin-dark:text-slate-400"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
@@ -290,10 +290,10 @@ function VariantManager({
           <path d="M17 8l-5-5-5 5" />
           <path d="M12 3v12" />
         </svg>
-        <span className="mt-3 text-sm font-semibold text-heading">
+        <span className="mt-3 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
           {selected ? selected.name : "Click to choose a logo image"}
         </span>
-        <span className="mt-1 text-xs text-neutral-500">
+        <span className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
           {selected
             ? `${(selected.size / 1024).toFixed(1)} KB`
             : "PNG, JPG, WebP, GIF or SVG — max 5 MB"}
@@ -316,8 +316,8 @@ function VariantManager({
         <p
           className={
             notice.kind === "success"
-              ? "mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-400"
-              : "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400"
+              ? "mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 admin-dark:text-emerald-400"
+              : "mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-600 admin-dark:text-red-400"
           }
           role="status"
         >
@@ -339,7 +339,7 @@ function VariantManager({
             type="button"
             onClick={handleRemove}
             disabled={busy !== null}
-            className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 admin-dark:text-red-400"
           >
             {busy === "remove" ? "Removing…" : "Remove"}
           </button>
@@ -356,10 +356,10 @@ export default function LogoManager() {
   return (
     <>
       <div className="rounded-2xl border border-primary-600/30 bg-primary-600/10 p-5">
-        <h1 className="text-base font-extrabold text-heading sm:text-lg">
+        <h1 className="text-base font-extrabold text-[#0b1e3a] admin-dark:text-white sm:text-lg">
           Theme-Based Dual Logo System
         </h1>
-        <p className="mt-1 text-sm leading-relaxed text-neutral-300">
+        <p className="mt-1 text-sm leading-relaxed text-slate-600 admin-dark:text-slate-300">
           Upload a separate logo for each theme. Visitors see the{" "}
           <strong>Light Mode Logo</strong> while using light mode and the{" "}
           <strong>Dark Mode Logo</strong> while using dark mode — switching
@@ -400,8 +400,8 @@ function SharedLogoInfo() {
   };
   return (
     <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-      <h2 className="text-lg font-bold text-heading">Shared Logo (Fallback)</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Shared Logo (Fallback)</h2>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         Used for any theme whose specific logo is not uploaded yet. Manage this
         logo from Admin Panel → Website Settings → Branding.
       </p>
@@ -424,9 +424,9 @@ function SharedLogoInfo() {
           className="max-h-24 w-auto object-contain"
         />
       </div>
-      <p className="mt-3 text-xs text-neutral-500">
+      <p className="mt-3 text-xs text-slate-500 admin-dark:text-slate-400">
         Status:{" "}
-        <span className={isCustom ? "font-semibold text-primary-400" : "font-semibold text-heading"}>
+        <span className={isCustom ? "font-semibold text-[#1a3a78] admin-dark:text-primary-400" : "font-semibold text-[#0b1e3a] admin-dark:text-white"}>
           {isCustom ? "Custom logo" : "Default MediSpark logo"}
         </span>{" "}
         · File: <span className="font-mono">{isCustom ? logo.fileName : "medispark-logo.png"}</span>

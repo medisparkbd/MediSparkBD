@@ -900,12 +900,12 @@ export default function ExamManager({
                     <label className={labelClass} htmlFor="ex-title">Exam Title</label>
                     <input id="ex-title" className={inputClass} value={form.title} placeholder="e.g. Medical Admission Model Test 01"
                       onChange={(event) => setForm({ ...form, title: event.target.value })} />
-                    <p className="mt-1 text-[11px] text-slate-500">Category: <span className="font-bold">{examCategoryLabel(fixedCategory)}</span> (fixed — auto-assigned)</p>
+                    <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Category: <span className="font-bold">{examCategoryLabel(fixedCategory)}</span> (fixed — auto-assigned)</p>
                   </div>
                   <div>
                     <label className={labelClass} htmlFor="ex-id">Exam ID — auto-generated</label>
                     <input id="ex-id" className={`${inputClass} bg-slate-50`} value={form.id} disabled placeholder="auto-generated" />
-                    <p className="mt-1 text-[11px] text-slate-500">{editingId ? "Existing ID (not editable)." : "Auto-generated ID will be used to create question slots Q01..QNN."}</p>
+                    <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">{editingId ? "Existing ID (not editable)." : "Auto-generated ID will be used to create question slots Q01..QNN."}</p>
                   </div>
                   <div className="sm:col-span-2">
                     <MediaUploadField
@@ -1133,7 +1133,7 @@ export default function ExamManager({
                                 }
                               />
                               <span className="truncate">{course.name}</span>
-                              <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400">{course.slug}</span>
+                              <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">{course.slug}</span>
                             </label>
                           ))}
                         </div>
@@ -1145,9 +1145,9 @@ export default function ExamManager({
                       <div>
                         <label className={labelClass} htmlFor="ex-format">Course Flow 4 exam category</label>
                         {fixedFormat ? (
-                          <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-heading">
+                          <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                             {fixedFormat === "topic-wise" ? "Topic-wise Exam" : fixedFormat === "paper-final" ? "Paper Final Exam" : fixedFormat === "subject-final" ? "Subject Final Exam" : "Final Model Test"}
-                            <span className="ml-2 text-[11px] font-semibold text-slate-500">(locked for this page)</span>
+                            <span className="ml-2 text-[11px] font-semibold text-slate-500 admin-dark:text-slate-400">(locked for this page)</span>
                           </p>
                         ) : (
                         <select
@@ -1169,15 +1169,15 @@ export default function ExamManager({
                           <option value="final-model">Final Model Test</option>
                         </select>
                         )}
-                        <p className="mt-1 text-[11px] text-slate-500">Only categorized exams appear in Course Flow 4 courses — one category per exam, never mixed.</p>
+                        <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Only categorized exams appear in Course Flow 4 courses — one category per exam, never mixed.</p>
                       </div>
                       {(form as unknown as { examFormat?: string }).examFormat === "topic-wise" && (
                         <div>
                           <label className={labelClass} htmlFor="ex-topic-subject">Topic subject (1 of 8)</label>
                           {fixedTopicSubject ? (
-                            <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-heading">
+                            <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                               {form.topicSubject || fixedTopicSubject}
-                              <span className="ml-2 text-[11px] font-semibold text-slate-500">(locked for this page)</span>
+                              <span className="ml-2 text-[11px] font-semibold text-slate-500 admin-dark:text-slate-400">(locked for this page)</span>
                             </p>
                           ) : (
                           <select

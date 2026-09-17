@@ -89,13 +89,13 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href="/admin/course-content-control" className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]">
+      <Link href="/admin/course-content-control" className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
         ← Course Content Control
       </Link>
-      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-heading">
+      <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         {courseName}
       </h1>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         Course Flow 4 — <span className="font-bold">Course → Topic-wise / Paper Final / Subject Final / Final Model</span> · Same 4 exam options students see on the Main Website. Open a card to Add / Edit / Delete / Manage its exams and questions.
       </p>
 
@@ -109,12 +109,12 @@ export default function CourseSubjectsPage({ params }: { params: Promise<{ slug:
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-600/15 text-sm font-black text-primary-400 transition group-hover:bg-primary-600 group-hover:text-white">
               {String(index + 1).padStart(2, "0")}
             </span>
-            <span className="text-base font-extrabold text-heading group-hover:text-[#1a3a78]">
+            <span className="text-base font-extrabold text-[#0b1e3a] group-hover:text-[#1a3a78] admin-dark:text-white">
               {format.title}
             </span>
-            <span className="text-xs text-neutral-500">{format.subtitle}</span>
+            <span className="text-xs text-slate-500 admin-dark:text-slate-400">{format.subtitle}</span>
             {formatCounts && (
-              <span className="rounded-full border border-ink/10 bg-ink/5 px-2.5 py-0.5 text-[11px] font-bold text-neutral-400">
+              <span className="rounded-full border border-ink/10 bg-ink/5 px-2.5 py-0.5 text-[11px] font-bold text-slate-500 admin-dark:text-slate-400">
                 {formatCounts[format.key]} exam{formatCounts[format.key] === 1 ? "" : "s"}
               </span>
             )}

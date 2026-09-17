@@ -709,7 +709,7 @@ export default function CourseManager({
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass}>Select Course Content Flow *</label>
-                <p className="mb-3 text-xs text-neutral-500">
+                <p className="mb-3 text-xs text-slate-500 admin-dark:text-slate-400">
                   Choose how content is organized for students. This cannot be changed later without affecting existing content.
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -724,12 +724,12 @@ export default function CourseManager({
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className={`text-sm font-bold ${form.contentLayout === "flow-1" ? "text-primary-300" : "text-heading"}`}>
+                      <span className={`text-sm font-bold ${form.contentLayout === "flow-1" ? "text-primary-700 admin-dark:text-primary-300" : "text-heading"}`}>
                         Flow 1
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-1"
-                          ? "bg-primary-500/20 text-primary-300"
+                          ? "bg-primary-500/20 text-primary-700 admin-dark:text-primary-300"
                           : "bg-ink/10 text-neutral-500"
                       }`}>
                         Direct
@@ -768,12 +768,12 @@ export default function CourseManager({
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className={`text-sm font-bold ${form.contentLayout === "flow-2" ? "text-primary-300" : "text-heading"}`}>
+                      <span className={`text-sm font-bold ${form.contentLayout === "flow-2" ? "text-primary-700 admin-dark:text-primary-300" : "text-heading"}`}>
                         Flow 2
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-2"
-                          ? "bg-primary-500/20 text-primary-300"
+                          ? "bg-primary-500/20 text-primary-700 admin-dark:text-primary-300"
                           : "bg-ink/10 text-neutral-500"
                       }`}>
                         Paper
@@ -814,12 +814,12 @@ export default function CourseManager({
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className={`text-sm font-bold ${form.contentLayout === "flow-3" ? "text-primary-300" : "text-heading"}`}>
+                      <span className={`text-sm font-bold ${form.contentLayout === "flow-3" ? "text-primary-700 admin-dark:text-primary-300" : "text-heading"}`}>
                         Flow 3
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-3"
-                          ? "bg-primary-500/20 text-primary-300"
+                          ? "bg-primary-500/20 text-primary-700 admin-dark:text-primary-300"
                           : "bg-ink/10 text-neutral-500"
                       }`}>
                         Subject
@@ -860,12 +860,12 @@ export default function CourseManager({
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <span className={`text-sm font-bold ${form.contentLayout === "flow-5" ? "text-primary-300" : "text-heading"}`}>
+                      <span className={`text-sm font-bold ${form.contentLayout === "flow-5" ? "text-primary-700 admin-dark:text-primary-300" : "text-heading"}`}>
                         Course Flow 4
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         form.contentLayout === "flow-5"
-                          ? "bg-primary-500/20 text-primary-300"
+                          ? "bg-primary-500/20 text-primary-700 admin-dark:text-primary-300"
                           : "bg-ink/10 text-neutral-500"
                       }`}>
                         Exam Flow

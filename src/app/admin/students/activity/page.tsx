@@ -132,24 +132,24 @@ export default function StudentActivityPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Student Activity</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Student Activity</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Live feed — registrations, course enrollments and exam submissions.
       </p>
 
       {loadError ? (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Failed to load the activity feed.</p>
+          <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load the activity feed.</p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white"
           >
             Retry
           </button>
         </div>
       ) : feed.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
+        <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">
           No student activity recorded yet.
         </p>
       ) : (
@@ -162,19 +162,19 @@ export default function StudentActivityPage() {
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
                   item.kind === "registration"
-                    ? "bg-sky-500/15 text-sky-300"
+                    ? "bg-sky-500/15 text-sky-700 admin-dark:text-sky-300"
                     : item.kind === "enrollment"
-                      ? "bg-emerald-500/15 text-emerald-300"
-                      : "bg-violet-500/15 text-violet-300"
+                      ? "bg-emerald-500/15 text-emerald-700 admin-dark:text-emerald-300"
+                      : "bg-violet-500/15 text-violet-700 admin-dark:text-violet-300"
                 }`}
               >
                 {item.kind}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-heading">{item.title}</p>
-                <p className="truncate text-[11px] text-neutral-500">{item.detail}</p>
+                <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">{item.title}</p>
+                <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">{item.detail}</p>
               </div>
-              <span className="shrink-0 text-[11px] text-neutral-500">{fmt(item.whenMs)}</span>
+              <span className="shrink-0 text-[11px] text-slate-500 admin-dark:text-slate-400">{fmt(item.whenMs)}</span>
             </li>
           ))}
         </ul>

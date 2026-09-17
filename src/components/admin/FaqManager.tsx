@@ -100,7 +100,7 @@ export function FaqVideoPlayer({ url }: { url: string }) {
           />
         )}
       </div>
-      <p className="mt-3 text-center text-xs leading-relaxed text-neutral-500 sm:text-sm">
+      <p className="mt-3 text-center text-xs leading-relaxed text-slate-500 admin-dark:text-slate-400 sm:text-sm">
         ভিডিওটি দেখুন এবং MediSpark-এর সকল সুবিধা সম্পর্কে সহজেই জেনে নিন।
       </p>
     </div>
@@ -413,9 +413,9 @@ export default function FaqManager({
   }
 
   const inputClass =
-    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
   const iconButtonClass =
-    "flex h-8 items-center justify-center gap-1 rounded-lg border border-ink/15 px-2 text-[11px] font-semibold text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30";
+    "flex h-8 items-center justify-center gap-1 rounded-lg border border-ink/15 px-2 text-[11px] font-semibold text-slate-500 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-30";
 
   const deleteTarget = faqs?.find((faq) => faq.id === deleteTargetId) ?? null;
 
@@ -428,10 +428,10 @@ export default function FaqManager({
             <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
               Admin Panel — Content
             </p>
-            <h1 className="mt-2 text-3xl font-extrabold text-heading">
+            <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">
               FAQ Management
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-400">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
               {description}
             </p>
           </div>
@@ -446,7 +446,7 @@ export default function FaqManager({
         </header>
 
         {!faqs ? (
-          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <p className="mt-8 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400">
             Failed to load the current FAQs. Please refresh the page.
           </p>
         ) : (
@@ -473,14 +473,14 @@ export default function FaqManager({
                 <option value="enabled">Enabled</option>
                 <option value="disabled">Disabled</option>
               </select>
-              <span className="ml-auto text-xs font-semibold text-neutral-500">
+              <span className="ml-auto text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                 {visible.length} of {faqs.length} shown · drag rows to reorder
               </span>
             </div>
 
             {/* FAQ table */}
             <section className="mt-5 overflow-hidden rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
-              <div className="hidden grid-cols-[24px_1fr_110px_150px_70px_170px_190px] items-center gap-3 border-b border-ink/10 px-4 py-3 text-[11px] font-extrabold uppercase tracking-wider text-neutral-500 lg:grid">
+              <div className="hidden grid-cols-[24px_1fr_110px_150px_70px_170px_190px] items-center gap-3 border-b border-ink/10 px-4 py-3 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400 lg:grid">
                 <span />
                 <span>Question</span>
                 <span>Type</span>
@@ -491,7 +491,7 @@ export default function FaqManager({
               </div>
 
               {visible.length === 0 ? (
-                <p className="px-4 py-10 text-center text-sm text-neutral-500">
+                <p className="px-4 py-10 text-center text-sm text-slate-500 admin-dark:text-slate-400">
                   {faqs.length === 0
                     ? "No FAQs yet. Press “+ Add FAQ” to create the first one."
                     : "No FAQs match your search or filter."}
@@ -514,23 +514,23 @@ export default function FaqManager({
                       >
                         <span
                           aria-hidden
-                          className="hidden cursor-grab select-none text-center text-neutral-600 lg:block"
+                          className="hidden cursor-grab select-none text-center text-slate-600 admin-dark:text-slate-400 lg:block"
                           title="Drag to reorder"
                         >
                           ⠿
                         </span>
 
                         <span className="min-w-0">
-                          <span className="block break-words text-sm font-bold text-heading">
+                          <span className="block break-words text-sm font-bold text-[#0b1e3a] admin-dark:text-white">
                             {faq.question}
                           </span>
-                          <span className="mt-0.5 block truncate text-xs text-neutral-500">
+                          <span className="mt-0.5 block truncate text-xs text-slate-500 admin-dark:text-slate-400">
                             {stripHtml(faq.answer) ||
                               (faq.videoUrl ? "Video answer" : "")}
                           </span>
                         </span>
 
-                        <span className="w-fit rounded-lg border border-ink/10 bg-ink/5 px-2 py-0.5 text-[11px] font-bold text-neutral-300">
+                        <span className="w-fit rounded-lg border border-ink/10 bg-ink/5 px-2 py-0.5 text-[11px] font-bold text-slate-600 admin-dark:text-slate-300">
                           {ANSWER_TYPE_LABELS[faq.answerType]}
                         </span>
 
@@ -538,8 +538,8 @@ export default function FaqManager({
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                               faq.status === "published"
-                                ? "bg-emerald-500/10 text-emerald-400"
-                                : "bg-yellow-500/10 text-yellow-400"
+                                ? "bg-emerald-500/10 text-emerald-700 admin-dark:text-emerald-400"
+                                : "bg-yellow-500/10 text-yellow-700 admin-dark:text-yellow-400"
                             }`}
                           >
                             {faq.status}
@@ -547,15 +547,15 @@ export default function FaqManager({
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                               faq.isActive
-                                ? "bg-primary-600/10 text-primary-400"
-                                : "bg-red-500/10 text-red-400"
+                                ? "bg-primary-600/10 text-primary-700 admin-dark:text-primary-400"
+                                : "bg-red-500/10 text-red-600 admin-dark:text-red-400"
                             }`}
                           >
                             {faq.isActive ? "Enabled" : "Disabled"}
                           </span>
                         </span>
 
-                        <span className="flex items-center gap-1 text-xs font-semibold text-neutral-400">
+                        <span className="flex items-center gap-1 text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                           <button
                             type="button"
                             onClick={() => moveItem(globalIndex, globalIndex - 1)}
@@ -577,7 +577,7 @@ export default function FaqManager({
                           </button>
                         </span>
 
-                        <span className="text-xs text-neutral-500">
+                        <span className="text-xs text-slate-500 admin-dark:text-slate-400">
                           {formatDate(faq.updatedAt ?? faq.createdAt)}
                         </span>
 
@@ -622,7 +622,7 @@ export default function FaqManager({
                             onClick={() => setDeleteTargetId(faq.id)}
                             disabled={busy}
                             aria-label={`Delete ${faq.question}`}
-                            className="flex h-8 items-center justify-center rounded-lg border border-ink/15 px-2 text-[11px] font-semibold text-red-400 transition hover:border-red-500/60 hover:bg-red-500/10"
+                            className="flex h-8 items-center justify-center rounded-lg border border-ink/15 px-2 text-[11px] font-semibold text-red-600 transition hover:border-red-500/60 hover:bg-red-500/10 admin-dark:text-red-400"
                           >
                             Delete
                           </button>
@@ -638,8 +638,8 @@ export default function FaqManager({
               <p
                 className={
                   notice.kind === "success"
-                    ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                    : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                  ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                  : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
                 }
                 role="status"
               >
@@ -662,12 +662,12 @@ export default function FaqManager({
           }}
         >
           <div className="mx-auto my-4 max-w-2xl rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-heading">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">
               {draft.id ? "Edit FAQ" : "Add FAQ"}
             </h2>
 
             <label className="mt-5 block">
-              <span className="text-xs font-semibold text-neutral-500">Question</span>
+              <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Question</span>
               <input
                 type="text"
                 value={draft.question}
@@ -684,7 +684,7 @@ export default function FaqManager({
 
             {/* Answer type */}
             <fieldset className="mt-5">
-              <legend className="text-xs font-semibold text-neutral-500">
+              <legend className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                 Answer Type
               </legend>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -700,8 +700,8 @@ export default function FaqManager({
                       }
                       className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
                         draft.answerType === type
-                          ? "border-primary-500 bg-primary-600/15 text-primary-400"
-                          : "border-ink/15 text-neutral-400 hover:text-heading"
+                          ? "border-primary-500 bg-primary-600/15 text-primary-700 admin-dark:text-primary-400"
+                          : "border-ink/15 text-slate-500 hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
                       }`}
                     >
                       {ANSWER_TYPE_LABELS[type]}
@@ -714,7 +714,7 @@ export default function FaqManager({
             {/* Rich-text answer */}
             {draft.answerType !== "video" && (
               <div className="mt-5">
-                <span className="text-xs font-semibold text-neutral-500">
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                   Text Answer
                 </span>
                 <div className="mt-2 flex flex-wrap gap-1 rounded-t-xl border border-ink/10 border-b-0 bg-[#f8fbff] admin-dark:bg-[#0f2547] p-2">
@@ -736,7 +736,7 @@ export default function FaqManager({
                         const [cmd, val] = command.split(":");
                         exec(cmd, val);
                       }}
-                      className="rounded-lg border border-ink/10 px-2.5 py-1 text-xs font-semibold text-neutral-300 transition hover:border-[#93c5fd] hover:text-[#1a3a78]"
+                      className="rounded-lg border border-ink/10 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-[#93c5fd] hover:text-[#1a3a78] admin-dark:text-slate-300 admin-dark:hover:text-white"
                     >
                       {label}
                     </button>
@@ -750,7 +750,7 @@ export default function FaqManager({
                         exec("createLink", href);
                       }
                     }}
-                    className="rounded-lg border border-ink/10 px-2.5 py-1 text-xs font-semibold text-neutral-300 transition hover:border-[#93c5fd] hover:text-[#1a3a78]"
+                      className="rounded-lg border border-ink/10 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:border-[#93c5fd] hover:text-[#1a3a78] admin-dark:text-slate-300 admin-dark:hover:text-white"
                   >
                     Link
                   </button>
@@ -772,7 +772,7 @@ export default function FaqManager({
                         : prev,
                     )
                   }
-                  className="prose-invert min-h-[120px] rounded-b-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-3 text-sm leading-relaxed text-neutral-200 outline-none transition focus:border-[#2f6bce]/60 [&_a]:text-primary-400 [&_a]:underline [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+                  className="prose-invert min-h-[120px] rounded-b-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-3 text-sm leading-relaxed text-slate-800 outline-none transition admin-dark:text-zinc-200 focus:border-[#2f6bce]/60 [&_a]:text-primary-400 [&_a]:underline [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
                 />
               </div>
             )}
@@ -780,7 +780,7 @@ export default function FaqManager({
             {/* Video URL */}
             {draft.answerType !== "text" && (
               <label className="mt-5 block">
-                <span className="text-xs font-semibold text-neutral-500">
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                   Video URL
                 </span>
                 <input
@@ -795,7 +795,7 @@ export default function FaqManager({
                   className={inputClass}
                 />
                 <VideoUrlHint url={draft.videoUrl} />
-                <p className="mt-1 text-[11px] text-neutral-600">
+                <p className="mt-1 text-[11px] text-slate-600 admin-dark:text-slate-400">
                   The website shows this inside a responsive 16:9 player — no code needed.
                 </p>
               </label>
@@ -804,7 +804,7 @@ export default function FaqManager({
             {/* Publish + enable defaults for new items */}
             {!draft.id && (
               <div className="mt-5 flex flex-wrap gap-5">
-                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-400">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                   <input
                     type="checkbox"
                     checked={draft.status === "published"}
@@ -824,7 +824,7 @@ export default function FaqManager({
                   />
                   Publish immediately
                 </label>
-                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-400">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                   <input
                     type="checkbox"
                     checked={draft.isActive}
@@ -845,7 +845,7 @@ export default function FaqManager({
                 type="button"
                 onClick={() => setDraft(null)}
                 disabled={busy}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-400 transition hover:text-heading"
+                className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
               >
                 Cancel
               </button>
@@ -876,7 +876,7 @@ export default function FaqManager({
           <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] p-2 shadow-2xl">
             <div className="rounded-2xl border border-primary-600/50 bg-white admin-dark:bg-[#112544] shadow-lg shadow-black/20">
               <div className="flex items-center justify-between gap-4 px-5 py-4 text-left">
-                <span className="font-semibold text-heading">
+                <span className="font-semibold text-[#0b1e3a] admin-dark:text-white">
                   {previewFaq.question}
                 </span>
                 <svg
@@ -892,7 +892,7 @@ export default function FaqManager({
               <div className="px-5 pb-5">
                 {previewFaq.answerType !== "video" && (
                   <div
-                    className="text-sm leading-relaxed text-neutral-300 [&_a]:text-primary-400 [&_a]:underline [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+                    className="text-sm leading-relaxed text-slate-700 admin-dark:text-slate-300 [&_a]:text-primary-700 admin-dark:[&_a]:text-primary-400 [&_a]:underline [&_h2]:text-lg [&_h2]:font-bold [&_h3]:text-base [&_h3]:font-bold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
                     dangerouslySetInnerHTML={{
                       __html: sanitizeFaqHtml(previewFaq.answer),
                     }}
@@ -906,7 +906,7 @@ export default function FaqManager({
             <button
               type="button"
               onClick={() => setPreviewFaq(null)}
-              className="mx-auto mt-3 block rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition hover:border-[#93c5fd] hover:text-heading"
+              className="mx-auto mt-3 block rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition hover:border-[#93c5fd] hover:text-white"
             >
               Close Preview
             </button>

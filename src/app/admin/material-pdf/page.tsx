@@ -586,11 +586,11 @@ D. 150 দিন
             >
               Clear
             </button>
-            <span className="ml-auto self-center text-xs text-slate-400">
+            <span className="ml-auto self-center text-xs text-slate-500 admin-dark:text-slate-400">
               {pasteText.length} chars • Auto renumber 1..N • Detects Ans: / উত্তর: / Correct Answer:
             </span>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Supported answers: <code className="rounded bg-slate-100 px-1">Answer: B</code> <code className="rounded bg-slate-100 px-1">Ans: B</code>{" "}
             <code className="rounded bg-slate-100 px-1">Correct Answer: (B)</code> <code className="rounded bg-slate-100 px-1">Ans. B</code>{" "}
             <code className="rounded bg-slate-100 px-1">উত্তর: খ</code> <code className="rounded bg-slate-100 px-1">উত্তর: গ</code> — if missing, answer stays blank and you can set manually in preview.
@@ -648,7 +648,7 @@ D. 150 দিন
                 ))}
               </div>
               <span className="text-xs text-slate-500 admin-dark:text-[#8da0c0]">— only spacing control • updates pagination automatically</span>
-              <span className="ml-auto text-xs text-slate-400 hidden sm:inline">{spacingLabel} • {lineHeightStyle.toFixed(2)}x</span>
+              <span className="ml-auto text-xs text-slate-500 admin-dark:text-slate-400 hidden sm:inline">{spacingLabel} • {lineHeightStyle.toFixed(2)}x</span>
             </div>
           </div>
         )}

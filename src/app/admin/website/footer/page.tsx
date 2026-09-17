@@ -35,7 +35,7 @@ const EMPTY_FORM: FooterForm = {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+  "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
 
 export default function FooterManagementPage() {
   const { user, authLoading } = useAuth();
@@ -203,8 +203,8 @@ export default function FooterManagementPage() {
     return (
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-4 py-3.5">
         <span>
-          <span className="block text-sm font-semibold text-heading">{label}</span>
-          <span className="mt-0.5 block text-xs text-neutral-500">{hint}</span>
+          <span className="block text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">{label}</span>
+          <span className="mt-0.5 block text-xs text-slate-500 admin-dark:text-slate-400">{hint}</span>
         </span>
         <input
           type="checkbox"
@@ -237,8 +237,8 @@ export default function FooterManagementPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Website
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">Footer</h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Footer</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Manage the website footer — description, contact information,
             social links, custom links, copyright text and column visibility.
             Changes are saved to MySQL and go live immediately.
@@ -248,8 +248,8 @@ export default function FooterManagementPage() {
         <div className="mt-8 space-y-6">
           {/* Description */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Footer Description</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Footer Description</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
               Short text shown under the logo in the footer.
             </p>
             <label className="mt-5 block">
@@ -267,10 +267,10 @@ export default function FooterManagementPage() {
 
           {/* Contact information */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Contact Information</h2>
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Contact Information</h2>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Contact Email</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Contact Email</span>
                 <input
                   type="email"
                   value={form.contactEmail}
@@ -282,7 +282,7 @@ export default function FooterManagementPage() {
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Contact Phone Number</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Contact Phone Number</span>
                 <input
                   type="tel"
                   value={form.contactPhone}
@@ -298,10 +298,10 @@ export default function FooterManagementPage() {
 
           {/* Social links */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Social Links</h2>
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Social Links</h2>
             <div className="mt-6 grid gap-5">
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">Facebook Page URL</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Facebook Page URL</span>
                 <input
                   type="url"
                   value={form.facebookUrl}
@@ -313,7 +313,7 @@ export default function FooterManagementPage() {
                 />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-neutral-500">YouTube Channel URL</span>
+                <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">YouTube Channel URL</span>
                 <input
                   type="url"
                   value={form.youtubeUrl}
@@ -329,8 +329,8 @@ export default function FooterManagementPage() {
 
           {/* Footer links */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Footer Links</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Footer Links</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
               Links shown in the Explore column. If empty, the main navigation
               links are used automatically.
             </p>
@@ -339,7 +339,7 @@ export default function FooterManagementPage() {
               {form.footerLinks.map((link, index) => (
                 <div key={index} className="flex flex-wrap items-end gap-2 rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] p-3">
                   <label className="block min-w-0 flex-[2]">
-                    <span className="text-xs font-semibold text-neutral-500">Label</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Label</span>
                     <input
                       type="text"
                       value={link.label}
@@ -349,7 +349,7 @@ export default function FooterManagementPage() {
                     />
                   </label>
                   <label className="block min-w-0 flex-[3]">
-                    <span className="text-xs font-semibold text-neutral-500">Link</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Link</span>
                     <input
                       type="text"
                       value={link.href}
@@ -364,7 +364,7 @@ export default function FooterManagementPage() {
                       onClick={() => moveLink(index, -1)}
                       disabled={index === 0}
                       aria-label="Move up"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-slate-500 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       ↑
                     </button>
@@ -373,7 +373,7 @@ export default function FooterManagementPage() {
                       onClick={() => moveLink(index, 1)}
                       disabled={index === form.footerLinks.length - 1}
                       aria-label="Move down"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-slate-500 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       ↓
                     </button>
@@ -403,7 +403,7 @@ export default function FooterManagementPage() {
                       footerLinks: [...prev.footerLinks, { label: "", href: "" }],
                     }))
                   }
-                  className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2.5 text-sm font-semibold text-heading transition hover:border-[#93c5fd] hover:bg-ink/10"
+                  className="rounded-xl border border-ink/15 bg-ink/5 px-4 py-2.5 text-sm font-semibold text-[#0b1e3a] admin-dark:text-white transition hover:border-[#93c5fd] hover:bg-ink/10"
                 >
                   + Add Link
                 </button>
@@ -413,8 +413,8 @@ export default function FooterManagementPage() {
 
           {/* Copyright */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Copyright Text</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Copyright Text</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
               Shown at the very bottom of the website. Leave empty to use the
               default “© YEAR MediSpark. All rights reserved.”
             </p>
@@ -433,8 +433,8 @@ export default function FooterManagementPage() {
 
           {/* Visibility */}
           <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-            <h2 className="text-lg font-bold text-heading">Section Visibility</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Section Visibility</h2>
+            <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
               Show or hide individual footer columns.
             </p>
             <div className="mt-5 space-y-3">

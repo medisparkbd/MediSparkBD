@@ -89,8 +89,8 @@ export default function StaffByRolePage({
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-heading">Staff Profiles — {selectedRoleLabel}</h1>
-          <p className="mt-1 text-sm text-neutral-400">
+          <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Staff Profiles — {selectedRoleLabel}</h1>
+          <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
             All staff members assigned to the {selectedRoleLabel} level.
           </p>
         </div>
@@ -104,11 +104,11 @@ export default function StaffByRolePage({
 
       {loadError ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Failed to load staff profiles.</p>
+          <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load staff profiles.</p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white"
           >
             Retry
           </button>
@@ -117,7 +117,7 @@ export default function StaffByRolePage({
         <AccessLoading label="Loading staff profiles…" />
       ) : staff.length === 0 ? (
         <div className={`${cardClass} p-8 text-center`}>
-          <p className="text-sm text-neutral-500">No staff members assigned to {selectedRoleLabel} level.</p>
+          <p className="text-sm text-slate-500 admin-dark:text-slate-400">No staff members assigned to {selectedRoleLabel} level.</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -149,10 +149,10 @@ export default function StaffByRolePage({
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-heading">
+                <p className="truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">
                   {member.displayName || member.email}
                 </p>
-                <p className="truncate text-[11px] text-neutral-500">
+                <p className="truncate text-[11px] text-slate-500 admin-dark:text-slate-400">
                   {member.email}
                   {member.uid && ` · UID: ${member.uid.slice(0, 8)}…`}
                 </p>
@@ -160,18 +160,18 @@ export default function StaffByRolePage({
               <span
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${
                   role === "admin"
-                    ? "border-purple-500/40 bg-purple-500/10 text-purple-400"
+                    ? "border-purple-500/40 bg-purple-500/10 text-purple-700 admin-dark:text-purple-400"
                     : role === "moderator"
-                    ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
-                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                    ? "border-blue-500/40 bg-blue-500/10 text-blue-700 admin-dark:text-blue-400"
+                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 admin-dark:text-emerald-400"
                 }`}
               >
                 {selectedRoleLabel}
               </span>
               <span className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
                 Number(member.isActive) === 1
-                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
-                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-700 hover:bg-yellow-500/20 admin-dark:text-yellow-400"
+                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 admin-dark:text-emerald-400"
               }`}>
                 {Number(member.isActive) === 1 ? "Active" : "Inactive"}
               </span>

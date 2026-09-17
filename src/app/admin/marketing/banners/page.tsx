@@ -265,7 +265,7 @@ export default function PromotionalBannersPage() {
   const inputClass =
     "mt-1 w-full rounded-xl border border-neutral-200 bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-400 focus:border-[#2f6bce]/60 focus:bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100";
   const labelClass =
-    "block text-xs font-semibold uppercase tracking-wider text-slate-400";
+    "block text-xs font-semibold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400";
   const iconButtonClass =
     "flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 text-slate-500 transition hover:border-[#93c5fd] hover:text-[#1a3a78] disabled:cursor-not-allowed disabled:opacity-30 admin-dark:border-zinc-700 admin-dark:text-slate-400";
   const cardClass =
@@ -286,7 +286,7 @@ export default function PromotionalBannersPage() {
 
       {/* Upload */}
       <div className={`${cardClass} mt-6 p-4 sm:p-5`}>
-        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400">
+        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400">
           Add Banner
         </h3>
         <div className="mt-3 grid gap-3">
@@ -485,7 +485,7 @@ export default function PromotionalBannersPage() {
                     }
                     className="h-4 w-4 accent-primary-600"
                   />
-                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
                     Show on website
                   </span>
                 </label>

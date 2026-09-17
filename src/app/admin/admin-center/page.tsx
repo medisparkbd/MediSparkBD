@@ -78,8 +78,8 @@ export default function AdminCenterPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Admin Center</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Admin Center</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Manage staff roles, permissions and admin accounts.
       </p>
 
@@ -103,10 +103,10 @@ export default function AdminCenterPage() {
               </span>
 
               {/* Title + count */}
-              <h2 className="mt-4 text-lg font-extrabold text-heading">
+              <h2 className="mt-4 text-lg font-extrabold text-[#0b1e3a] admin-dark:text-white">
                 {role.label}
               </h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 {count} {count === 1 ? "user" : "users"}
               </p>
 
@@ -132,13 +132,13 @@ export default function AdminCenterPage() {
 
       {/* Quick info */}
       <div className={`${cardClass} mt-6 p-5`}>
-        <h3 className="text-sm font-extrabold text-heading">How it works</h3>
-        <ul className="mt-2 space-y-1.5 text-xs text-neutral-500">
+        <h3 className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">How it works</h3>
+        <ul className="mt-2 space-y-1.5 text-xs text-slate-500 admin-dark:text-slate-400">
           <li>
-            <span className="font-bold text-heading">View [Users]</span> — See all registered users under that role, with an option to add new ones.
+            <span className="font-bold text-[#0b1e3a] admin-dark:text-white">View [Users]</span> — See all registered users under that role, with an option to add new ones.
           </li>
           <li>
-            <span className="font-bold text-heading">[Role] Roles</span> — Configure permissions for each role level (what each role can access).
+            <span className="font-bold text-[#0b1e3a] admin-dark:text-white">[Role] Roles</span> — Configure permissions for each role level (what each role can access).
           </li>
         </ul>
       </div>

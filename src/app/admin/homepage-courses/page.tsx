@@ -281,14 +281,14 @@ export default function HomepageCoursesAdminPage() {
       <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
         <header className="animate-fade-up">
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Admin Panel — Homepage</p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">Homepage Courses</h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Homepage Courses</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Manage the 3 category cards shown on the main website Homepage. Changes are saved to MySQL and appear
             automatically on the Homepage. Only authorized administrators can update these cards. This is not part of the
             Academic Panel.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] px-3 py-1 text-xs font-semibold text-neutral-500">
+            <span className="rounded-full border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] px-3 py-1 text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
               3 fixed categories: SSC · HSC · Medical
             </span>
             <span className="rounded-full border border-primary-500/20 bg-primary-500/10 px-3 py-1 text-xs font-semibold text-primary-400">
@@ -301,8 +301,8 @@ export default function HomepageCoursesAdminPage() {
           <p
             className={
               globalNotice.kind === "success"
-                ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
             }
             role="status"
           >
@@ -324,10 +324,10 @@ export default function HomepageCoursesAdminPage() {
                     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${slugBadgeColor(card.slug)}`}>
                       {card.slug.toUpperCase()}
                     </span>
-                    <h2 className="text-base font-bold text-heading">{slugLabel(card.slug)}</h2>
+                    <h2 className="text-base font-bold text-[#0b1e3a] admin-dark:text-white">{slugLabel(card.slug)}</h2>
                   </div>
                   <label className="flex cursor-pointer items-center gap-3">
-                    <span className="text-xs font-semibold text-neutral-500">Active</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Active</span>
                     <button
                       type="button"
                       role="switch"
@@ -343,7 +343,7 @@ export default function HomepageCoursesAdminPage() {
                         }`}
                       />
                     </button>
-                    <span className={`text-xs font-semibold ${card.isActive ? "text-emerald-400" : "text-neutral-500"}`}>
+                    <span className={`text-xs font-semibold ${card.isActive ? "text-emerald-700 admin-dark:text-emerald-400" : "text-slate-500 admin-dark:text-slate-400"}`}>
                       {card.isActive ? "Visible on Homepage" : "Hidden"}
                     </span>
                   </label>
@@ -352,7 +352,7 @@ export default function HomepageCoursesAdminPage() {
                 <div className="p-6">
                   {/* Image */}
                   <div className="mb-6">
-                    <p className="text-xs font-semibold text-neutral-500">Card Image</p>
+                    <p className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Card Image</p>
                     <div className="mt-2 flex min-h-44 items-center justify-center overflow-hidden rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]">
                       {displayImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -362,22 +362,22 @@ export default function HomepageCoursesAdminPage() {
                           className="h-44 w-full object-cover sm:h-56"
                         />
                       ) : (
-                        <span className="px-6 py-10 text-center text-sm text-neutral-500">
+                        <span className="px-6 py-10 text-center text-sm text-slate-500 admin-dark:text-slate-400">
                           No image uploaded yet. Upload an image to display on the Homepage card.
                         </span>
                       )}
                     </div>
                     {card.imageFileName && !previewUrl && (
-                      <p className="mt-2 text-center font-mono text-xs text-neutral-500">{card.imageFileName}</p>
+                      <p className="mt-2 text-center font-mono text-xs text-slate-500 admin-dark:text-slate-400">{card.imageFileName}</p>
                     )}
                     {previewUrl && fileBySlug[card.slug] && (
-                      <p className="mt-2 text-center font-mono text-xs text-neutral-500">
+                      <p className="mt-2 text-center font-mono text-xs text-slate-500 admin-dark:text-slate-400">
                         Preview — {fileBySlug[card.slug]?.name} • {((fileBySlug[card.slug]?.size ?? 0) / 1024).toFixed(1)} KB
                       </p>
                     )}
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <label className="cursor-pointer rounded-xl border border-dashed border-ink/20 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-4 py-2.5 text-sm font-semibold text-neutral-300 transition hover:border-primary-500/50 hover:text-heading">
+                      <label className="cursor-pointer rounded-xl border border-dashed border-ink/20 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-primary-500/50 hover:text-[#0b1e3a] admin-dark:text-slate-300 admin-dark:hover:text-white">
                         {fileBySlug[card.slug] ? fileBySlug[card.slug]?.name : "Choose image"}
                         <input
                           ref={(el) => {
@@ -393,7 +393,7 @@ export default function HomepageCoursesAdminPage() {
                         <button
                           type="button"
                           onClick={() => handleFileChange(card.slug, undefined)}
-                          className="text-sm font-semibold text-neutral-500 transition hover:text-heading"
+                          className="text-sm font-semibold text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white"
                         >
                           Clear
                         </button>
@@ -403,63 +403,63 @@ export default function HomepageCoursesAdminPage() {
                           type="button"
                           onClick={() => handleRemoveImage(card.slug)}
                           disabled={isBusy}
-                          className="text-sm font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-50"
+                          className="text-sm font-semibold text-red-600 transition hover:text-red-700 admin-dark:text-red-400 admin-dark:hover:text-red-300 disabled:opacity-50"
                         >
                           {isBusy ? "Removing…" : "Remove image"}
                         </button>
                       )}
                     </div>
-                    <p className="mt-2 text-xs text-neutral-600">PNG, JPG, WebP, GIF or SVG — max 5 MB. Recommended 600×400.</p>
+                    <p className="mt-2 text-xs text-slate-600 admin-dark:text-slate-400">PNG, JPG, WebP, GIF or SVG — max 5 MB. Recommended 600×400.</p>
                   </div>
 
                   <div className="grid gap-5">
                     <label className="block">
-                      <span className="text-xs font-semibold text-neutral-500">Title *</span>
+                      <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Title *</span>
                       <input
                         type="text"
                         value={card.title}
                         onChange={(e) => updateCard(card.slug, { title: e.target.value })}
                         placeholder={slugLabel(card.slug)}
                         maxLength={255}
-                        className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60"
+                        className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60"
                       />
                     </label>
 
                     <label className="block">
-                      <span className="text-xs font-semibold text-neutral-500">Short Description *</span>
+                      <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Short Description *</span>
                       <textarea
                         value={card.description}
                         onChange={(e) => updateCard(card.slug, { description: e.target.value })}
                         placeholder="Short description shown on the Homepage card..."
                         rows={3}
                         maxLength={1000}
-                        className="mt-1 w-full resize-none rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60"
+                        className="mt-1 w-full resize-none rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60"
                       />
-                      <span className="mt-1 block text-right text-xs text-neutral-600">{card.description.length}/1000</span>
+                      <span className="mt-1 block text-right text-xs text-slate-600 admin-dark:text-slate-400">{card.description.length}/1000</span>
                     </label>
 
                     <div className="grid gap-5 sm:grid-cols-2">
                       <label className="block">
-                        <span className="text-xs font-semibold text-neutral-500">Button Text *</span>
+                        <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Button Text *</span>
                         <input
                           type="text"
                           value={card.buttonText}
                           onChange={(e) => updateCard(card.slug, { buttonText: e.target.value })}
                           placeholder="Explore Courses"
                           maxLength={100}
-                          className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60"
+                          className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60"
                         />
                       </label>
                       <label className="block">
-                        <span className="text-xs font-semibold text-neutral-500">Button Link *</span>
+                        <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Button Link *</span>
                         <input
                           type="text"
                           value={card.buttonHref}
                           onChange={(e) => updateCard(card.slug, { buttonHref: e.target.value })}
                           placeholder="/courses?category=ssc"
-                          className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60"
+                          className="mt-1 w-full rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60"
                         />
-                        <span className="mt-1 block text-xs text-neutral-600">Use /courses or https:// link</span>
+                        <span className="mt-1 block text-xs text-slate-600 admin-dark:text-slate-400">Use /courses or https:// link</span>
                       </label>
                     </div>
                   </div>
@@ -468,8 +468,8 @@ export default function HomepageCoursesAdminPage() {
                     <p
                       className={
                         notice.kind === "success"
-                          ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-400"
-                          : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400"
+                          ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                          : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-600 admin-dark:text-red-400"
                       }
                       role="status"
                     >

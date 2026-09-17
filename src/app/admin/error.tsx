@@ -20,13 +20,13 @@ export default function AdminError({
 
   return (
     <section className="mx-auto flex max-w-xl flex-col items-center px-4 py-20 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/15 text-2xl text-red-400">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/15 text-2xl text-red-600 admin-dark:text-red-400">
         !
       </span>
-      <h1 className="mt-5 text-xl font-extrabold text-heading">
+      <h1 className="mt-5 text-xl font-extrabold text-[#0b1e3a] admin-dark:text-white">
         Something went wrong
       </h1>
-      <p className="mt-2 break-all text-sm leading-relaxed text-neutral-400">
+      <p className="mt-2 break-all text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
         {error.message || "The page could not be rendered."}
         {error.digest ? ` (ref: ${error.digest})` : ""}
       </p>
@@ -40,7 +40,7 @@ export default function AdminError({
         </button>
         <Link
           href="/admin"
-          className="rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-bold text-heading transition hover:border-[#93c5fd]"
+          className="rounded-xl border border-ink/15 px-5 py-2.5 text-sm font-bold text-[#0b1e3a] transition hover:border-[#93c5fd] admin-dark:text-white"
         >
           Back to Admin Home
         </Link>

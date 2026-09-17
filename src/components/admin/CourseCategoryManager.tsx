@@ -280,7 +280,7 @@ export default function CourseCategoryManager({
   }
 
   const inputClass =
-    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none transition placeholder:text-neutral-600 focus:border-[#2f6bce]/60";
+    "mt-1 w-full rounded-xl border border-ink/10 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-500 admin-dark:text-white admin-dark:placeholder:text-slate-400 focus:border-[#2f6bce]/60";
   const iconButtonClass =
     "flex h-8 w-8 items-center justify-center rounded-lg border border-ink/15 text-neutral-400 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-30";
 
@@ -291,8 +291,8 @@ export default function CourseCategoryManager({
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
             Admin Panel — Courses
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-heading">Categories</h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+          <h1 className="mt-2 text-3xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Categories</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Organize courses into categories for the website — create, edit,
             delete, enable or disable categories, change their image and change
             their display order. Changes go live immediately.
@@ -307,11 +307,11 @@ export default function CourseCategoryManager({
           <>
             {/* Add form */}
             <div className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">New Category</h2>
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">New Category</h2>
               {adding ? (
                 <div className="mt-5 grid gap-5 sm:grid-cols-2">
                   <label className="block">
-                    <span className="text-xs font-semibold text-neutral-500">Name *</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Name *</span>
                     <input
                       type="text"
                       value={addDraft.name}
@@ -321,7 +321,7 @@ export default function CourseCategoryManager({
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs font-semibold text-neutral-500">Slug (optional)</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Slug (optional)</span>
                     <input
                       type="text"
                       value={addDraft.slug}
@@ -331,7 +331,7 @@ export default function CourseCategoryManager({
                     />
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="text-xs font-semibold text-neutral-500">Description</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Description</span>
                     <textarea
                       value={addDraft.description}
                       onChange={(e) =>
@@ -343,7 +343,7 @@ export default function CourseCategoryManager({
                     />
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="text-xs font-semibold text-neutral-500">
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">
                       Link (optional — defaults to /courses/&lt;slug&gt;)
                     </span>
                     <input
@@ -355,13 +355,13 @@ export default function CourseCategoryManager({
                     />
                   </label>
                   <label className="block sm:col-span-2">
-                    <span className="text-xs font-semibold text-neutral-500">Image (optional)</span>
+                    <span className="text-xs font-semibold text-slate-500 admin-dark:text-slate-400">Image (optional)</span>
                     <input
                       ref={imageInputRef}
                       type="file"
                       accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
                       onChange={(e) => setAddFile(e.target.files?.[0] ?? null)}
-                      className="mt-1 block w-full text-sm text-neutral-400 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-400"
+                      className="mt-1 block w-full text-sm text-slate-500 admin-dark:text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-700 admin-dark:file:text-primary-300"
                     />
                   </label>
                   <div className="flex flex-wrap gap-3 sm:col-span-2">
@@ -381,7 +381,7 @@ export default function CourseCategoryManager({
                         setAddFile(null);
                       }}
                       disabled={busy}
-                      className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-400 transition hover:text-heading disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition hover:text-[#0b1e3a] admin-dark:text-slate-400 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -392,7 +392,7 @@ export default function CourseCategoryManager({
                   type="button"
                   onClick={() => setAdding(true)}
                   disabled={busy}
-                  className="mt-4 rounded-xl border border-ink/15 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition hover:border-[#93c5fd] hover:text-heading disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-4 rounded-xl border border-ink/15 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-[#93c5fd] hover:text-[#0b1e3a] admin-dark:text-slate-300 admin-dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   + Add New Category
                 </button>
@@ -401,14 +401,14 @@ export default function CourseCategoryManager({
 
             {/* Category list */}
             <section className="mt-6 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6">
-              <h2 className="text-lg font-bold text-heading">Category List</h2>
-              <p className="mt-1 text-xs text-neutral-500">
+              <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Category List</h2>
+              <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
                 Use the checkbox to enable or disable a category, the arrows to
                 change display order, the pencil to edit and ✕ to delete.
               </p>
 
               {categories.length === 0 ? (
-                <p className="mt-5 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-neutral-500">
+                <p className="mt-5 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-slate-500 admin-dark:text-slate-400">
                   No categories yet. Use &quot;+ Add New Category&quot; above to create one.
                 </p>
               ) : (
@@ -487,7 +487,7 @@ export default function CourseCategoryManager({
                               type="button"
                               onClick={() => setEditingId(null)}
                               disabled={busy}
-                              className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-400 transition hover:text-heading disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-400 transition hover:text-heading disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Cancel
                             </button>
@@ -543,8 +543,8 @@ export default function CourseCategoryManager({
               <p
                 className={
                   notice.kind === "success"
-                    ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
-                    : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                    ? "mt-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 admin-dark:text-emerald-400"
+                    : "mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400"
                 }
                 role="status"
               >

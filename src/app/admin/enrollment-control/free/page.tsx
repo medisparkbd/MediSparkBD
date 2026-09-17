@@ -85,23 +85,23 @@ export default function FreeEnrollmentPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Free Course Enrollment</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Free Course Enrollment</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         Auto Enrollment switch and course-wise manual enrollment.
       </p>
 
       {/* Auto Enrollment */}
       <div className="mt-8 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-6 shadow-lg shadow-black/20">
-        <h2 className="text-lg font-bold text-heading">Auto Enrollment</h2>
+        <h2 className="text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Auto Enrollment</h2>
         <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-4">
           <div>
-            <p className="font-semibold text-heading">
+            <p className="font-semibold text-[#0b1e3a] admin-dark:text-white">
               Auto Enrollment is{" "}
-              <span className={freeAutoEnroll ? "text-emerald-400" : "text-yellow-400"}>
+              <span className={freeAutoEnroll ? "text-emerald-600 admin-dark:text-emerald-400" : "text-yellow-600 admin-dark:text-yellow-400"}>
                 {freeAutoEnroll === null ? "…" : freeAutoEnroll ? "ON" : "OFF"}
               </span>
             </p>
-            <p className="mt-0.5 text-xs text-neutral-400">
+            <p className="mt-0.5 text-xs text-slate-500 admin-dark:text-slate-400">
               ON → eligible students are enrolled into free courses instantly.
               OFF → every free enrollment waits for your approval below.
             </p>
@@ -127,8 +127,8 @@ export default function FreeEnrollmentPage() {
       </div>
 
       {/* Manual enrollment — Category → Course → Applications */}
-      <h2 className="mt-8 text-lg font-bold text-heading">Manual Enrollment</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <h2 className="mt-8 text-lg font-bold text-[#0b1e3a] admin-dark:text-white">Manual Enrollment</h2>
+      <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         Flow: Category → Course → Applications. No payment info required for
         free courses.
       </p>
@@ -142,7 +142,7 @@ export default function FreeEnrollmentPage() {
           className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
             categoryId === ""
               ? "border-primary-500/60 bg-primary-600/15 text-primary-300"
-              : "border-ink/15 bg-ink/5 text-neutral-300 hover:border-primary-500/50 hover:text-heading"
+              : "border-ink/15 bg-ink/5 text-slate-600 hover:border-primary-500/50 admin-dark:text-slate-300 admin-dark:hover:text-white"
           }`}
         >
           All Categories
@@ -156,7 +156,7 @@ export default function FreeEnrollmentPage() {
             className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
               categoryId === category.id
                 ? "border-primary-500/60 bg-primary-600/15 text-primary-300"
-                : "border-ink/15 bg-ink/5 text-neutral-300 hover:border-primary-500/50 hover:text-heading"
+                : "border-ink/15 bg-ink/5 text-slate-600 hover:border-primary-500/50 admin-dark:text-slate-300 admin-dark:hover:text-white"
             }`}
           >
             {category.name}
@@ -165,12 +165,12 @@ export default function FreeEnrollmentPage() {
       </div>
 
       {/* 2 · Course */}
-      <h3 className="mt-6 text-sm font-bold uppercase tracking-wide text-neutral-500">
+      <h3 className="mt-6 text-sm font-bold uppercase tracking-wide text-slate-500 admin-dark:text-slate-400">
         2 · Courses{categoryId ? ` — ${categories.find((c) => c.id === categoryId)?.name ?? ""}` : ""}
       </h3>
 
       {error ? (
-        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 admin-dark:text-red-400">
           Could not load courses.
           <button
             type="button"
@@ -183,7 +183,7 @@ export default function FreeEnrollmentPage() {
       ) : loading || courses === null ? (
         <AccessLoading label="Loading courses…" />
       ) : freeCourses.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
+        <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">
           {categoryId
             ? "No courses found in this category."
             : "No free courses published yet."}

@@ -361,7 +361,7 @@ export default function PopupAnnouncementManagementPage() {
   const inputClass =
     "mt-1 w-full rounded-xl border border-neutral-200 bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1e3a] outline-none transition placeholder:text-slate-400 focus:border-[#2f6bce]/60 focus:bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100";
   const labelClass =
-    "text-[11px] font-bold uppercase tracking-wider text-slate-400";
+    "text-[11px] font-bold uppercase tracking-wider text-slate-500 admin-dark:text-slate-400";
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
@@ -485,7 +485,7 @@ export default function PopupAnnouncementManagementPage() {
       <ul className="mt-3 space-y-3">
         {announcements.length === 0 && (
           <li className={cardClass}>
-            <p className="py-4 text-center text-sm font-semibold text-slate-500">
+            <p className="py-4 text-center text-sm font-semibold text-slate-500 admin-dark:text-slate-400">
               No announcements yet. Create the first one above.
             </p>
           </li>
@@ -495,7 +495,7 @@ export default function PopupAnnouncementManagementPage() {
           return (
             <li key={announcement.id} className={`${cardClass} ${announcement.isActive ? "" : "opacity-75"}`}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-lg bg-[#f1f5f9] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 admin-dark:bg-[#132a4f]">
+                <span className="rounded-lg bg-[#f1f5f9] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 admin-dark:bg-[#132a4f] admin-dark:text-slate-400">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-zinc-100">

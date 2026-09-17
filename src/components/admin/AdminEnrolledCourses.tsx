@@ -115,7 +115,7 @@ function AdminBackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition hover:text-primary-500 admin-dark:text-slate-400 admin-dark:hover:text-[#1a3a78]"
+      className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition hover:text-primary-500 admin-dark:text-slate-400 admin-dark:hover:text-[#93c5fd]"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -334,7 +334,7 @@ export function AdminCourseSubjectsView({ slug }: { slug: string }) {
                       </svg>
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-base font-extrabold text-[#0b1e3a] transition group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#1a3a78]">
+                      <span className="block text-base font-extrabold text-[#0b1e3a] transition group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#93c5fd]">
                         {subject.name}
                       </span>
                       <span className="text-xs text-slate-500 admin-dark:text-slate-500">
@@ -345,7 +345,7 @@ export function AdminCourseSubjectsView({ slug }: { slug: string }) {
                         {counts.classes} class{counts.classes === 1 ? "" : "es"}
                       </span>
                     </span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-neutral-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78]">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:group-hover:text-[#93c5fd]">
                       <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                     </svg>
                   </Link>
@@ -456,7 +456,7 @@ export function AdminSubjectPapersView({
                     <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 admin-dark:text-slate-500">
                       {entry.kindLabel}
                     </span>
-                    <span className="block truncate text-base font-extrabold text-[#0b1e3a] transition group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#1a3a78]">
+                      <span className="block truncate text-base font-extrabold text-[#0b1e3a] transition group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#93c5fd]">
                       {entry.name}
                     </span>
                     <span className="mt-1.5 flex flex-wrap gap-1.5">
@@ -471,7 +471,7 @@ export function AdminSubjectPapersView({
                       </span>
                     </span>
                   </span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-neutral-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78]">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:group-hover:text-[#93c5fd]">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                   </svg>
                 </Link>
@@ -758,12 +758,12 @@ export function AdminChapterView({
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-[#0b1e3a] group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#1a3a78]">
+                        <span className="block truncate text-sm font-semibold text-[#0b1e3a] group-hover:text-primary-500 admin-dark:text-white admin-dark:group-hover:text-[#93c5fd]">
                     {item.title}
                   </span>
                   <span className="text-[11px] text-slate-500 admin-dark:text-slate-500">{item.subtitle}</span>
                 </span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-neutral-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-1 group-hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:group-hover:text-[#93c5fd]">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                 </svg>
               </Link>
@@ -994,7 +994,7 @@ export function AdminClassView({
             />
           )
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-neutral-500">
+          <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-neutral-400">
             No video attached to this class yet
           </div>
         )}
@@ -1005,7 +1005,7 @@ export function AdminClassView({
           href={cls.noteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#93c5fd] hover:text-primary-500 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:text-zinc-200 admin-dark:hover:text-[#1a3a78]"
+           className="flex items-center justify-center gap-2 rounded-xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#93c5fd] hover:text-primary-500 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:text-zinc-200 admin-dark:hover:text-[#93c5fd]"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />

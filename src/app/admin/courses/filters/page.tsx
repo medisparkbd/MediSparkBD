@@ -8,7 +8,7 @@ type FilterOption = { id: string; label: string };
 type Scope = "ssc" | "hsc";
 
 const inputClass =
-  "w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-heading outline-none focus:border-[#2f6bce]/60";
+  "w-full rounded-xl border border-ink/15 bg-[#f8fbff] admin-dark:bg-[#0f2547] px-3.5 py-2.5 text-sm text-[#0b1e3a] outline-none admin-dark:text-white focus:border-[#2f6bce]/60";
 
 /**
  * Admin → Courses → Filter Edit. Manages the batch filter pills shown on the
@@ -167,8 +167,8 @@ export default function CourseFiltersManager() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Course Filter Edit</h1>
-      <p className="mt-1 text-sm text-neutral-400">
+      <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Course Filter Edit</h1>
+      <p className="mt-1 text-sm text-slate-500 admin-dark:text-slate-400">
         The batch filter pills on the Course pages. Changes save to MySQL and
         appear on the Main Website immediately.
       </p>
@@ -186,8 +186,8 @@ export default function CourseFiltersManager() {
             aria-pressed={scope === item}
             className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
               scope === item
-                ? "border-primary-500/60 bg-primary-600/10 text-primary-300"
-                : "border-ink/10 bg-white admin-dark:bg-[#112544] text-heading hover:border-primary-500/40"
+                ? "border-primary-500/60 bg-primary-600/10 text-primary-700 admin-dark:text-primary-300"
+                : "border-ink/10 bg-white admin-dark:bg-[#112544] text-[#0b1e3a] hover:border-primary-500/40 admin-dark:text-white"
             }`}
           >
             {item === "ssc" ? "SSC Pages" : "HSC / Admission Pages"}
@@ -197,11 +197,11 @@ export default function CourseFiltersManager() {
 
       {loadError ? (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Failed to load the filter options.</p>
+          <p className="text-sm text-red-600 admin-dark:text-red-400">Failed to load the filter options.</p>
           <button
             type="button"
             onClick={() => void load()}
-            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd]"
+            className="mt-2 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:text-white"
           >
             Retry
           </button>
@@ -242,7 +242,7 @@ export default function CourseFiltersManager() {
                   onClick={() => removeOption(index)}
                   disabled={option.id === "all" || busy}
                   title={option.id === "all" ? "The All Batch option cannot be removed" : "Remove option"}
-                  className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40 admin-dark:text-red-400"
                 >
                   Remove
                 </button>
@@ -255,7 +255,7 @@ export default function CourseFiltersManager() {
               type="button"
               onClick={addOption}
               disabled={busy}
-              className="rounded-xl border border-ink/15 px-4 py-2 text-xs font-bold text-heading transition hover:border-[#93c5fd]"
+              className="rounded-xl border border-ink/15 px-4 py-2 text-xs font-bold text-[#0b1e3a] transition hover:border-[#93c5fd] admin-dark:text-white"
             >
               + Add Option
             </button>
@@ -269,7 +269,7 @@ export default function CourseFiltersManager() {
             </button>
           </div>
 
-          <p className="mt-3 text-[11px] leading-relaxed text-neutral-500">
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500 admin-dark:text-slate-400">
             Option id must match the course batch ids (e.g. a course with batch
             &ldquo;hsc-27&rdquo; shows under the option with id &ldquo;hsc-27&rdquo;). The first row is
             always the &ldquo;All Batch&rdquo; filter.
@@ -280,8 +280,8 @@ export default function CourseFiltersManager() {
               role="status"
               className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
                 message.kind === "success"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                  : "border-red-500/30 bg-red-500/10 text-red-400"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 admin-dark:text-emerald-400"
+                  : "border-red-500/30 bg-red-500/10 text-red-600 admin-dark:text-red-400"
               }`}
             >
               {message.text}
