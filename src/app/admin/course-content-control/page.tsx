@@ -1,88 +1,79 @@
-"use client";
-
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { AccessLoading } from "@/components/auth/AccessGuard";
+import { HubHeader } from "@/components/admin/hub-ui";
+import { fetchActiveCourseCategories } from "@/lib/course-categories-store";
 
-type Course = { slug: string; name: string; category?: string };
+export const dynamic = "force-dynamic";
 
-// Flow 4: Course Content Control directly mirrors Course Control —
-// every course created in Course Control automatically appears here.
-export default function ContentControlPage() {
-  const { user, authLoading } = useAuth();
-  const [courses, setCourses] = useState<Course[] | null>(null);
-  const [error, setError] = useState(false);
+const CATEGORY_ICONS: Record<string, string> = {
+  ssc: "📗",
+  hsc: "📘",
+  medical: "🩺",
+  varsity: "🎓",
+};
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setError(false);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch("/api/admin/courses", {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("failed");
-      const data = (await res.json()) as { courses?: Course[] };
-      setCourses(Array.isArray(data.courses) ? data.courses : []);
-    } catch {
-      setError(true);
-    }
-  }, [user]);
+function iconForSlug(slug: string): string {
+  const key = Object.keys(CATEGORY_ICONS).find((icon) =>
+    slug.toLowerCase().includes(icon),
+  );
+  return CATEGORY_ICONS[key ?? "hsc"];
+}
 
-  useEffect(() => {
-    if (authLoading || !user) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [authLoading, user, load]);
-
-  if (authLoading || courses === null)
-    return <AccessLoading label="Loading Course Content Control…" />;
+/**
+ * Admin → Course Content Control — Category Selection.
+ * Same categories, same cards, same visual language as the Main Website and
+ * Course Control (single shared course_categories source — no duplicates).
+ * Flow: Course Content Control → Category → Courses → existing content flow
+ * (Topic-wise / Paper Final / Subject Final / Final Model → content).
+ */
+export default async function ContentControlPage() {
+  const categories = await fetchActiveCourseCategories();
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Course Content Control</h1>
-      <p className="mt-1 text-sm text-neutral-400">
-        Manage all course flows. Flows 1-3 remain unchanged. <span className="font-bold text-primary-400">Course Flow 4</span> is the exam-based flow — courses are synced from Course Control automatically.
-      </p>
-      <p className="mt-1 text-xs text-neutral-500">
-        Course Flow 4 Hierarchy: <span className="font-bold text-primary-400">Course → Topic-wise / Paper Final / Subject Final / Final Model</span> · Flows 1-3 keep their own hierarchies (Direct / Paper / Subject → Class/Exam/Materials/Archive → Chapter → Content)
-      </p>
-      {error && (
-        <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center">
-          <p className="text-sm text-red-400">Could not load courses.</p>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="mt-3 rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:bg-primary-700"
-          >
-            Try Again
-          </button>
+    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <HubHeader
+        eyebrow="Admin · Course Content"
+        title="Course Content Control"
+        description="Select a category to manage only its courses' content. New courses created in Course Control appear here automatically."
+      />
+
+      {categories.length === 0 ? (
+        <p className="mt-8 rounded-2xl border border-dashed border-zinc-300 p-8 text-center text-sm text-slate-500 admin-dark:border-zinc-700">
+          No active categories found. Create one in Course Control first.
+        </p>
+      ) : (
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          {categories.map((category) => (
+            <Link
+              key={category.id}
+              href={`/admin/course-content-control/category/${encodeURIComponent(category.id)}`}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 p-6 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 active:scale-[0.99]"
+            >
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl transition duration-300 group-hover:bg-primary-600/20" />
+              <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
+              <div className="relative flex items-center gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600/15 text-primary-500 transition duration-300 group-hover:bg-primary-600 group-hover:text-heading group-hover:shadow-md group-hover:shadow-primary-900/50">
+                  <span className="text-xl">{iconForSlug(category.slug)}</span>
+                </span>
+                <h2 className="text-lg font-extrabold leading-snug text-heading transition duration-300 group-hover:text-primary-400 sm:text-xl">
+                  {category.name}
+                </h2>
+              </div>
+              <p className="relative mt-3 line-clamp-2 flex-1 text-sm font-medium leading-relaxed text-neutral-400">
+                {category.description ?? "Manage this category's course content."}
+              </p>
+              <div className="relative mt-auto pt-6">
+                <span className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition duration-300 group-hover:bg-primary-700 group-hover:shadow-primary-900/60">
+                  Explore Content
+                  <svg className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
-      {!error && courses.length === 0 && (
-        <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
-          No courses found. Create a course in Course Control — it will appear here automatically.
-        </p>
-      )}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {courses?.map((course) => (
-          <Link
-            key={course.slug}
-            href={`/admin/course-content-control/course/${encodeURIComponent(course.slug)}`}
-            className="group flex min-h-[84px] items-center gap-3 rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-primary-600/60"
-          >
-            <span aria-hidden className="text-xl">📘</span>
-            <span className="flex-1 min-w-0">
-              <span className="block break-words font-extrabold text-heading group-hover:text-[#1a3a78]">
-                {course.name}
-              </span>
-              {course.category && <span className="text-xs text-neutral-500">{course.category}</span>}
-            </span>
-          </Link>
-        ))}
-      </div>
     </section>
   );
 }
