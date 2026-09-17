@@ -249,8 +249,10 @@ export function useAdminGate(): AdminGate {
     }
   }, [authLoading, user]);
 
-  // Keep the token fresh: Firebase rotates ID tokens hourly, and a stale
-  // token in state made every admin write fail with 401 after an hour.
+  // Keep the token fresh: Firebase rotates ID tokens hourly. A transient
+  // refresh failure must NOT clear the stored token — falling back to no
+  // Authorization would turn every later admin request (including Refresh)
+  // into a 401. Keep the previous token; the next rotation retries.
   useEffect(() => {
     if (!user) return;
     return onIdTokenChanged(getAuth(), (refreshed) => {
@@ -258,7 +260,7 @@ export function useAdminGate(): AdminGate {
       void refreshed
         ?.getIdToken()
         .then((t) => setToken((prev) => (prev === t ? prev : t)))
-        .catch(() => setToken(null));
+        .catch(() => undefined);
     });
   }, [user]);
 

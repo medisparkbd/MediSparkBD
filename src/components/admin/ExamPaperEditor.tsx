@@ -534,18 +534,45 @@ export default function ExamPaperEditor({
     const v = langVersion;
     const s = setLabel;
     const token = ++loadVersionRef.current;
+    const url = `/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${v}&set=${s}`;
     setRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${v}&set=${s}`, {
-        cache: "no-store",
-        headers: authHeaders,
-      });
-      if (!res.ok) throw new Error("refresh failed");
-      const data = (await res.json()) as { questions?: ExamQuestion[] };
+      // Single retry on network-level failure (fetch itself throwing).
+      let res: Response | null = null;
+      let networkError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          res = await fetch(url, { cache: "no-store", headers: authHeaders });
+          networkError = null;
+          break;
+        } catch (e) {
+          networkError = e;
+          res = null;
+        }
+      }
+      if (!res) throw networkError ?? new Error("network request failed");
+      if (!res.ok) {
+        // Read the server's message for the debug log (never blank the UI).
+        const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+        const detail = `Refresh GET ${url} → HTTP ${res.status}${errBody?.error ? `: ${errBody.error}` : ""}`;
+        // eslint-disable-next-line no-console
+        console.error("[ExamPaperEditor]", detail);
+        if (res.status === 401 || res.status === 403) {
+          throw new Error("SESSION_EXPIRED");
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = (await res.json().catch(() => null)) as { questions?: unknown } | null;
+      if (!data || !Array.isArray(data.questions)) {
+        // eslint-disable-next-line no-console
+        console.error("[ExamPaperEditor]", `Refresh GET ${url} → unexpected response shape`, data);
+        throw new Error("BAD_RESPONSE");
+      }
       if (token !== loadVersionRef.current) return;
       if (workspaceRef.current.v !== v || workspaceRef.current.s !== s) return;
-      const fresh = data.questions ?? [];
+      const fresh = data.questions as ExamQuestion[];
       setQuestions(fresh);
       const next: Record<number, SlotDraft> = {};
       for (let i = 0; i < totalSlots; i++) {
@@ -556,8 +583,15 @@ export default function ExamPaperEditor({
       setDetectExistingMap({});
       setNotice(null);
       void loadCoverage();
-    } catch {
-      setError("Refresh failed — showing current data. Please try again.");
+    } catch (e) {
+      // Keep everything visible — report what actually happened.
+      // eslint-disable-next-line no-console
+      console.error("[ExamPaperEditor] refresh failed:", e);
+      if (e instanceof Error && e.message === "SESSION_EXPIRED") {
+        setError("Session expired — please reload the page and sign in again, then retry Refresh.");
+      } else {
+        setError("Refresh failed — showing current data. Please check your connection and try again.");
+      }
     } finally {
       if (token === loadVersionRef.current) setRefreshing(false);
     }
