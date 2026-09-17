@@ -115,7 +115,7 @@ export default async function GlanceSection() {
           MediSpark at a Glance
         </SectionHeading>
 
-        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-4">
+        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4">
           {cards.map((card, index) => {
             const Icon = cardIcons[index];
             return (
