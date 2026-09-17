@@ -80,6 +80,35 @@ function padNum(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+/**
+ * Clean loading screen shown after Rules → Continue while the question paper
+ * is being prepared. No metadata, no counts, no partial paper — just this.
+ */
+function PreparingExamScreen() {
+  return (
+    <div
+      className="flex min-h-[60vh] items-center justify-center px-4 py-16"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-dark-900 p-8 text-center shadow-lg shadow-black/20 sm:p-10">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center">
+          <span
+            aria-hidden="true"
+            className="block h-12 w-12 animate-spin rounded-full border-[3px] border-ink/10 border-t-primary-500"
+          />
+        </div>
+        <h2 className="mt-6 text-lg font-extrabold text-heading sm:text-xl">
+          Preparing Your Exam Question...
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+          আপনার পরীক্ষার প্রশ্ন প্রস্তুত করা হচ্ছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন।
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ExamParticipationArea({
   examId,
   autoBegin: propAutoBegin,
@@ -414,11 +443,14 @@ export default function ExamParticipationArea({
   }, [examId, user]);
 
   // ── Exam Navigation Lock: hide BottomNav + block navigation during active attempt ──
+  // Also locked while the begin=1 flow is preparing the paper, so no exam
+  // metadata/counts/timer leak onto the screen before questions are ready.
   useEffect(() => {
-    const locked = begun && !outcome && !terminatedNotice && !alreadyAttempted;
+    const preparing = autoBegin && loading;
+    const locked = (begun || preparing) && !outcome && !terminatedNotice && !alreadyAttempted;
     setExamLocked(locked);
     return () => setExamLocked(false);
-  }, [begun, outcome, terminatedNotice, alreadyAttempted, setExamLocked]);
+  }, [begun, outcome, terminatedNotice, alreadyAttempted, autoBegin, loading, setExamLocked]);
 
   // Register auto-submit as the exit handler for the confirmation modal.
   // Returned promise is awaited by confirmExit so submission/session
@@ -718,6 +750,11 @@ export default function ExamParticipationArea({
   }
 
   if (loading) {
+    // Rules → Continue flow: clean preparing screen until questions + exam
+    // data are fully ready. Normal visits keep the existing loader.
+    if (autoBegin) {
+      return <PreparingExamScreen />;
+    }
     return <AccessLoading label="Loading exam…" />;
   }
 
