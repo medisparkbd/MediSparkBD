@@ -158,6 +158,8 @@ export default function ExamManager({
   fixedCategory,
   fixedChapter,
   fixedCourse,
+  fixedFormat,
+  fixedTopicSubject,
 }: {
   title: string;
   description: string;
@@ -171,6 +173,10 @@ export default function ExamManager({
   fixedChapter?: FixedChapter;
   /** Flow 4 Exam Batch mode — only this course's enrolled exams. */
   fixedCourse?: FixedCourse;
+  /** Course Content Control exam-flow mode — only this Flow-5 category (format lock). */
+  fixedFormat?: "topic-wise" | "paper-final" | "subject-final" | "final-model";
+  /** Topic-wise subject lock (one of the 8 fixed subjects) — implies topic-wise. */
+  fixedTopicSubject?: string;
 }) {
   const gate = useAdminGate();
   const router = useRouter();
@@ -287,7 +293,13 @@ export default function ExamManager({
       });
     } else if (fixedCourse) {
       // Flow 4 Exam Batch — always enrolled, auto-assigned to this course.
-      setForm({ ...EMPTY, kind: "enrolled" });
+      // Exam-flow pages additionally lock the Flow-5 category + subject.
+      setForm({
+        ...EMPTY,
+        kind: "enrolled",
+        examFormat: fixedFormat ?? "",
+        topicSubject: fixedTopicSubject ?? "",
+      });
     } else {
       setForm(EMPTY);
     }
@@ -638,13 +650,23 @@ export default function ExamManager({
     : kindFilter === "enrolled";
   const filteredByMode = (() => {
     if (!exams) return null;
+    // Course Content Control exam-flow lock — one Flow-5 category (and
+    // optionally one topic-wise subject) so branches never mix.
+    const scoped = fixedFormat || fixedTopicSubject
+      ? exams.filter((e) => {
+          const fmt = (e.examFormat ?? "") as string;
+          if (fixedFormat && fmt !== fixedFormat) return false;
+          if (fixedTopicSubject && (e.topicSubject ?? "") !== fixedTopicSubject) return false;
+          return true;
+        })
+      : exams;
     if (hasEnrolledExams) {
-      return exams.filter((e) => {
+      return scoped.filter((e) => {
         if (phaseFilter === "all") return true;
         return flow4Phase(e) === phaseFilter;
       });
     }
-    return exams.filter((e) => modeFilter === "all" || (e.examMode ?? "live") === modeFilter);
+    return scoped.filter((e) => modeFilter === "all" || (e.examMode ?? "live") === modeFilter);
   })();
 
   const filteredCount = filteredByMode?.length ?? 0;
@@ -730,7 +752,7 @@ export default function ExamManager({
         <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
       ) : (filteredByMode?.length ?? 0) === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
-          {exams.length === 0 ? "No exams yet." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
+          {exams.length === 0 ? "No exams yet." : (fixedFormat || fixedTopicSubject) ? "No exams in this category yet — create the first one with + New Exam." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
         </p>
       ) : (
         <ul className="mt-5 space-y-3">
@@ -1122,6 +1144,12 @@ export default function ExamManager({
                     <>
                       <div>
                         <label className={labelClass} htmlFor="ex-format">Course Flow 4 exam category</label>
+                        {fixedFormat ? (
+                          <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-heading">
+                            {fixedFormat === "topic-wise" ? "Topic-wise Exam" : fixedFormat === "paper-final" ? "Paper Final Exam" : fixedFormat === "subject-final" ? "Subject Final Exam" : "Final Model Test"}
+                            <span className="ml-2 text-[11px] font-semibold text-slate-500">(locked for this page)</span>
+                          </p>
+                        ) : (
                         <select
                           id="ex-format"
                           className={inputClass}
@@ -1140,11 +1168,18 @@ export default function ExamManager({
                           <option value="subject-final">Subject Final Exam</option>
                           <option value="final-model">Final Model Test</option>
                         </select>
+                        )}
                         <p className="mt-1 text-[11px] text-slate-500">Only categorized exams appear in Course Flow 4 courses — one category per exam, never mixed.</p>
                       </div>
                       {(form as unknown as { examFormat?: string }).examFormat === "topic-wise" && (
                         <div>
                           <label className={labelClass} htmlFor="ex-topic-subject">Topic subject (1 of 8)</label>
+                          {fixedTopicSubject ? (
+                            <p className="mt-1 rounded-xl border border-ink/10 bg-ink/5 px-3.5 py-2.5 text-sm font-bold text-heading">
+                              {form.topicSubject || fixedTopicSubject}
+                              <span className="ml-2 text-[11px] font-semibold text-slate-500">(locked for this page)</span>
+                            </p>
+                          ) : (
                           <select
                             id="ex-topic-subject"
                             className={inputClass}
@@ -1161,6 +1196,7 @@ export default function ExamManager({
                             <option value="english">English</option>
                             <option value="gk">General Knowledge</option>
                           </select>
+                          )}
                         </div>
                       )}
                     </>
