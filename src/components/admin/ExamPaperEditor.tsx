@@ -46,6 +46,47 @@ function tabKey(version: LangVersion, set: SetLabel): string {
 
 const EMPTY_OPTIONS = ["", "", "", ""];
 
+/** Unsaved per-slot edits. Nothing reaches the database until Save Questions. */
+type SlotDraft = {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  questionImage: string | null;
+};
+
+function emptyDraft(): SlotDraft {
+  return { question: "", options: [...EMPTY_OPTIONS], correctIndex: 0, explanation: "", questionImage: null };
+}
+
+function draftFromQuestion(q: ExamQuestion | null | undefined): SlotDraft {
+  const opts = q?.options?.length
+    ? (q.options.length >= 4 ? q.options.slice(0, 4) : [...q.options, ...EMPTY_OPTIONS.slice(q.options.length)])
+    : [...EMPTY_OPTIONS];
+  while (opts.length < 4) opts.push("");
+  return {
+    question: q?.question || "",
+    options: opts.slice(0, 4),
+    correctIndex: q?.correctIndex ?? 0,
+    explanation: q?.explanation ?? "",
+    questionImage: q?.questionImage ?? null,
+  };
+}
+
+/** True when the draft differs from the saved slot (i.e. unsaved changes). */
+function isDraftDirty(d: SlotDraft | undefined, q: ExamQuestion | null | undefined): boolean {
+  if (!d) return false;
+  if ((d.question || "") !== (q?.question || "")) return true;
+  const qOpts = q?.options?.slice(0, 4) ?? [];
+  for (let i = 0; i < 4; i++) {
+    if ((d.options[i] || "") !== (qOpts[i] || "")) return true;
+  }
+  if ((d.correctIndex ?? 0) !== (q?.correctIndex ?? 0)) return true;
+  if ((d.explanation || "") !== (q?.explanation || "")) return true;
+  if ((d.questionImage ?? null) !== (q?.questionImage ?? null)) return true;
+  return false;
+}
+
 function isCompleted(q: ExamQuestion | null | undefined): boolean {
   if (!q || q.id === null) return false;
   if (!q.question || q.question.trim().length < 3) return false;
@@ -225,40 +266,20 @@ export default function ExamPaperEditor({
       ? `${completedCount}/${totalSlots} Questions Completed`
       : `${completedCount} questions`;
 
-  // Local draft for inline editing — mirrors DB but allows immediate typing before save
-  const [drafts, setDrafts] = useState<Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }>>({});
+  // Local drafts for inline editing — UNSAVED until "Save Questions" is clicked.
+  // Typing, detecting, answering and image uploads only touch these drafts.
+  const [drafts, setDrafts] = useState<Record<number, SlotDraft>>({});
 
   useEffect(() => {
-    // Sync drafts when questions load (keep user edits if already drafting)
+    // Seed drafts from saved questions when they load (never overwrite edits in progress)
     if (!questions) return;
-    const next: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = {};
-    for (let i = 0; i < totalSlots; i++) {
-      const q = i < questions.length ? questions[i] : null;
-      if (q && q.id !== null) {
-        // Preserve existing draft if user is mid-edit (has unsaved changes) — only fill if missing
-        if (drafts[i]) {
-          next[i] = drafts[i];
-        } else {
-          const opts = q.options.length >= 4 ? q.options.slice(0, 4) : [...q.options, ...EMPTY_OPTIONS.slice(q.options.length)];
-          while (opts.length < 4) opts.push("");
-          next[i] = { question: q.question || "", options: opts.slice(0, 4), correctIndex: q.correctIndex ?? 0, explanation: q.explanation ?? "" };
-        }
-      } else {
-        if (drafts[i]) {
-          next[i] = drafts[i];
-        } else {
-          next[i] = { question: q?.question || "", options: q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS], correctIndex: q?.correctIndex ?? 0, explanation: q?.explanation ?? "" };
-          while (next[i].options.length < 4) next[i].options.push("");
-          next[i].options = next[i].options.slice(0, 4);
-        }
-      }
-    }
-    // Only update if drafts empty or totalSlots changed; avoid overwriting active edits on every load
-    // We merge: keep existing drafts for slots that already have draft
     setDrafts((prev) => {
-      const merged: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = { ...prev };
+      const merged: Record<number, SlotDraft> = { ...prev };
       for (let i = 0; i < totalSlots; i++) {
-        if (!merged[i]) merged[i] = next[i];
+        if (!merged[i]) {
+          const q = i < questions.length ? questions[i] : null;
+          merged[i] = draftFromQuestion(q);
+        }
       }
       // Remove extra indices beyond totalSlots
       Object.keys(merged).forEach((k) => {
@@ -269,84 +290,21 @@ export default function ExamPaperEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, totalSlots]);
 
-  async function persistSlot(slotIndex: number) {
-    const draft = drafts[slotIndex];
-    if (!draft) return;
-    const slot = displaySlots[slotIndex];
-    const existing = slot?.q;
-
-    const qText = draft.question.trim();
-    const opts = draft.options.map((o) => o.trim());
-
-    // Allow saving incomplete slots as draft — but require at least question or any option to avoid blank saves
-    // For blank slots the admin can just type and we save on blur; skip if completely empty
-    const anyOption = opts.some((o) => o.length > 0);
-    if (!qText && !anyOption) return;
-    // Enforce minimal validation only when both present; let backend handle full validation
-    // We save even if only question typed (will be incomplete but stored)
-
-    // Prepare options padded to 4
-    const saveOptions = [...opts];
-    while (saveOptions.length < 4) saveOptions.push("");
-    const finalOptions = saveOptions.slice(0, 4);
-
-    // Ensure correctIndex points to non-empty option if possible
-    let ci = draft.correctIndex;
-    if (ci < 0 || ci >= 4) ci = 0;
-    // Don't auto-correct here — allow saving even if correct points to empty (backend will reject)
-    // But we keep as is
-
-    setSavingSlot(slotIndex);
-    setError(null);
-    try {      const order = slotIndex + 1;
-      const marksPerQ = Number((exam.marksPerQuestion ?? 1) as number) || 1;
-      const body: Record<string, unknown> = {
-        ...(existing && existing.id !== null ? { id: existing.id } : {}),
-        examId: exam.id,
-        // Version/Set cell — the permanent slot ID stays the same.
-        version: langVersion,
-        set: setLabel,
-        subject: existing?.subject || exam.subject || "",
-        question: qText || " ",
-        questionImage: existing?.questionImage || null,
-        question_image: existing?.questionImage || null,
-        options: finalOptions,
-        correctIndex: ci,
-      explanation: draft.explanation || existing?.explanation || null,
-        marks: (existing?.marks ?? marksPerQ) as number,
-        isActive: true,
-        order,
-      };
-      // If question is blank placeholder, use " " to pass server min length; but we already early-returned if empty
-      if (!qText) body.question = finalOptions.find((o) => o) ? `Question ${pad(slotIndex + 1)}` : qText;
-      // If still empty, skip save
-      if (!String(body.question).trim() || String(body.question).trim().length < 1) return;
-      // Server requires >=3 chars and 2 options; if not met, still try but handle error quietly
-      const res = await fetch("/api/admin/exams/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(body),
-      });
-      const data = (await res.json().catch(() => null)) as { error?: string; id?: number } | null;
-      if (!res.ok) {
-        // Only surface error if slot has meaningful content
-        if (qText.length >= 2 || anyOption) setError(data?.error ?? "Failed to save.");
-        return;
-      }
-      // Update local state only — no refetch, so typing/editing never triggers a reload.
-      applySavedSlot(slotIndex, {
-        question: qText,
-        options: finalOptions,
-        correctIndex: ci,
-        explanation: draft.explanation || "",
-        id: typeof data?.id === "number" ? data.id : (existing?.id ?? null),
-      });
-      void loadCoverage();
-      onChanged?.();
-    } finally {
-      setSavingSlot(null);
+  // Number of slots with unsaved changes (powers the Save button label).
+  const dirtyCount = useMemo(() => {
+    if (!questions) return 0;
+    let n = 0;
+    for (const k of Object.keys(drafts)) {
+      const i = Number(k);
+      if (i >= totalSlots) continue;
+      const q = i < questions.length ? questions[i] : null;
+      if (isDraftDirty(drafts[i], q)) n += 1;
     }
-  }
+    return n;
+  }, [drafts, questions, totalSlots]);
+
+  // NOTE: there is intentionally NO blur auto-save. All edits stay in `drafts`
+  // until the admin explicitly clicks "Save Questions".
 
   async function handleDetect() {
     setError(null);
@@ -398,8 +356,10 @@ export default function ExamPaperEditor({
       }
       setDetectWarnings(warnings);
 
-      // Fully replace drafts — clear ALL old drafts first, then set only the newly detected ones
-      const newDrafts: Record<number, { question: string; options: string[]; correctIndex: number; explanation: string }> = {};
+      // Detected questions stay UNSAVED drafts until "Save Questions" is clicked.
+      // Fully replace drafts — clear ALL old drafts first, then set only the newly detected ones.
+      // Saved images on overwritten slots are preserved in the drafts.
+      const newDrafts: Record<number, SlotDraft> = {};
       for (let i = 0; i < count; i++) {
         const p = useParsed[i];
         const ci = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : -1;
@@ -408,40 +368,20 @@ export default function ExamPaperEditor({
           options: p.options.slice(0, 4) as string[],
           correctIndex: ci >= 0 ? ci : -1,
           explanation: p.explanation ?? "",
+          questionImage: displaySlots[i]?.q?.questionImage ?? null,
         };
       }
       setDrafts(newDrafts);
 
-      // Persist sequentially to preserve order
-      let persisted = 0;
-      let skippedDueToMissingAnswer = 0;
-      for (let i = 0; i < count; i++) {
-        const p = useParsed[i];
-        // If correctIndex is null, we persist with fallback 0 but keep warning; admin must verify
-        // To avoid backend rejection, map -1 to 0 on persist but retain warning state
-        const ciPersist = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : 0;
-        const hasMissingAnswer = p.correctIndex === null;
-        if (hasMissingAnswer) skippedDueToMissingAnswer += 1;
-        const draft = { question: p.question, options: p.options.slice(0, 4) as string[], correctIndex: ciPersist, explanation: p.explanation ?? "" };
-        // Validate before persist: need at least question and 2 options
-        const qTrim = draft.question.trim();
-        const filledOpts = draft.options.filter((o) => o.trim()).length;
-        if (qTrim.length < 3 || filledOpts < 2) continue;
-        // eslint-disable-next-line no-await-in-loop
-        await persistSlotWithData(i, draft);
-        persisted += 1;
-      }
-      // No refetch here — each persist already merged into local state, so the
-      // page keeps its scroll position, drafts and notices without any reload.
-      onChanged?.();
-      void loadCoverage();
-      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${detectVersion} Set ${detectSet}.`;
-      if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not saved).`;
-      if (skippedDueToMissingAnswer > 0) msg += ` ${skippedDueToMissingAnswer} question${skippedDueToMissingAnswer === 1 ? "" : "s"} have no confident answer — please verify.`;
+      // No database writes here — the admin reviews and clicks Save Questions.
+      let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${detectVersion} Set ${detectSet} (unsaved — review, then click Save Questions).`;
+      if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not included).`;
+      const noAnswerCount = useParsed.slice(0, count).filter((p) => p.correctIndex === null).length;
+      if (noAnswerCount > 0) msg += ` ${noAnswerCount} question${noAnswerCount === 1 ? "" : "s"} have no confident answer — please verify before saving.`;
       const reviewCount = Object.keys(warnings).length;
       if (reviewCount > 0) msg += ` ${reviewCount} need review.`;
       const existingCount = Object.keys(existingMap).length;
-      if (existingCount > 0) msg += ` ${existingCount} already had content — overwritten.`;
+      if (existingCount > 0) msg += ` ${existingCount} already had saved content — saving will overwrite those slots.`;
       setNotice(msg);
       setTimeout(() => setNotice(null), 8000);
       // Auto-scroll question list to top so detected questions are visible
@@ -453,7 +393,7 @@ export default function ExamPaperEditor({
     }
   }
 
-  async function persistSlotWithData(slotIndex: number, draft: { question: string; options: string[]; correctIndex: number; explanation: string }) {
+  async function persistSlotWithData(slotIndex: number, draft: SlotDraft) {
     const slot = displaySlots[slotIndex];
     const existing = slot?.q;
     const order = slotIndex + 1;
@@ -470,8 +410,8 @@ export default function ExamPaperEditor({
       set: saveSet,
       subject: existing?.subject || exam.subject || "",
       question: draft.question.trim(),
-      questionImage: null,
-      question_image: null,
+      questionImage: draft.questionImage ?? existing?.questionImage ?? null,
+      question_image: draft.questionImage ?? existing?.questionImage ?? null,
       options: finalOptions.slice(0, 4),
       correctIndex: draft.correctIndex,
       explanation: draft.explanation || null,
@@ -494,38 +434,151 @@ export default function ExamPaperEditor({
         options: finalOptions.slice(0, 4),
         correctIndex: draft.correctIndex,
         explanation: draft.explanation || "",
+        questionImage: draft.questionImage ?? existing?.questionImage ?? null,
         id: typeof data?.id === "number" ? data.id : (existing?.id ?? null),
       });
     }
   }
 
+  /**
+   * Explicit "Save Questions" — the ONLY writer to the database on this page.
+   * Saves every draft with valid content sequentially; invalid/empty slots are
+   * skipped and reported, never written.
+   */
+  const [saveAllBusy, setSaveAllBusy] = useState(false);
+
+  async function handleSaveAll() {
+    setError(null);
+    setNotice(null);
+    const saveVersion = langVersion;
+    const saveSet = setLabel;
+    const indices = Object.keys(drafts).map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    if (indices.length === 0) {
+      setError("Nothing to save — detect or type questions first.");
+      return;
+    }
+    setSaveAllBusy(true);
+    try {
+      let saved = 0;
+      const skipped: string[] = [];
+      let failed = 0;
+      for (const i of indices) {
+        const d = drafts[i];
+        if (!d) continue;
+        const qText = d.question.trim();
+        const filledOpts = d.options.filter((o) => o.trim()).length;
+        const hasAny = qText.length > 0 || d.options.some((o) => o.trim()) || !!d.questionImage;
+        if (!hasAny) continue; // blank slot — leave saved data (if any) untouched
+        if (qText.length < 3 || filledOpts < 2 || d.correctIndex < 0 || d.correctIndex > 3 || !d.options[d.correctIndex]?.trim()) {
+          skipped.push(`Q${pad(i + 1)}`);
+          continue;
+        }
+        setSavingSlot(i);
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await persistSlotWithData(i, d);
+          saved += 1;
+        } catch {
+          failed += 1;
+          skipped.push(`Q${pad(i + 1)}`);
+        }
+        // Stop touching another workspace if the admin switched tabs mid-save.
+        if (workspaceRef.current.v !== saveVersion || workspaceRef.current.s !== saveSet) break;
+      }
+      void loadCoverage();
+      onChanged?.();
+      let msg = `Saved ${saved} question${saved === 1 ? "" : "s"} to ${saveVersion} Set ${saveSet}.`;
+      if (skipped.length > 0) msg += ` Skipped (need review): ${skipped.join(", ")}${failed > 0 ? " — some saves failed, please retry." : "."}`;
+      setNotice(msg);
+      setTimeout(() => setNotice(null), 8000);
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setSavingSlot(null);
+      setSaveAllBusy(false);
+    }
+  }
+
+  /**
+   * "Remove All" — clears the current detection state only (drafts, warnings,
+   * paste area). Never touches the database; previously saved questions stay.
+   */
+  function handleRemoveAll() {
+    setError(null);
+    setDetectWarnings({});
+    setDetectExistingMap({});
+    setDrafts({});
+    setBulkTexts((prev) => ({ ...prev, [activeTab]: "" }));
+    setNotice("Detection cleared — paste a new question set, then Detect.");
+    setTimeout(() => setNotice(null), 5000);
+  }
+
+  /** Global Refresh (existing button) — reload saved data, discard unsaved drafts. */
+  function handleRefresh() {
+    setDrafts({});
+    setDetectWarnings({});
+    setDetectExistingMap({});
+    setError(null);
+    setNotice(null);
+    void load();
+    void loadCoverage();
+  }
+
+  /** Per-question Refresh — reload one saved slot, leave every other slot untouched. */
+  const [refreshingSlot, setRefreshingSlot] = useState<number | null>(null);
+
+  async function refreshSlot(slotIndex: number) {
+    const rv = langVersion;
+    const rs = setLabel;
+    setRefreshingSlot(slotIndex);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/exams/questions?examId=${encodeURIComponent(exam.id)}&version=${rv}&set=${rs}`, {
+        cache: "no-store",
+        headers: authHeaders,
+      });
+      const data = (await res.json()) as { questions?: ExamQuestion[] };
+      if (workspaceRef.current.v !== rv || workspaceRef.current.s !== rs) return;
+      const fresh = (data.questions ?? [])[slotIndex] ?? null;
+      setQuestions((prev) => {
+        if (!prev) return prev;
+        const next = [...prev];
+        while (next.length <= slotIndex) next.push(null as unknown as ExamQuestion);
+        next[slotIndex] = fresh;
+        return next;
+      });
+      setDrafts((prev) => ({ ...prev, [slotIndex]: draftFromQuestion(fresh) }));
+      setDetectWarnings((prev) => {
+        const next = { ...prev };
+        delete next[slotIndex];
+        return next;
+      });
+    } catch {
+      setError("Refresh failed — please try again.");
+    } finally {
+      setRefreshingSlot(null);
+    }
+  }
+
   async function handleCorrectChange(slotIndex: number, newIdx: number) {
-    setDrafts((prev) => ({ ...prev, [slotIndex]: { ...prev[slotIndex], correctIndex: newIdx } }));
+    // Draft-only: selecting an answer never writes to the database and never
+    // reloads anything. It is saved when "Save Questions" is clicked.
+    setDrafts((prev) => {
+      const cur = prev[slotIndex];
+      if (!cur) return prev;
+      return { ...prev, [slotIndex]: { ...cur, correctIndex: newIdx } };
+    });
     setDetectWarnings((prev) => {
       const next = { ...prev };
       delete next[slotIndex];
       return next;
     });
-    // Persist in the background; the save merges into local state itself,
-    // so selecting a correct answer never reloads the page.
-    const draft = drafts[slotIndex];
-    if (!draft) return;
-    const updated = { ...draft, correctIndex: newIdx };
-    setDrafts((prev) => ({ ...prev, [slotIndex]: updated }));
-    // slight delay to ensure state, then persist
-    setTimeout(() => {
-      setDrafts((curr) => {
-        const cur = curr[slotIndex];
-        if (cur) void persistSlotWithData(slotIndex, cur).then(() => {
-          void loadCoverage();
-          onChanged?.();
-        }).catch(() => setError("Failed to update correct answer."));
-        return curr;
-      });
-    }, 0);
   }
 
   async function handleImageUpload(file: File, slotIndex: number) {
+    // Draft-only: the file is uploaded to storage for preview, but the URL is
+    // kept in the unsaved draft. It reaches the database via Save Questions.
     if (!bearer) {
       setError("Not authorized — sign in as admin.");
       return;
@@ -543,71 +596,28 @@ export default function ExamPaperEditor({
       });
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error || "Upload failed.");
-      // Save image to question
-      const slot = displaySlots[slotIndex];
-      const q = slot?.q;
-      const draft = drafts[slotIndex];
-      // Use existing or draft data
-      const body: Record<string, unknown> = {
-        ...(q && q.id !== null ? { id: q.id } : {}),
-        examId: exam.id,
-        version: langVersion,
-        set: setLabel,
-        subject: q?.subject || exam.subject || "",
-        question: draft?.question?.trim() || q?.question || `Question ${pad(slotIndex + 1)}`,
-        questionImage: data.url,
-        question_image: data.url,
-        options: draft ? draft.options.map((o) => o.trim()).slice(0, 4) : q?.options ?? [...EMPTY_OPTIONS],
-        correctIndex: draft?.correctIndex ?? q?.correctIndex ?? 0,
-        explanation: q?.explanation || null,
-        marks: (q?.marks ?? Number(exam.marksPerQuestion ?? 1) ?? 1) || 1,
-        isActive: true,
-        order: slotIndex + 1,
-      };
-      // Ensure options valid
-      while ((body.options as string[]).length < 4) (body.options as string[]).push("");
-      if (!(body.options as string[]).some((o) => String(o).trim())) {
-        (body.options as string[]) = [...EMPTY_OPTIONS];
-      }
-      // If question still empty, provide placeholder to allow image-only save
-      if (!String(body.question).trim()) body.question = `Question ${pad(slotIndex + 1)}`;
-      // Server requires at least 3 chars and 2 options — if slot is empty we still save with placeholder options
-      // Fill placeholder options if empty
-      const opts = body.options as string[];
-      if (opts.filter((o) => String(o).trim()).length < 2) {
-        // Keep empty will fail; show error instead of saving
-        setError("Add question text and at least two options before attaching an image.");
-        return;
-      }
-      const saveRes = await fetch("/api/admin/exams/questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(body),
+      const url = data.url;
+      setDrafts((prev) => {
+        const cur = prev[slotIndex] ?? emptyDraft();
+        return { ...prev, [slotIndex]: { ...cur, questionImage: url } };
       });
-      const saveData = (await saveRes.json().catch(() => null)) as { error?: string; id?: number } | null;
-      if (!saveRes.ok) throw new Error(saveData?.error || "Failed to save image.");
-      // Update local state only — attaching an image never reloads the page.
-      const savedSlot = displaySlots[slotIndex];
-      const savedQ = savedSlot?.q;
-      const slotDraft = drafts[slotIndex];
-      applySavedSlot(slotIndex, {
-        question: slotDraft?.question?.trim() || savedQ?.question || `Question ${pad(slotIndex + 1)}`,
-        options: (slotDraft ? slotDraft.options.map((o) => o.trim()) : savedQ?.options ?? [...EMPTY_OPTIONS]).slice(0, 4),
-        correctIndex: slotDraft?.correctIndex ?? savedQ?.correctIndex ?? 0,
-        explanation: slotDraft?.explanation ?? savedQ?.explanation ?? "",
-        questionImage: data.url,
-        id: typeof saveData?.id === "number" ? saveData.id : (savedQ?.id ?? null),
-      });
-      void loadCoverage();
-      onChanged?.();
-      setNotice("Image uploaded.");
-      setTimeout(() => setNotice(null), 2000);
+      setNotice("Image attached (unsaved — click Save Questions to keep it).");
+      setTimeout(() => setNotice(null), 4000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Image upload failed.");
     } finally {
       setImageUploadingSlot(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  /** Remove the attached image from the unsaved draft (saved data untouched until Save). */
+  function handleRemoveImage(slotIndex: number) {
+    setDrafts((prev) => {
+      const cur = prev[slotIndex];
+      if (!cur) return prev;
+      return { ...prev, [slotIndex]: { ...cur, questionImage: null } };
+    });
   }
 
   const headerBlock = (
@@ -681,19 +691,42 @@ export default function ExamPaperEditor({
             rows={6}
             className="max-h-[40vh] min-h-[100px] w-full resize-y rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3.5 text-sm leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 focus:border-[#93c5fd] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500"
           />
-          <button
-            type="button"
-            disabled={detectBusy || busy}
-            onClick={() => void handleDetect()}
-            className={`${buttonPrimaryClass} w-full sm:w-auto`}
-          >
-            {detectBusy ? "Detecting…" : `Detect Questions → ${langVersion === "bangla" ? "Bangla" : "English"} Set ${setLabel}`}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={detectBusy || busy || saveAllBusy}
+              onClick={() => void handleDetect()}
+              className={`${buttonPrimaryClass} w-full sm:w-auto`}
+            >
+              {detectBusy ? "Detecting…" : `Detect Questions → ${langVersion === "bangla" ? "Bangla" : "English"} Set ${setLabel}`}
+            </button>
+            <button
+              type="button"
+              disabled={detectBusy || busy || saveAllBusy}
+              onClick={() => void handleSaveAll()}
+              className="w-full rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-extrabold text-white shadow hover:bg-emerald-700 disabled:opacity-40 sm:w-auto"
+              title="Permanently save all detected/edited questions, answers and images"
+            >
+              {saveAllBusy ? "Saving…" : `Save Questions${dirtyCount > 0 ? ` (${dirtyCount} unsaved)` : ""}`}
+            </button>
+            <button
+              type="button"
+              disabled={detectBusy || busy || saveAllBusy}
+              onClick={handleRemoveAll}
+              className="w-full rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40 sm:w-auto admin-dark:border-red-900/40 admin-dark:bg-transparent admin-dark:text-red-300 admin-dark:hover:bg-red-500/10"
+              title="Clear detected questions from this page only (saved questions are not deleted)"
+            >
+              Remove All
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Detected questions stay unsaved until <span className="font-bold">Save Questions</span> is clicked. Leaving this page without saving discards them.
+          </p>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-[#eef4ff] pt-3 admin-dark:border-[#1e3a65]/60">
           <p className="text-xs font-extrabold text-slate-600 admin-dark:text-slate-300">{progressText} <span className="font-semibold capitalize">({langVersion} Set {setLabel})</span></p>
-          <button type="button" disabled={busy} onClick={() => { void load(); void loadCoverage(); }} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
+          <button type="button" disabled={busy} onClick={handleRefresh} className={buttonSecondaryClass} title="Refresh">↻ Refresh</button>
         </div>
       </div>
     </div>
@@ -725,19 +758,21 @@ export default function ExamPaperEditor({
           <ol className="space-y-4">
             {displaySlots.map(({ index, q }) => {
               const slotNumber = index + 1;
-              const draft = drafts[index] ?? { question: q?.question || "", options: (q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS]), correctIndex: (q?.correctIndex ?? 0) };
+              const draft = drafts[index] ?? draftFromQuestion(q);
               // Ensure 4 options
               const opts = [...draft.options];
               while (opts.length < 4) opts.push("");
               const isSaving = savingSlot === index;
+              const isRefreshing = refreshingSlot === index;
               const warnings = detectWarnings[index];
+              const imageUrl = draft.questionImage ?? q?.questionImage ?? null;
 
               return (
                 <li
                   key={q?.id ?? `slot-${index}`}
                   className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${warnings && warnings.length > 0 ? "border-amber-300 admin-dark:border-amber-700" : "border-[#dbeafe] admin-dark:border-[#1e3a65]"} admin-dark:bg-[#112544]`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">
                       Q{pad(slotNumber)}
                       {q?.id !== null && q?.id !== undefined && (
@@ -746,24 +781,34 @@ export default function ExamPaperEditor({
                         </span>
                       )}
                     </p>
-                    {warnings && warnings.length > 0 && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
-                    )}
+                    <div className="flex shrink-0 items-center gap-2">
+                      {warnings && warnings.length > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isRefreshing}
+                        onClick={() => void refreshSlot(index)}
+                        className="rounded-lg border border-[#dbeafe] bg-white px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-[#eff6ff] disabled:opacity-40 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
+                        title={`Reload saved Q${pad(slotNumber)} (discards unsaved edits for this question only)`}
+                      >
+                        {isRefreshing ? "…" : "↻ Refresh"}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Question text — click to edit */}
+                  {/* Question text — edits stay unsaved until Save Questions */}
                   <div className="mt-2">
                     <textarea
                       value={draft.question}
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [index]: { ...draft, question: e.target.value, options: opts.slice(0, 4) } }))}
-                      onBlur={() => void persistSlot(index)}
                       placeholder=""
                       rows={2}
                       className="min-h-[48px] w-full resize-y rounded-xl border border-transparent bg-[#f8fbff] p-3 text-sm font-semibold leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 hover:border-[#dbeafe] focus:border-[#93c5fd] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500 admin-dark:focus:bg-[#0f2547]"
                     />
-                    {q?.questionImage && (
+                    {imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={q.questionImage} alt="Question image" className="mt-3 max-h-48 w-auto rounded-xl border border-neutral-200 object-contain admin-dark:border-zinc-700" />
+                      <img src={imageUrl} alt="Question image" className="mt-3 max-h-48 w-auto rounded-xl border border-neutral-200 object-contain admin-dark:border-zinc-700" />
                     )}
                     {isSaving && <p className="mt-1 text-[11px] font-bold text-slate-400">Saving…</p>}
                   </div>
@@ -795,7 +840,6 @@ export default function ExamPaperEditor({
                               nextOpts[oi] = e.target.value;
                               setDrafts((prev) => ({ ...prev, [index]: { ...draft, options: nextOpts.slice(0, 4) } }));
                             }}
-                            onBlur={() => void persistSlot(index)}
                             placeholder=""
                             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none admin-dark:text-zinc-200 admin-dark:placeholder:text-slate-500"
                           />
@@ -825,14 +869,13 @@ export default function ExamPaperEditor({
                       onChange={(e) => {
                         setDrafts((prev) => ({ ...prev, [index]: { ...draft, explanation: e.target.value } }));
                       }}
-                      onBlur={() => void persistSlot(index)}
                       placeholder="ব্যাখ্যা বা Explanation লিখুন (ঐচ্ছিক)"
                       className="w-full rounded-lg border border-[#dbeafe] bg-[#f8fbff] px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#2f6bce] focus:ring-2 focus:ring-[#2f6bce]/10 admin-dark:border-[#1e3a65] admin-dark:bg-[#132a4f] admin-dark:text-slate-200 admin-dark:placeholder:text-slate-500 admin-dark:focus:border-[#2f5aa0]"
                     />
                   </div>
 
-                  {/* Image upload — small, per question */}
-                  <div className="mt-3 flex items-center gap-2">
+                  {/* Image upload — per question (unsaved until Save Questions) */}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       disabled={imageUploadingSlot === index}
@@ -844,10 +887,19 @@ export default function ExamPaperEditor({
                       }}
                       className="rounded-lg border border-[#dbeafe] bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-[#eff6ff] disabled:opacity-40 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
                     >
-                      {imageUploadingSlot === index ? "Uploading…" : "Image Upload"}
+                      {imageUploadingSlot === index ? "Uploading…" : imageUrl ? "Replace Image" : "Image Upload"}
                     </button>
-                    {q?.questionImage && (
-                      <span className="truncate text-xs text-slate-500 admin-dark:text-slate-400">{q.questionImage.slice(0, 32)}…</span>
+                    {imageUrl && (
+                      <>
+                        <span className="max-w-[220px] truncate text-xs text-slate-500 admin-dark:text-slate-400">{imageUrl.slice(0, 40)}…</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50 admin-dark:border-red-900/40 admin-dark:bg-transparent admin-dark:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>
@@ -917,18 +969,20 @@ export default function ExamPaperEditor({
             <ol className="space-y-4">
               {displaySlots.map(({ index, q }) => {
                 const slotNumber = index + 1;
-                const draft = drafts[index] ?? { question: q?.question || "", options: (q?.options?.slice(0, 4) ?? [...EMPTY_OPTIONS]), correctIndex: (q?.correctIndex ?? 0) };
+                const draft = drafts[index] ?? draftFromQuestion(q);
                 const opts = [...draft.options];
                 while (opts.length < 4) opts.push("");
                 const isSaving = savingSlot === index;
+                const isRefreshing = refreshingSlot === index;
                 const warnings = detectWarnings[index];
+                const imageUrl = draft.questionImage ?? q?.questionImage ?? null;
 
                 return (
                   <li
                     key={q?.id ?? `slot-${index}`}
                     className={`rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${warnings && warnings.length > 0 ? "border-amber-300 admin-dark:border-amber-700" : "border-[#dbeafe] admin-dark:border-[#1e3a65]"} admin-dark:bg-[#112544]`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-extrabold tracking-widest text-[#0b1e3a] admin-dark:text-zinc-100">
                         Q{pad(slotNumber)}
                         {q?.id !== null && q?.id !== undefined && (
@@ -937,23 +991,33 @@ export default function ExamPaperEditor({
                           </span>
                         )}
                       </p>
-                      {warnings && warnings.length > 0 && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {warnings && warnings.length > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 admin-dark:bg-amber-900/30 admin-dark:text-amber-300">Needs review</span>
+                        )}
+                        <button
+                          type="button"
+                          disabled={isRefreshing}
+                          onClick={() => void refreshSlot(index)}
+                          className="rounded-lg border border-[#dbeafe] bg-white px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-[#eff6ff] disabled:opacity-40 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
+                          title={`Reload saved Q${pad(slotNumber)} (discards unsaved edits for this question only)`}
+                        >
+                          {isRefreshing ? "…" : "↻ Refresh"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-2">
                       <textarea
                         value={draft.question}
                         onChange={(e) => setDrafts((prev) => ({ ...prev, [index]: { ...draft, question: e.target.value, options: opts.slice(0, 4) } }))}
-                        onBlur={() => void persistSlot(index)}
                         placeholder=""
                         rows={2}
                         className="min-h-[48px] w-full resize-y rounded-xl border border-transparent bg-[#f8fbff] p-3 text-sm font-semibold leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 hover:border-[#dbeafe] focus:border-[#93c5fd] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500 admin-dark:focus:bg-[#0f2547]"
                       />
-                      {q?.questionImage && (
+                      {imageUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={q.questionImage} alt="Question image" className="mt-3 max-h-48 w-auto rounded-xl border border-neutral-200 object-contain admin-dark:border-zinc-700" />
+                        <img src={imageUrl} alt="Question image" className="mt-3 max-h-48 w-auto rounded-xl border border-neutral-200 object-contain admin-dark:border-zinc-700" />
                       )}
                       {isSaving && <p className="mt-1 text-[11px] font-bold text-slate-400">Saving…</p>}
                     </div>
@@ -984,7 +1048,6 @@ export default function ExamPaperEditor({
                                 nextOpts[oi] = e.target.value;
                                 setDrafts((prev) => ({ ...prev, [index]: { ...draft, options: nextOpts.slice(0, 4) } }));
                               }}
-                              onBlur={() => void persistSlot(index)}
                               placeholder=""
                               className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none admin-dark:text-zinc-200 admin-dark:placeholder:text-slate-500"
                             />
@@ -1002,6 +1065,35 @@ export default function ExamPaperEditor({
                         ))}
                       </div>
                     )}
+
+                    {/* Image upload — per question (unsaved until Save Questions) */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={imageUploadingSlot === index}
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.setAttribute("data-slot", String(index));
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        className="rounded-lg border border-[#dbeafe] bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-[#eff6ff] disabled:opacity-40 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-slate-300"
+                      >
+                        {imageUploadingSlot === index ? "Uploading…" : imageUrl ? "Replace Image" : "Image Upload"}
+                      </button>
+                      {imageUrl && (
+                        <>
+                          <span className="max-w-[220px] truncate text-xs text-slate-500 admin-dark:text-slate-400">{imageUrl.slice(0, 40)}…</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50 admin-dark:border-red-900/40 admin-dark:bg-transparent admin-dark:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </li>
                 );
               })}
