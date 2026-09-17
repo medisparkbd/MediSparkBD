@@ -44,11 +44,11 @@ export const HOMEPAGE_SECTIONS_CONFIG: HomepageSectionConfig[] = [
     editableText: false,
   },
   {
-    key: "homepage-courses",
-    label: "Courses Section",
-    defaultTitle: "Explore Our Courses",
+    key: "our-success",
+    label: "Our Success",
+    defaultTitle: "Milestones that drive us forward",
     defaultDescription:
-      "Choose your track — SSC, HSC or Medical Admission. Every course is built for your next achievement.",
+      "A snapshot of what we have achieved together on the road to medical admission.",
     editableText: true,
   },
   {
@@ -73,14 +73,6 @@ export const HOMEPAGE_SECTIONS_CONFIG: HomepageSectionConfig[] = [
     defaultTitle: "MediSpark at a Glance",
     defaultDescription: "",
     editableText: false,
-  },
-  {
-    key: "our-success",
-    label: "Our Success",
-    defaultTitle: "Milestones that drive us forward",
-    defaultDescription:
-      "A snapshot of what we have achieved together on the road to medical admission.",
-    editableText: true,
   },
   {
     key: "jersey",
@@ -120,6 +112,14 @@ export const HOMEPAGE_SECTIONS_CONFIG: HomepageSectionConfig[] = [
     defaultTitle: "Join With Us Now!",
     defaultDescription:
       "Connect with MediSpark on your favourite platforms and never miss an update.",
+    editableText: true,
+  },
+  {
+    key: "homepage-courses",
+    label: "Courses Section",
+    defaultTitle: "Explore Our Courses",
+    defaultDescription:
+      "Choose your track — SSC, HSC or Medical Admission. Every course is built for your next achievement.",
     editableText: true,
   },
 ];

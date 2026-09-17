@@ -57,7 +57,8 @@ export async function fetchHomepageSections(): Promise<HomepageSection[]> {
     }
 
     // Ensure every known section exists even if the DB row is missing,
-    // slotted into its default position (Our Success → Jersey → Mentors)
+    // slotted into its default position (Hero → Our Success → Featured →
+    // Why → Glance → Jersey → Mentors → Reviews → FAQ → Join With Us)
     // instead of being appended at the end of the list.
     for (const fallback of defaults) {
       if (sections.some((section) => section.key === fallback.key)) continue;
