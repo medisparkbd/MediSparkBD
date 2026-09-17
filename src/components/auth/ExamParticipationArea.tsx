@@ -386,13 +386,13 @@ export default function ExamParticipationArea({
     return () => setExamLocked(false);
   }, [begun, outcome, terminatedNotice, alreadyAttempted, setExamLocked]);
 
-  // Register auto-submit as the exit handler for the confirmation modal
+  // Register auto-submit as the exit handler for the confirmation modal.
+  // Returned promise is awaited by confirmExit so submission/session
+  // cleanup completes before navigating to Home.
   useEffect(() => {
     const locked = begun && !outcome && !terminatedNotice && !alreadyAttempted;
     if (locked) {
-      registerExitHandler(() => {
-        void submit();
-      });
+      registerExitHandler(() => submit());
     } else {
       unregisterExitHandler();
     }

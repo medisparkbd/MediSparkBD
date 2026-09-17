@@ -13,7 +13,7 @@ type ExamLockContextValue = {
   isLocked: boolean;
   setLocked: (v: boolean) => void;
   requestExit: (action?: () => void) => void;
-  confirmExit: () => void;
+  confirmExit: () => void | Promise<void>;
   cancelExit: () => void;
   showModal: boolean;
   registerExitHandler: (fn: () => void | Promise<void>) => void;
@@ -50,7 +50,7 @@ function ExamExitModal({
   onExit,
 }: {
   onStay: () => void;
-  onExit: () => void;
+  onExit: () => void | Promise<void>;
 }) {
   // Lock body scroll when modal open
   useEffect(() => {
@@ -122,9 +122,10 @@ function ExamExitModal({
 export function ExamLockProvider({ children }: { children: React.ReactNode }) {
   const [isLocked, setIsLocked] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [, setPendingAction] = useState<(() => void) | null>(null);
   const exitHandlerRef = useRef<(() => void | Promise<void>) | null>(null);
   const isLockedRef = useRef(isLocked);
+  const isExitingRef = useRef(false);
 
   useEffect(() => {
     isLockedRef.current = isLocked;
@@ -150,28 +151,58 @@ export function ExamLockProvider({ children }: { children: React.ReactNode }) {
     setShowModal(true);
   }, []);
 
-  const confirmExit = useCallback(() => {
-    setShowModal(false);
-    const handler = exitHandlerRef.current;
-    const action = pendingAction;
-    setPendingAction(null);
-    if (handler) {
+  const confirmExit = useCallback(async () => {
+    // Prevent double-clicks from double-submitting / double-navigating.
+    if (isExitingRef.current) return;
+    isExitingRef.current = true;
+    try {
+      setShowModal(false);
+      const handler = exitHandlerRef.current;
+      // Clear pending navigation — Exit always ends at Home ("/") per spec,
+      // so the stored intent is discarded after the exit process completes.
+      setPendingAction(null);
+      if (handler) {
+        try {
+          // Await the existing exam-exit process (auto-submit) so async
+          // submission/session cleanup completes before navigation.
+          await handler();
+        } catch {
+          // ignore — still exit to Home; keepalive/pagehide retries submit
+        }
+      }
+      // End the active exam session + clear the lock trap synchronously so
+      // browser history cannot return the student to the exam.
+      exitHandlerRef.current = null;
+      setIsLocked(false);
+      isLockedRef.current = false;
       try {
-        const result = handler();
-        if (result instanceof Promise) {
-          void result.catch(() => undefined);
+        if (
+          typeof window !== "undefined" &&
+          (window.history.state as Record<string, unknown> | null)?.examLock
+        ) {
+          // Remove the dummy trap entry added while locked.
+          window.history.back();
+          // Let the pop (listener already removed on unlock) settle.
+          await new Promise((resolve) => setTimeout(resolve, 60));
         }
       } catch {
         // ignore
       }
-      // Handler is auto-submit — exam will transition to outcome and unlock.
-      // Do NOT execute pending navigation; result card should be shown first.
-      return;
+      // Navigate to Home. replace() (not push) so Back never lands back
+      // inside the exam. No timer restart / no new attempt — the exam
+      // component unmounts and submittedRef already guards re-submit.
+      try {
+        window.location.replace("/");
+      } catch {
+        window.location.href = "/";
+      }
+    } finally {
+      // Reset after navigation starts; harmless if page unloads.
+      setTimeout(() => {
+        isExitingRef.current = false;
+      }, 1000);
     }
-    if (action) {
-      action();
-    }
-  }, [pendingAction]);
+  }, []);
 
   const cancelExit = useCallback(() => {
     setShowModal(false);
