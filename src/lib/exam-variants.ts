@@ -91,6 +91,109 @@ export function assignSetServerSide(): QuestionSet {
   return randomInt(2) === 0 ? "A" : "B";
 }
 
+/**
+ * Pure validity check for one authored variant cell (mirrors save-time rules):
+ * question text (≥3 chars) or an image, at least two non-empty options, and a
+ * correct index inside the options range.
+ */
+export function isValidVariantContent(
+  question: string | null | undefined,
+  optionsJson: string | null | undefined,
+  correctIndex: number | string | null | undefined,
+  questionImage?: string | null | undefined,
+): boolean {
+  const text = String(question ?? "").trim();
+  if (text.length < 3 && !questionImage) return false;
+  const parsed = parseJsonColumn<unknown[]>(optionsJson ?? "");
+  if (!Array.isArray(parsed) || parsed.length < 2) return false;
+  const options = parsed.map((o) => String(o));
+  if (options.some((o) => o.length === 0)) return false;
+  const ci = Number(correctIndex);
+  if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) return false;
+  return true;
+}
+
+/** Number of VALID variant cells for one (exam, version, set). */
+export async function countValidVariants(
+  examId: string,
+  version: QuestionVersion,
+  set: QuestionSet,
+): Promise<number> {
+  await ensureVariantTables();
+  const rows = await query<{
+    question: string;
+    options: string;
+    correct_index: number;
+    question_image: string | null;
+  }[]>(
+    `SELECT v.question, v.options, v.correct_index, v.question_image
+       FROM exam_question_variants v
+       JOIN exam_questions q ON q.id = v.question_id
+      WHERE q.exam_id = ? AND q.is_active = 1 AND v.lang = ? AND v.set_label = ?`,
+    [examId, version, set],
+  );
+  let valid = 0;
+  for (const row of rows) {
+    if (isValidVariantContent(row.question, row.options, row.correct_index, row.question_image)) {
+      valid += 1;
+    }
+  }
+  return valid;
+}
+
+/**
+ * Which Sets actually contain the required valid question data for one exam
+ * version. A Set is available only when its valid variant cells cover every
+ * active question slot — an empty or partially-authored Set is unavailable.
+ * Legacy exams (base-row content, no variants) report no available sets so
+ * callers keep the existing assignment behavior unchanged.
+ */
+export async function availableSetsForExam(
+  examId: string,
+  version: QuestionVersion,
+): Promise<QuestionSet[]> {
+  try {
+    await ensureVariantTables();
+    const slotRows = await query<{ n: number }[]>(
+      `SELECT COUNT(*) AS n FROM exam_questions WHERE exam_id = ? AND is_active = 1`,
+      [examId],
+    );
+    const totalSlots = Number(slotRows[0]?.n ?? 0) || 0;
+    if (totalSlots <= 0) return [];
+    const [validA, validB] = await Promise.all([
+      countValidVariants(examId, version, "A"),
+      countValidVariants(examId, version, "B"),
+    ]);
+    const out: QuestionSet[] = [];
+    if (validA >= totalSlots) out.push("A");
+    if (validB >= totalSlots) out.push("B");
+    return out;
+  } catch {
+    // On DB errors report no available sets — callers keep the legacy
+    // random assignment instead of blocking the exam start.
+    return [];
+  }
+}
+
+/**
+ * Availability-aware Set assignment for an attempt start. When exactly one
+ * Set holds complete valid data it is used directly (no random draw, never an
+ * unavailable Set). When both or neither do, fall back to the existing
+ * random server-side assignment (legacy/base-row exams behave as before).
+ */
+export async function assignSetForExam(
+  examId: string,
+  version: QuestionVersion,
+): Promise<QuestionSet> {
+  try {
+    const available = await availableSetsForExam(examId, version);
+    if (available.length === 1) return available[0];
+  } catch {
+    // On DB errors keep the legacy behavior — never block an exam start.
+  }
+  return assignSetServerSide();
+}
+
 /** Fisher–Yates shuffle with crypto randomness. Returns a new array. */
 export function shuffledOrder(ids: number[]): number[] {
   const arr = [...ids];

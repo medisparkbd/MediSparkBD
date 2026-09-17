@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ensureColumn, exec, parseJsonColumn, query, withTransaction } from "@/lib/mysql";
 import { fetchExams, hasEnrolledExamAccess, type Exam } from "@/lib/exams-admin";
 import {
-  assignSetServerSide,
+  assignSetForExam,
   ensureVariantTables,
   fetchVariantMap,
   normalizeVersion,
@@ -291,7 +291,9 @@ async function backfillAttemptLock(
 ): Promise<void> {
   try {
     await ensureVariantTables();
-    const assignedSet = assignSetServerSide();
+    // Availability-aware: a single fully-authored Set is reused as-is so a
+    // resumed legacy attempt can never land on an unavailable Set.
+    const assignedSet = await assignSetForExam(examId, questionVersion);
     const idRows = await query<{ id: number }[]>(
       `SELECT id FROM exam_questions WHERE exam_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC`,
       [examId],
@@ -361,7 +363,8 @@ function ensureAttemptTables(): Promise<void> {
  * begins. Returns the session token for this device.
  *
  * Language Version + Set + Order lock: the student's chosen version is stored,
- * the Set (A/B) is assigned server-side (crypto-random, never client-chosen),
+ * the Set is assigned server-side (the only fully-available Set is used
+ * directly; otherwise crypto-random between A/B, never client-chosen),
  * and the display order is shuffled server-side. All three are persisted in
  * exam_attempts and REUSED on resume — refresh / reopen / device switch /
  * re-enter never regenerates them while the attempt is active.
@@ -451,7 +454,9 @@ async function startExamAttempt(
   }
   const token = randomUUID();
   // Server-side Set assignment + order shuffle, locked to this attempt.
-  const assignedSet = assignSetServerSide();
+  // Availability-aware: when only one Set holds complete valid questions it
+  // is used directly; when both do, the existing random assignment applies.
+  const assignedSet = await assignSetForExam(examId, questionVersion);
   let questionOrder: number[];
   try {
     const idRows = await query<{ id: number }[]>(
