@@ -30,15 +30,6 @@ type ResultScript = {
   questions: ScriptQuestion[];
 };
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
 export default function ExamResultClient({
   examId,
   examName,
@@ -123,7 +114,6 @@ export default function ExamResultClient({
   const correctMarks = script.questions
     .filter((q) => q.chosenIndex !== null && q.chosenIndex === q.correctIndex)
     .reduce((s, q) => s + q.marks, 0);
-  const percentage = script.totalMarks > 0 ? Math.round((script.score / script.totalMarks) * 100) : 0;
 
   if (showSheet) {
     return (
@@ -235,35 +225,10 @@ export default function ExamResultClient({
       <h3 className="text-center text-lg font-extrabold text-heading">Exam Result</h3>
       <div className="mx-auto mt-4 max-w-2xl rounded-2xl border border-ink/10 bg-dark-900 p-5 sm:p-6">
         <div className="text-center">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-neutral-500">━━━━━━━━━━━━ Exam Result ━━━━━━━━━━━━</p>
-          <div className="mt-3">
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Exam Name</p>
-              <p className="text-sm font-bold text-heading">{script.examName || examName}</p>
-            </div>
+          <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Exam Name</p>
+            <p className="text-sm font-bold text-heading">{script.examName || examName}</p>
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Total Questions</dt>
-              <dd className="text-sm font-extrabold text-heading">{totalQuestions}</dd>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Total Marks</dt>
-              <dd className="text-sm font-extrabold text-heading">{script.totalMarks}</dd>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Time Taken</dt>
-              <dd className="text-sm font-extrabold text-heading">{script.timeTakenSeconds != null ? formatDuration(script.timeTakenSeconds) : "—"}</dd>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Submission Status</dt>
-              <dd className="text-sm font-extrabold text-heading">Completed</dd>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-dark-850 px-3 py-2 text-center sm:col-span-2 lg:col-span-1">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Highest Mark</dt>
-              <dd className="text-sm font-extrabold text-heading">{script.highestMark != null ? script.highestMark : "—"}</dd>
-            </div>
-          </dl>
         </div>
 
         <div className="mx-auto mt-4 grid max-w-md grid-cols-3 gap-3 text-center">
@@ -287,7 +252,6 @@ export default function ExamResultClient({
             {script.score}
             <span className="text-2xl text-neutral-400"> / {script.totalMarks}</span>
           </p>
-          <p className="mt-1 text-sm font-semibold text-neutral-300">{percentage}%</p>
         </div>
 
         <ul className="mt-4 grid gap-2 text-left text-sm">
@@ -307,8 +271,11 @@ export default function ExamResultClient({
             <span className="font-semibold text-neutral-400">Merit Position / Rank</span>
             <span className="font-extrabold text-primary-300">{script.meritPosition != null ? `#${script.meritPosition}` : "—"}</span>
           </li>
+          <li className="flex items-center justify-between rounded-xl border border-ink/10 bg-dark-850 px-4 py-2.5">
+            <span className="font-semibold text-neutral-400">Highest Mark</span>
+            <span className="font-extrabold text-heading">{script.highestMark != null ? script.highestMark : "—"}</span>
+          </li>
         </ul>
-        <p className="mt-3 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500">━━━━━━━━━━━━━━━━━━━━━━━━━━</p>
       </div>
 
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
