@@ -289,7 +289,7 @@ export default function AdminQaControlPage() {
           Same card design, layout, icon and typography as the Main Website. Admin cards show 3 statistics (Total / Answered / Unanswered) — each is clickable and filters that subject only.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {subjects.map((subject) => {
             const stats = subjectStats[subject.id] ?? { total: 0, answered: 0, unanswered: 0 };
             const icon = subjectIcons[subject.id] ?? subjectIcons[subject.id.toLowerCase()] ?? null;
@@ -298,80 +298,83 @@ export default function AdminQaControlPage() {
                 key={subject.id}
                 className="group flex min-w-0 flex-col rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-800 text-white shadow-md shadow-primary-900/20 transition group-hover:shadow-primary-800/50">
-                    {icon ?? fallbackIcon(subject.name)}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {renamingId === subject.id ? null : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRenamingId(subject.id);
-                            setRenameValue(subject.name);
+                {/* Same left/right interior as the Main Website subject cards:
+                    icon + name (+ Edit/Delete) on the left, statistics on the
+                    right. Admin stats stay clickable subject filters. */}
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-800 text-white shadow-md shadow-primary-900/20 transition group-hover:shadow-primary-800/50">
+                      {icon ?? fallbackIcon(subject.name)}
+                    </span>
+
+                    {renamingId === subject.id ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        <input
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void renameSubject(subject);
+                            if (e.key === "Escape") setRenamingId(null);
                           }}
-                          className="rounded-md px-1.5 py-0.5 text-[10px] font-bold text-neutral-500 hover:bg-ink/10 hover:text-neutral-300"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteSubject(subject)}
-                          className="rounded-md px-1.5 py-0.5 text-[10px] font-bold text-neutral-500 hover:bg-red-500/10 hover:text-red-400"
-                        >
-                          Del
-                        </button>
+                          autoFocus
+                          className="w-full min-w-0 flex-1 rounded-lg border border-primary-500/40 bg-dark-800 px-2 py-1 text-xs font-semibold text-heading outline-none"
+                        />
+                        <button type="button" onClick={() => void renameSubject(subject)} className="shrink-0 rounded-lg bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700">Save</button>
+                        <button type="button" onClick={() => setRenamingId(null)} className="shrink-0 rounded-lg border border-ink/15 px-2 py-1 text-xs font-bold text-neutral-400">✕</button>
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="mt-3 truncate font-bold text-heading transition group-hover:text-primary-400">{subject.name}</h3>
+                        <div className="mt-1 flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenamingId(subject.id);
+                              setRenameValue(subject.name);
+                            }}
+                            className="rounded-md px-1.5 py-0.5 text-[10px] font-bold text-neutral-500 hover:bg-ink/10 hover:text-neutral-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteSubject(subject)}
+                            className="rounded-md px-1.5 py-0.5 text-[10px] font-bold text-neutral-500 hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            Del
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>
-                </div>
 
-                {renamingId === subject.id ? (
-                  <div className="mt-3 flex items-center gap-1.5">
-                    <input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void renameSubject(subject);
-                        if (e.key === "Escape") setRenamingId(null);
-                      }}
-                      autoFocus
-                      className="w-full rounded-lg border border-primary-500/40 bg-dark-800 px-2 py-1 text-xs font-semibold text-heading outline-none"
-                    />
-                    <button type="button" onClick={() => void renameSubject(subject)} className="shrink-0 rounded-lg bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700">Save</button>
-                    <button type="button" onClick={() => setRenamingId(null)} className="shrink-0 rounded-lg border border-ink/15 px-2 py-1 text-xs font-bold text-neutral-400">✕</button>
+                  {/* THREE clickable statistics — subject-specific filtering */}
+                  <div className="w-40 shrink-0 space-y-2 sm:w-48">
+                    <Link
+                      href={`/admin/qa/${encodeURIComponent(subject.id)}`}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-primary-500/40 hover:bg-primary-500/10"
+                      title="Click to view all questions for this subject"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Total Questions</span>
+                      <span className="shrink-0 text-sm font-bold text-heading">{stats.total}</span>
+                    </Link>
+                    <Link
+                      href={`/admin/qa/${encodeURIComponent(subject.id)}?status=answered`}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-emerald-500/40 hover:bg-emerald-500/10"
+                      title="Click to view only answered questions for this subject"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Answered Questions</span>
+                      <span className="shrink-0 text-sm font-bold text-emerald-400">{stats.answered}</span>
+                    </Link>
+                    <Link
+                      href={`/admin/qa/${encodeURIComponent(subject.id)}?status=unanswered`}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-yellow-500/40 hover:bg-yellow-500/10"
+                      title="Click to view only unanswered questions for this subject"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Unanswered Questions</span>
+                      <span className="shrink-0 text-sm font-bold text-yellow-300">{stats.unanswered}</span>
+                    </Link>
                   </div>
-                ) : (
-                  <h3 className="mt-4 truncate font-bold text-heading transition group-hover:text-primary-400">{subject.name}</h3>
-                )}
-
-                {/* THREE clickable statistics — subject-specific filtering */}
-                <div className="mt-4 space-y-2">
-                  <Link
-                    href={`/admin/qa/${encodeURIComponent(subject.id)}`}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-primary-500/40 hover:bg-primary-500/10"
-                    title="Click to view all questions for this subject"
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Total Questions</span>
-                    <span className="shrink-0 text-sm font-bold text-heading">{stats.total}</span>
-                  </Link>
-                  <Link
-                    href={`/admin/qa/${encodeURIComponent(subject.id)}?status=answered`}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-emerald-500/40 hover:bg-emerald-500/10"
-                    title="Click to view only answered questions for this subject"
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Answered Questions</span>
-                    <span className="shrink-0 text-sm font-bold text-emerald-400">{stats.answered}</span>
-                  </Link>
-                  <Link
-                    href={`/admin/qa/${encodeURIComponent(subject.id)}?status=unanswered`}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 transition hover:border-yellow-500/40 hover:bg-yellow-500/10"
-                    title="Click to view only unanswered questions for this subject"
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Unanswered Questions</span>
-                    <span className="shrink-0 text-sm font-bold text-yellow-300">{stats.unanswered}</span>
-                  </Link>
                 </div>
 
                 <Link

@@ -129,6 +129,7 @@ export type DashboardCardPatch = {
   href?: string;
   icon?: string;
   isActive?: boolean;
+  sort_order?: number;
 };
 
 export async function updateDashboardCard(
@@ -158,6 +159,10 @@ export async function updateDashboardCard(
   if (patch.isActive !== undefined) {
     sets.push("is_active = ?");
     values.push(patch.isActive ? 1 : 0);
+  }
+  if (patch.sort_order !== undefined && Number.isFinite(patch.sort_order)) {
+    sets.push("sort_order = ?");
+    values.push(Math.trunc(patch.sort_order));
   }
 
   if (sets.length > 0) {

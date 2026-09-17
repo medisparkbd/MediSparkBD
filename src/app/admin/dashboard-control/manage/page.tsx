@@ -164,6 +164,40 @@ export default function DashboardCardManagerPage() {
     }
   }
 
+    async function moveCard(index: number, direction: -1 | 1) {
+    const current = cards[index];
+    const neighbor = cards[index + direction];
+    if (!current || !neighbor || busyKey) return;
+    setBusyKey(current.key);
+    try {
+      const res = await fetch("/api/admin/dashboard-cards", {
+        method: "PATCH",
+        headers: await headers(),
+        body: JSON.stringify({ key: neighbor.key, sort_order: current.order }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast.showToast("error", data?.error ?? "Failed to reorder the cards.");
+        return;
+      }
+      const res2 = await fetch("/api/admin/dashboard-cards", {
+        method: "PATCH",
+        headers: await headers(),
+        body: JSON.stringify({ key: current.key, sort_order: neighbor.order }),
+      });
+      const data2 = (await res2.json().catch(() => null)) as { error?: string; cards?: DashboardCard[] } | null;
+      if (!res2.ok) {
+        toast.showToast("error", data2?.error ?? "Failed to reorder the cards.");
+        return;
+      }
+      applyCards(data2, "Card order updated.");
+    } catch {
+      toast.showToast("error", "Network error.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   function startEdit(card: DashboardCard) {
     setEditKey(card.key);
     setEdit({
@@ -285,7 +319,7 @@ export default function DashboardCardManagerPage() {
           </p>
         ) : (
           <ul className="mt-4 space-y-2.5">
-            {cards.map((card) => {
+            {cards.map((card, index) => {
               const busy = busyKey === card.key;
               const isEditing = editKey === card.key;
               return (
@@ -339,6 +373,28 @@ export default function DashboardCardManagerPage() {
                     >
                       {isEditing ? "Cancel" : "Edit"}
                     </button>
+                    <span className="flex shrink-0 items-center gap-1" role="group" aria-label={`Reorder ${card.title}`}>
+                      <button
+                        type="button"
+                        onClick={() => void moveCard(index, -1)}
+                        disabled={busy || busyKey !== null || index === 0}
+                        aria-label={`Move ${card.title} up`}
+                        title="Move up"
+                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-40"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void moveCard(index, 1)}
+                        disabled={busy || busyKey !== null || index === cards.length - 1}
+                        aria-label={`Move ${card.title} down`}
+                        title="Move down"
+                        className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-bold text-heading hover:border-[#93c5fd] disabled:opacity-40"
+                      >
+                        ↓
+                      </button>
+                    </span>
                     <button
                       type="button"
                       onClick={() => void deleteCard(card)}

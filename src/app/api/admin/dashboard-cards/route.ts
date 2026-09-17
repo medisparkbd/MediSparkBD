@@ -76,6 +76,9 @@ export async function PATCH(request: NextRequest) {
   if (typeof body?.href === "string") patch.href = body.href.trim();
   if (typeof body?.icon === "string") patch.icon = body.icon;
   if (typeof body?.isActive === "boolean") patch.isActive = body.isActive;
+  if (typeof body?.sort_order === "number" && Number.isFinite(body.sort_order)) {
+    patch.sort_order = Math.trunc(body.sort_order);
+  }
   try {
     const cards = await updateDashboardCard(key, patch);
     await logAdminAction(admin, "dashboard-card.update", key, request);
