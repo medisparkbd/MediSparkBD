@@ -94,7 +94,10 @@ export default function BottomNav() {
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/10 bg-dark-950/95 backdrop-blur">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/10 bg-dark-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      style={{ transform: "translateZ(0)" }}
+    >
       <div className="mx-auto grid h-16 max-w-lg grid-cols-5">
         {mainNavLinks.map((link) => {
           const active = isActive(link.href);

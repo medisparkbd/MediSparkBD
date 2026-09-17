@@ -152,10 +152,8 @@ export default function ExamParticipationArea({
   const submittedRef = useRef(false);
   const answersRef = useRef<Record<number, number>>({});
   const tokenRef = useRef<string | null>(null);
-  // Exam Fixed Header — measured offsets so it stays directly below the normal website header
+  // Exam Fixed Header — measured offset so it stays directly below the normal website header
   const [headerOffset, setHeaderOffset] = useState(64);
-  const [examHeaderHeight, setExamHeaderHeight] = useState(48);
-  const examFixedHeaderRef = useRef<HTMLDivElement>(null);
 
   /**
    * Activate a freshly created server session — locks in the start time and
@@ -481,6 +479,9 @@ export default function ExamParticipationArea({
 
   // Exam Fixed Header positioning — keep it directly below the normal website header (sticky Navbar).
   // Measures the live header height so the sticky exam header sticks at the correct offset and never overlaps the Navbar.
+  // Measured ONLY on real layout changes (resize / header resize) — never on
+  // scroll — so the sticky offset stays perfectly stable while scrolling and
+  // the bar never shifts with the page content.
   useEffect(() => {
     if (!begun || outcome || terminatedNotice) return;
     function updateOffsets() {
@@ -488,29 +489,20 @@ export default function ExamParticipationArea({
       if (header) {
         // Navbar is sticky top-0; its height is the offset where the exam header should stick
         const h = Math.round(header.getBoundingClientRect().height);
-        if (h) setHeaderOffset(h);
-      }
-      if (examFixedHeaderRef.current) {
-        const h = examFixedHeaderRef.current.offsetHeight;
-        if (h && h !== examHeaderHeight) setExamHeaderHeight(h);
+        if (h > 0) setHeaderOffset((prev) => (prev === h ? prev : h));
       }
     }
     updateOffsets();
-    window.addEventListener("scroll", updateOffsets, { passive: true });
     window.addEventListener("resize", updateOffsets);
-    const iv = setInterval(updateOffsets, 500);
     // also observe announcement dismissal / header height changes
     const ro = new ResizeObserver(updateOffsets);
     const headerEl = document.querySelector("header");
     if (headerEl) ro.observe(headerEl);
-    if (examFixedHeaderRef.current) ro.observe(examFixedHeaderRef.current);
     return () => {
-      window.removeEventListener("scroll", updateOffsets);
       window.removeEventListener("resize", updateOffsets);
-      clearInterval(iv);
       ro.disconnect();
     };
-  }, [begun, outcome, terminatedNotice, examHeaderHeight]);
+  }, [begun, outcome, terminatedNotice]);
 
   // Close/leave protection for an active exam.
   // - beforeunload ONLY warns ("If you close this tab, your exam will be
@@ -1084,9 +1076,8 @@ export default function ExamParticipationArea({
           Placed OUTSIDE the scrollable question-paper container, questions scroll underneath.
           LEFT: Answered X/Y (same answeredCount) | RIGHT: live countdown (same secondsLeft state). */}
       <div
-        ref={examFixedHeaderRef}
         className="sticky z-40 -mx-4 border-b border-ink/10 bg-dark-950/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-dark-950/80 sm:-mx-6 sm:px-6"
-        style={{ top: `${headerOffset}px` }}
+        style={{ top: `${headerOffset}px`, transform: "translateZ(0)" }}
         role="region"
         aria-label="Exam progress and timer"
       >
