@@ -34,6 +34,7 @@ type SubmissionOutcome = {
   negativeDeduction?: number;
   timerPenalty?: number;
   secondTimer?: boolean;
+  autoSubmitted?: boolean;
   meritPosition?: number | null;
   timeTakenSeconds?: number | null;
   highestMark?: number | null;
@@ -112,6 +113,9 @@ export default function ExamParticipationArea({
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Submit failure is shown inline (exam stays open for retry) — it must
+  // never replace the exam UI or reset timer/answers/attempt.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<SubmissionOutcome | null>(null);
   const [terminatedNotice, setTerminatedNotice] = useState(false);
   // Strict one-attempt: if already completed, show View Result instead of Start Exam
@@ -181,10 +185,17 @@ export default function ExamParticipationArea({
         secondsLeft?: number | null;
         questions?: TakingQuestion[];
         questionVersion?: "bangla" | "english" | null;
+        abandonedOutcome?: SubmissionOutcome | null;
         error?: string;
       };
       if (!response.ok) {
         setLoadError(data.error ?? "Could not start the exam. Please retry.");
+        return;
+      }
+      if (data.abandonedOutcome && "score" in data.abandonedOutcome) {
+        submittedRef.current = true;
+        setOutcome({ ...data.abandonedOutcome, autoSubmitted: true });
+        setAlreadyAttempted(true);
         return;
       }
       // Locked server order — replace the preview list with the student's
@@ -228,11 +239,23 @@ export default function ExamParticipationArea({
         const data = (await response.json().catch(() => ({}))) as {
           exam?: TakingExam;
           questions?: TakingQuestion[];
+          abandonedOutcome?: SubmissionOutcome | null;
           error?: string;
         };
         if (cancelled) return;
         if (!response.ok || !data.exam) {
           setLoadError(data.error ?? "This exam is not available right now.");
+          return;
+        }
+        // Re-entering found the previous session abandoned — the backend
+        // auto-submitted it; show its result instead of a new attempt.
+        if (data.abandonedOutcome && "score" in data.abandonedOutcome) {
+          if (!cancelled) {
+            submittedRef.current = true;
+            setExam(data.exam);
+            setOutcome({ ...data.abandonedOutcome, autoSubmitted: true });
+            setAlreadyAttempted(true);
+          }
           return;
         }
         setExam(data.exam);
@@ -287,8 +310,14 @@ export default function ExamParticipationArea({
             );
             const startData = (await startResponse
               .json()
-              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; questions?: TakingQuestion[]; questionVersion?: "bangla" | "english" | null; error?: string; alreadyAttempted?: boolean };
+              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; questions?: TakingQuestion[]; questionVersion?: "bangla" | "english" | null; abandonedOutcome?: SubmissionOutcome | null; error?: string; alreadyAttempted?: boolean };
             if (cancelled) return;
+            if (startData.abandonedOutcome && "score" in startData.abandonedOutcome) {
+              submittedRef.current = true;
+              setOutcome({ ...startData.abandonedOutcome, autoSubmitted: true });
+              setAlreadyAttempted(true);
+              return;
+            }
             if (startResponse.ok && data.exam) {
               // Locked server order replaces the preview list.
               if (Array.isArray(startData.questions) && startData.questions.length > 0) {
@@ -338,9 +367,12 @@ export default function ExamParticipationArea({
   }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl]);
 
   const submit = useCallback(async () => {
+    // Duplicate guard: one submission per attempt — concurrent triggers
+    // (button, timer expiry, exit handler) collapse into a single POST.
     if (submittedRef.current || !user) return;
     submittedRef.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const token = await user.getIdToken();
       const response = await fetch(
@@ -365,15 +397,17 @@ export default function ExamParticipationArea({
         | SubmissionOutcome
         | { error?: string };
       if ("score" in data) {
+        // Timer, answers and attempt are untouched — the attempt is finalized
+        // server-side and the existing result/Answer Card flow takes over.
         setOutcome(data);
       } else {
-        // Allow retry on failure.
+        // Allow retry on failure — the exam stays exactly as it was.
         submittedRef.current = false;
-        setLoadError("error" in data && data.error ? data.error : "Submission failed.");
+        setSubmitError("error" in data && data.error ? data.error : "Submission failed. Please try again.");
       }
     } catch {
       submittedRef.current = false;
-      setLoadError("Submission failed. Check your connection and try again.");
+      setSubmitError("Submission failed. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -455,16 +489,26 @@ export default function ExamParticipationArea({
     };
   }, [begun, outcome, terminatedNotice, examHeaderHeight]);
 
-  // Interrupted active exam → automatically submit and cannot be recovered/resumed.
-  // Handles tab close, navigation away, refresh, and hidden tab.
-  // Server-side stored answers remain authoritative; this sends the latest
-  // local selections with keepalive so the result is finalized.
+  // Close/leave protection for an active exam.
+  // - beforeunload ONLY warns ("If you close this tab, your exam will be
+  //   automatically submitted.") — it never submits, so cancelling the dialog
+  //   leaves the attempt fully intact (timer, answers, session untouched).
+  // - pagehide (the tab is really going away) sends the answers with
+  //   keepalive so the backend finalizes the attempt reliably.
   useEffect(() => {
-    function handleInterrupt() {
-      if (submittedRef.current || !user) return;
-      // Only auto-submit if the attempt has actually begun (rules accepted).
-      if (!begun) return;
-      submittedRef.current = true;
+    const active = begun && !outcome && !terminatedNotice && !alreadyAttempted;
+    if (!active || !user) return;
+    const currentUser = user;
+    const warningText =
+      "If you close this tab, your exam will be automatically submitted.";
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (submittedRef.current) return;
+      e.preventDefault();
+      // Browsers show their own generic prompt, but returnValue is required.
+      e.returnValue = warningText;
+      return warningText;
+    }
+    function postAnswersKeepalive() {
       try {
         const answered = answersRef.current;
         const body = JSON.stringify({
@@ -472,7 +516,7 @@ export default function ExamParticipationArea({
             Object.entries(answered).map(([key, value]) => [String(key), value]),
           ),
         });
-        void user.getIdToken().then((authToken) => {
+        void currentUser.getIdToken().then((authToken) => {
           // keepalive lets the request finish even as the page unloads.
           void fetch(`/api/exams/${encodeURIComponent(examId)}/submit`, {
             method: "POST",
@@ -488,18 +532,87 @@ export default function ExamParticipationArea({
         // Best effort — the server-side stored answers remain authoritative.
       }
     }
-    function handleVisibility() {
-      if (document.visibilityState === "hidden") handleInterrupt();
+    function onPageHide() {
+      // Only when the page is actually unloading (leave confirmed).
+      if (submittedRef.current) return;
+      submittedRef.current = true;
+      postAnswersKeepalive();
     }
-    window.addEventListener("pagehide", handleInterrupt);
-    window.addEventListener("beforeunload", handleInterrupt);
-    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      window.removeEventListener("pagehide", handleInterrupt);
-      window.removeEventListener("beforeunload", handleInterrupt);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", onPageHide);
     };
-  }, [examId, user, begun]);
+  }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted]);
+
+  // Presence heartbeat (every 20s) while the exam is active. Keeps the
+  // server-side session alive; if the backend reports the session ended
+  // elsewhere (abandoned / submitted / taken over), the result is shown
+  // instead of a dead exam paper. Never submits from the client on hide.
+  useEffect(() => {
+    const active = begun && !outcome && !terminatedNotice && !alreadyAttempted;
+    if (!active || !user) return;
+    let stopped = false;
+    const pullStoredResult = async (): Promise<boolean> => {
+      try {
+        const authToken = await user.getIdToken();
+        if (stopped) return false;
+        const rRes = await fetch(`/api/exams/${encodeURIComponent(examId)}/result`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          cache: "no-store",
+        });
+        const rData = (await rRes.json().catch(() => ({}))) as SubmissionOutcome & { error?: string };
+        if (stopped) return false;
+        if (rRes.ok && "score" in rData) {
+          submittedRef.current = true;
+          setOutcome(rData as SubmissionOutcome);
+          return true;
+        }
+      } catch {
+        // ignore — stay on the exam, next beat retries
+      }
+      return false;
+    };
+    const beat = async () => {
+      if (stopped || submittedRef.current) return;
+      try {
+        const authToken = await user.getIdToken();
+        if (stopped || submittedRef.current) return;
+        const res = await fetch(`/api/exams/${encodeURIComponent(examId)}/heartbeat`, {
+          method: "POST",
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          status?: "ok" | "abandoned" | "submitted";
+          outcome?: SubmissionOutcome;
+        };
+        if (stopped || submittedRef.current) return;
+        if (data.status === "abandoned" && data.outcome && "score" in data.outcome) {
+          // Server finalized the abandoned session — show its result card.
+          submittedRef.current = true;
+          setOutcome({ ...data.outcome, autoSubmitted: true });
+        } else if (data.status === "submitted") {
+          // Attempt ended elsewhere (keepalive won, another device, expiry).
+          submittedRef.current = true;
+          const shown = await pullStoredResult();
+          if (!shown) submittedRef.current = false; // result not ready yet — stay on exam
+        }
+      } catch {
+        // Offline — stay on the exam; the next beat retries.
+      }
+    };
+    void beat();
+    const iv = setInterval(() => void beat(), 20000);
+    const onVisibility = () => void beat(); // revalidate on return; stamp presence on hide
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted]);
 
   /** Select an answer — allowed only once per question, no changing later. */
   async function chooseOption(question: TakingQuestion, optionIndex: number) {
@@ -747,7 +860,7 @@ export default function ExamParticipationArea({
     }
 
     const totalQuestions = questions.length > 0 ? questions.length : outcome.correctCount + outcome.wrongCount + outcome.skippedCount;
-    const submissionStatus = (outcome as { autoSubmitted?: boolean }).autoSubmitted ? "Auto Submitted" : "Manual Submit";
+    const submissionStatus = outcome.autoSubmitted ? "Auto Submitted" : "Manual Submit";
     return (
       <div className="rounded-2xl border border-primary-600/30 bg-primary-600/10 p-4 text-left sm:p-8">
         {terminatedNotice ? (
@@ -1121,18 +1234,26 @@ export default function ExamParticipationArea({
             Answered <span className="font-extrabold text-primary-300">{answeredCount}</span> / {totalQuestions} · Unanswered{" "}
             <span className="font-extrabold text-amber-300">{unansweredCount}</span>
           </p>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => {
-              if (window.confirm("Are you sure you want to submit the exam?")) {
-                void submit();
-              }
-            }}
-            className="w-full rounded-xl bg-emerald-600 px-8 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
-          >
-            {submitting ? "Submitting…" : "Submit Exam"}
-          </button>
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+            {submitError && (
+              <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-center text-xs font-bold text-red-300 sm:text-right">
+                {submitError}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => {
+                setSubmitError(null);
+                if (window.confirm("Are you sure you want to submit the exam?")) {
+                  void submit();
+                }
+              }}
+              className="w-full rounded-xl bg-emerald-600 px-8 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
+            >
+              {submitting ? "Submitting…" : "Submit Exam"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

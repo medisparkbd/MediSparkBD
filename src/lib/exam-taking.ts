@@ -232,7 +232,24 @@ type AttemptRow = {
   assigned_set?: string | null;
   /** Locked at start: shuffled permanent Question IDs in display order. */
   question_order?: string | number[] | null;
+  /** Last client heartbeat — staleness means the session was abandoned. */
+  last_seen?: Date | string | null;
 };
+
+/**
+ * Abandoned-session rule: an ACTIVE attempt whose client has been silent for
+ * this long is treated as left/closed and auto-submitted server-side.
+ * The client heartbeats every 20s, so a healthy session never goes stale.
+ */
+export const ATTEMPT_ABANDON_AFTER_SEC = 120;
+
+/** True when last_seen exists and is older than the abandon threshold. */
+function isAttemptAbandoned(lastSeen: AttemptRow["last_seen"]): boolean {
+  if (lastSeen === null || lastSeen === undefined) return false;
+  const ms = lastSeen instanceof Date ? lastSeen.getTime() : new Date(lastSeen as string).getTime();
+  if (Number.isNaN(ms)) return false;
+  return (Date.now() - ms) / 1000 > ATTEMPT_ABANDON_AFTER_SEC;
+}
 
 /** Parse the locked question_order JSON into an array of permanent IDs. */
 function parseLockedOrder(value: AttemptRow["question_order"]): number[] | null {
@@ -300,7 +317,7 @@ async function backfillAttemptLock(
     );
     const order = shuffledOrder(idRows.map((r) => Number(r.id)));
     await exec(
-      `UPDATE exam_attempts SET question_version = ?, assigned_set = ?, question_order = ?
+      `UPDATE exam_attempts SET question_version = ?, assigned_set = ?, question_order = ?, last_seen = CURRENT_TIMESTAMP
         WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
       [questionVersion, assignedSet, JSON.stringify(order), examId, uid],
     );
@@ -347,6 +364,12 @@ function ensureAttemptTables(): Promise<void> {
         await ensureVariantTables();
       } catch {
         // Best effort — variant Lock is applied on next attempt start.
+      }
+      // Client heartbeat for abandoned-session detection (close/leave → auto-submit).
+      try {
+        await ensureColumn("exam_attempts", "last_seen", "`last_seen` TIMESTAMP NULL DEFAULT NULL");
+      } catch {
+        // Best effort — abandon detection is skipped when the column is missing.
       }
     })().catch((error) => {
       attemptTablesReady = null;
@@ -469,9 +492,9 @@ async function startExamAttempt(
   }
   // Ensure started_at reflects the new start time and lock Timer Type + Version/Set/Order for this attempt
   await exec(
-    `INSERT INTO exam_attempts (exam_id, student_uid, session_token, status, timer_type, question_version, assigned_set, question_order, started_at)
-     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, CURRENT_TIMESTAMP)
-     ON DUPLICATE KEY UPDATE session_token = VALUES(session_token), status = 'active', timer_type = VALUES(timer_type), question_version = VALUES(question_version), assigned_set = VALUES(assigned_set), question_order = VALUES(question_order), started_at = CURRENT_TIMESTAMP`,
+    `INSERT INTO exam_attempts (exam_id, student_uid, session_token, status, timer_type, question_version, assigned_set, question_order, last_seen, started_at)
+     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     ON DUPLICATE KEY UPDATE session_token = VALUES(session_token), status = 'active', timer_type = VALUES(timer_type), question_version = VALUES(question_version), assigned_set = VALUES(assigned_set), question_order = VALUES(question_order), last_seen = CURRENT_TIMESTAMP, started_at = CURRENT_TIMESTAMP`,
     [examId, uid, token, normalizedTimer, questionVersion, assignedSet, JSON.stringify(questionOrder)],
   );
   // Fresh session — clear any leftover answers.
@@ -1064,6 +1087,8 @@ export async function getExamForTaking(
   startedAt: string | null;
   /** Locked version for this attempt (echo of the student's selection). Set/order stay server-side. */
   questionVersion: QuestionVersion | null;
+  /** Present when re-entering found the session abandoned — auto-submitted, show the result. */
+  abandonedOutcome?: SubmissionOutcome | null;
 } | null> {
   // Direct ID lookup — never via cached fetchExams list. Ensures the exact
   // published exam selected on Live Website is resolved, with no stale cache
@@ -1153,6 +1178,7 @@ export async function getExamForTaking(
   let secondsLeft: number | null = null;
   let startedAt: string | null = null;
   let sessionToken: string | null = null;
+  let abandonedOutcome: SubmissionOutcome | null = null;
 
   if (uid) {
     try {
@@ -1193,6 +1219,16 @@ export async function getExamForTaking(
           startedAt = new Date().toISOString();
         }
       } else {
+        // Re-entering without starting: a stale (abandoned) session is
+        // finalized server-side first — the student gets the result, never a
+        // fresh attempt on the same lock.
+        abandonedOutcome = await finalizeAbandonedAttempt(examId, uid, studentName || "Student");
+        if (abandonedOutcome) {
+          questions = [];
+          secondsLeft = 0;
+          startedAt = null;
+          sessionToken = null;
+        } else {
         const attemptRows = await query<AttemptRow[]>(
           `SELECT session_token, status, started_at, question_version, assigned_set, question_order FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
           [examId, uid],
@@ -1234,6 +1270,7 @@ export async function getExamForTaking(
           secondsLeft = found.durationMinutes * 60;
           sessionToken = attempt.session_token ?? null;
         }
+        } // end non-abandoned resume
       }
     } catch {
       // On DB errors, fall back to default (null timer)
@@ -1271,7 +1308,73 @@ export async function getExamForTaking(
     secondsLeft,
     startedAt,
     questionVersion: lockedVersion,
+    abandonedOutcome,
   };
+}
+
+/**
+ * Server-side abandon detection: if the ACTIVE attempt's client has been
+ * silent past the threshold (tab closed, app switched away, browser killed),
+ * finalize it now from the server-stored answers. Returns the outcome when it
+ * finalized, or null when the attempt is live/legacy/finished. Never creates a
+ * new attempt, never restarts the timer — the submitted result + one-attempt
+ * rule then prevent reopening it as a fresh attempt.
+ */
+export async function finalizeAbandonedAttempt(
+  examId: string,
+  uid: string,
+  studentName: string,
+): Promise<SubmissionOutcome | null> {
+  try {
+    await ensureAttemptTables();
+    const rows = await query<{ status: string; last_seen: Date | string | null }[]>(
+      `SELECT status, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    const attempt = rows[0];
+    if (!attempt || attempt.status !== "active") return null;
+    if (!isAttemptAbandoned(attempt.last_seen)) return null;
+    const outcome = await finalizeAttempt(examId, uid, studentName, {});
+    if (!outcome) return null;
+    return { ...outcome, autoSubmitted: true };
+  } catch {
+    return null;
+  }
+}
+
+export type HeartbeatResult =
+  | { status: "ok" }
+  | { status: "abandoned"; outcome: SubmissionOutcome }
+  | { status: "submitted" };
+
+/**
+ * Client presence ping (every ~20s during an active exam). Refreshes last_seen;
+ * finalizes the attempt when it has gone stale; reports already-submitted so
+ * the client shows the result instead of a dead exam paper.
+ */
+export async function updateHeartbeat(
+  examId: string,
+  uid: string,
+  studentName: string,
+): Promise<HeartbeatResult> {
+  try {
+    await ensureAttemptTables();
+    const abandoned = await finalizeAbandonedAttempt(examId, uid, studentName);
+    if (abandoned) return { status: "abandoned", outcome: abandoned };
+    const rows = await query<{ status: string }[]>(
+      `SELECT status FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    if (!rows[0]) return { status: "ok" };
+    if (rows[0].status !== "active") return { status: "submitted" };
+    await exec(
+      `UPDATE exam_attempts SET last_seen = CURRENT_TIMESTAMP WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
+      [examId, uid],
+    );
+    return { status: "ok" };
+  } catch {
+    return { status: "ok" };
+  }
 }
 
 export async function submitExamAttempt(
@@ -1306,11 +1409,20 @@ export async function submitExamAttempt(
   // Already submitted (double-submit / auto-submit race / terminated by
   // another device) → return the stored result instead of re-grading.
   const attempts = await query<AttemptRow[]>(
-    `SELECT session_token, status, started_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    `SELECT session_token, status, started_at, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
     [examId, uid],
   );
   if (attempts[0]?.status === "submitted") {
     return latestOutcome(examId, uid);
+  }
+
+  // Abandoned session (silent past the threshold) → finalize from stored
+  // answers even if the client never sent a submit (closed tab / killed app).
+  if (attempts[0]?.status === "active" && isAttemptAbandoned(attempts[0]?.last_seen)) {
+    const outcome = await finalizeAttempt(examId, uid, studentName, answers);
+    if (outcome) return { ...outcome, autoSubmitted: true };
+    const latest = await latestOutcome(examId, uid);
+    if (latest) return { ...latest, autoSubmitted: true };
   }
 
   // Server-side expiry check

@@ -293,9 +293,11 @@ export function ExamLockProvider({ children }: { children: React.ReactNode }) {
 
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      // Modern browsers ignore custom text but require returnValue set
+      // Modern browsers ignore custom text but require returnValue set.
+      // Warn-only: cancelling keeps the attempt intact; confirming lets the
+      // pagehide handler finalize it server-side.
       e.returnValue =
-        "Are you sure you want to exit the exam? If you exit now, your exam may be submitted and you may not be able to attempt this exam again.";
+        "If you close this tab, your exam will be automatically submitted.";
       return e.returnValue;
     };
     window.addEventListener("beforeunload", onBeforeUnload);
