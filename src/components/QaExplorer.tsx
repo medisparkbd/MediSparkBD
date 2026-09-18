@@ -472,13 +472,6 @@ export default function QaExplorer({
             <h2 className="text-2xl font-extrabold text-heading">
               {selectedSubject.name}
             </h2>
-            <button
-              type="button"
-              onClick={handleBackToSubjects}
-              className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
-            >
-              Change Subject
-            </button>
           </div>
         </div>
       )}

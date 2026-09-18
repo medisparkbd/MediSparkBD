@@ -230,13 +230,6 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             >
               View Result →
             </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/exam/${examId}`)}
-              className="rounded-xl border border-ink/10 bg-dark-850 px-6 py-3 text-sm font-bold text-neutral-300 transition hover:text-heading"
-            >
-              Back to Exam
-            </button>
           </div>
         </div>
       )}
@@ -318,23 +311,16 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             />
             <span className="text-sm font-semibold text-heading">I have read and agree to the exam rules</span>
           </label>
-          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => router.push(`/exam/${examId}`)}
-              className="rounded-xl border border-ink/10 bg-dark-850 px-5 py-3 text-sm font-bold text-neutral-300 transition hover:border-ink/20 hover:text-heading active:scale-[0.98]"
-            >
-              Back / Exit
-            </button>
+<div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               disabled={!agreed || (secondTimerEnabled && !timerType) || !questionVersion}
               onClick={() => {
                 router.push(beginHref());
               }}
-              className="rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
+              className="w-full sm:w-auto rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
             >
-              Agree &amp; Continue →
+              Agree & Continue →
             </button>
           </div>
         </>
@@ -444,14 +430,7 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
             </span>
           </label>
 
-          <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => router.push(`/exam/${examId}`)}
-              className="rounded-xl border border-ink/10 bg-dark-850 px-5 py-3 text-sm font-bold text-neutral-300 transition hover:border-ink/20 hover:text-heading active:scale-[0.98]"
-            >
-              Back / Exit
-            </button>
+<div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               disabled={!agreed || (secondTimerEnabled && !timerType) || !questionVersion}
@@ -468,9 +447,9 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
                       ? "Select a Timer Type first"
                       : undefined
               }
-              className="rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
+              className="w-full sm:w-auto rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
             >
-              Agree &amp; Continue →
+              Agree & Continue →
             </button>
           </div>
 

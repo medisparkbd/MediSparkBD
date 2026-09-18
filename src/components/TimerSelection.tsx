@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 type TimerChoice = "first" | "second";
@@ -16,7 +16,6 @@ export default function TimerSelection({
   secondTimerDeduction: number;
   hasPriorAttempt: boolean;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<TimerChoice | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,18 +150,10 @@ export default function TimerSelection({
       <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button
           type="button"
-          disabled={loading}
-          onClick={() => router.push(`/exam/${examId}`)}
-          className="rounded-xl border border-ink/10 bg-dark-850 px-5 py-3 text-sm font-bold text-neutral-300 transition hover:border-ink/20 hover:text-heading active:scale-[0.98]"
-        >
-          Back / Exit
-        </button>
-        <button
-          type="button"
           disabled={!selected || loading}
           onClick={() => void handleContinue()}
           title={selected ? undefined : "Select an attempt type first"}
-          className="rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
+          className="w-full sm:w-auto rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border disabled:border-ink/10 disabled:bg-dark-800 disabled:text-neutral-500 disabled:shadow-none"
         >
           {loading ? "Starting…" : "Continue →"}
         </button>

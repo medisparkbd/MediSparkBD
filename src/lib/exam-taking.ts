@@ -480,7 +480,7 @@ async function startExamAttempt(
   );
   if (existing[0]?.status === "active") {
     if (isPublicExam) {
-      // For public exams with strict one-attempt, an active attempt is still the first attempt — resume it, don't auto-submit and create duplicate.
+      // One-attempt rule: active attempt is still the first attempt — resume it, don't auto-submit and create duplicate.
       // Backfill the version/set/order lock for attempts started before this system existed.
       try {
         const lock = parseLockedOrder(existing[0].question_order);
