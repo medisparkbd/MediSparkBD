@@ -166,15 +166,15 @@ export default function NotificationsPage() {
               <span className={`block truncate text-sm font-bold ${item.isActive ? "text-[#0b1e3a] admin-dark:text-zinc-100" : "text-slate-400 line-through"}`}>
                 {item.title}
               </span>
-              <span className="block line-clamp-2 text-xs text-slate-500">{item.message}</span>
+              <span className="block line-clamp-2 text-xs text-slate-500 admin-dark:text-slate-400">{item.message}</span>
               <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 {item.audience} · {new Date(item.createdAt).toLocaleDateString()}
               </span>
             </span>
-            <button type="button" onClick={() => startEdit(item)} disabled={busy} className="rounded-lg border border-neutral-200 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-500 admin-dark:border-zinc-700">
+            <button type="button" onClick={() => startEdit(item)} disabled={busy} className="rounded-lg border border-neutral-200 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-500 admin-dark:border-zinc-700 admin-dark:text-slate-400">
               Edit
             </button>
-            <button type="button" onClick={() => void toggle(item)} disabled={busy} className="rounded-lg border border-neutral-200 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-500 admin-dark:border-zinc-700">
+            <button type="button" onClick={() => void toggle(item)} disabled={busy} className="rounded-lg border border-neutral-200 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-500 admin-dark:border-zinc-700 admin-dark:text-slate-400">
               {item.isActive ? "Hide" : "Show"}
             </button>
             <button type="button" disabled={busy} aria-label="Delete notification" className={buttonDangerClass}
@@ -182,7 +182,7 @@ export default function NotificationsPage() {
           </li>
         ))}
         {(items ?? []).length === 0 && items !== null && (
-          <li className="rounded-xl border border-dashed border-neutral-300 p-6 text-center text-xs font-semibold text-slate-500 admin-dark:border-zinc-700">
+          <li className="rounded-xl border border-dashed border-neutral-300 p-6 text-center text-xs font-semibold text-slate-500 admin-dark:border-zinc-700 admin-dark:text-slate-400">
             No notifications yet.
           </li>
         )}

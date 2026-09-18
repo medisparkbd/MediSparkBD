@@ -54,11 +54,11 @@ export default function PushOptIn() {
   if (!isPushSupported() || authLoading || !user) return null;
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-dark-900 p-4">
+    <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-dark-900 p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-white">Push Notifications</h3>
-          <p className="mt-0.5 text-xs text-zinc-400">
+          <h3 className="text-sm font-bold text-heading">Push Notifications</h3>
+          <p className="mt-0.5 text-xs text-neutral-400">
             Get exam and course updates instantly, even when the site is closed.
           </p>
         </div>
@@ -76,12 +76,12 @@ export default function PushOptIn() {
         </button>
       </div>
       {state === "denied" && (
-        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+        <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
           Notifications are blocked in your browser settings. Allow them for this site to subscribe.
         </p>
       )}
       {message && (
-        <p role="status" className="mt-2 text-xs font-semibold text-zinc-300">
+        <p role="status" className="mt-2 text-xs font-semibold text-neutral-300">
           {message}
         </p>
       )}
