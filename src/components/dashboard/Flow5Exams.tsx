@@ -218,6 +218,9 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <InfoBox title="Topic-wise Exam" className="mt-4">
+        পরীক্ষার বিষয় নির্বাচন করো।
+      </InfoBox>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FLOW5_SUBJECTS.map((subject, index) => (
           <Link
