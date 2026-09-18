@@ -59,19 +59,20 @@ export default function QaExplorer({
     null
   );
   const [signingIn, setSigningIn] = useState(false);
-  // ── Q&A-owned navigation history (never Exam/Home) ───────────────────
-  // Fixed flow: Q&A Main → Subject → Back → Q&A Main.
+  // ── Q&A-owned navigation: explicit parent only (never global history) ──
+  // Final rule: Q&A Subject/Question child → Back = Q&A Main (`/qa`).
+  // - NEVER use router.back() / history.back() / navigate(-1) here.
   // - Q&A Main → Subject uses push (parent `/qa` explicitly preserved).
-  // - Subject → Subject uses replace (no subject stacking, parent stays `/qa`).
+  // - Subject → Subject uses replace (no stacking, parent stays `/qa`).
+  // - Child → Q&A Main ALWAYS uses replace(`/qa`) — explicit route only.
+  //   Replace removes the child entry → Back on Main can never loop back
+  //   to the child. Scroll/cards state is preserved via saved position.
   // - Deep links (`/qa?subject=x`) inject `/qa` as parent on mount so
   //   Browser / Android Back lands on Q&A Main, never a foreign page.
-  // - Custom Back: back() only when parent is guaranteed `/qa`,
-  //   otherwise replace(`/qa`). Fallback is replace (never push → no loop).
-  // - popstate guard: any Back from a child that would land outside Q&A
-  //   Main (foreign route or another subject) is forced to `/qa` via
-  //   replace. Main-page Back is untouched (normal history).
-  const pushedInAppRef = useRef(false);
-  const backInitiatedRef = useRef(false);
+  // - popstate guard: any Browser/Android Back from a child that would
+  //   land outside Q&A Main is forced to `/qa` via replace. Main-page
+  //   Back is untouched (other sections unaffected).
+  const savedMainScrollRef = useRef(0);
   const injectedParentRef = useRef(false);
 
   const readSubjectFromUrl = useCallback(() => {
@@ -86,8 +87,9 @@ export default function QaExplorer({
 
   // Browser / Android Back/Forward: a child (Subject/Question list) must
   // always land on Q&A Main (`/qa` with no subject) — never Home, Exam,
-  // Exam Category, or another subject. Leaving Q&A from Main itself is
-  // normal history and is left untouched (other sections unaffected).
+  // Dashboard, Exam Category, or another subject. Leaving Q&A from Main
+  // itself is normal history and is left untouched (other sections
+  // unaffected). Uses explicit `/qa` route only — never global history.
   useEffect(() => {
     const onPopState = () => {
       let nextPath = "";
@@ -97,33 +99,44 @@ export default function QaExplorer({
         nextPath = "";
       }
       const nextSubject = readSubjectFromUrl();
-      const wasChild =
-        selectedRef.current != null || backInitiatedRef.current;
-      backInitiatedRef.current = false;
+      const wasChild = selectedRef.current != null;
 
       if (wasChild) {
         const isQaMain = nextPath === "/qa" && nextSubject == null;
         if (!isQaMain) {
-          // Back tried to go foreign (Home/Exam/…) or to another subject
-          // → force Q&A Main via replace (no new entry → no loop).
-          pushedInAppRef.current = false;
+          // Back tried to go foreign (Home/Exam/Dashboard/…) or to another
+          // subject → force explicit Q&A Main via replace (no new entry
+          // → no loop, never the pre-Q&A page).
           selectedRef.current = null;
           setSelectedSubjectId(null);
           setAskOpen(false);
           router.replace("/qa", { scroll: false });
+          // Restore Main scroll after explicit navigation.
+          requestAnimationFrame(() => {
+            try {
+              window.scrollTo(0, savedMainScrollRef.current);
+            } catch {
+              // ignore
+            }
+          });
           return;
         }
-        // Correct Back to Q&A Main.
-        pushedInAppRef.current = false;
+        // Correct Back to Q&A Main (native pop to injected/pushed `/qa`).
         selectedRef.current = null;
         setSelectedSubjectId(null);
         setAskOpen(false);
+        requestAnimationFrame(() => {
+          try {
+            window.scrollTo(0, savedMainScrollRef.current);
+          } catch {
+            // ignore
+          }
+        });
         return;
       }
       // Was on Q&A Main: allow normal history (Back to previous section,
-      // Forward to a subject). Just keep state in sync + track parent.
+      // Forward to a subject). Just keep state in sync.
       if (nextPath !== "/qa") return;
-      pushedInAppRef.current = nextSubject != null;
       selectedRef.current = nextSubject;
       setSelectedSubjectId(nextSubject);
       setAskOpen(false);
@@ -145,6 +158,10 @@ export default function QaExplorer({
         "subject",
       );
       if (current !== initialSubjectId) return;
+      // Explicit Q&A parent: [.., /qa?subject=x] →
+      // [.., /qa, /qa?subject=x] so Browser/Android Back lands on `/qa`.
+      // This establishes the parent route explicitly — it never reads or
+      // navigates to any pre-Q&A (Home/Exam/Dashboard) history entry.
       window.history.replaceState(null, "", "/qa");
       window.history.pushState(
         null,
@@ -152,9 +169,8 @@ export default function QaExplorer({
         `/qa?subject=${encodeURIComponent(initialSubjectId)}`,
       );
       injectedParentRef.current = true;
-      pushedInAppRef.current = true;
     } catch {
-      // If history rewrite fails, custom Back still falls back to
+      // If history rewrite fails, custom Back still uses explicit
       // replace(`/qa`) and the popstate guard still forces Q&A Main.
     }
   }, [initialSubjectId, validSubjectIds]);
@@ -181,20 +197,26 @@ export default function QaExplorer({
     (subjectId: string) => {
       // No duplicate history entry when re-selecting the current subject.
       if (subjectId === selectedSubjectId) return;
+      // Preserve Q&A Main scroll so Back can restore cards position.
+      if (!selectedSubjectId) {
+        try {
+          savedMainScrollRef.current = window.scrollY;
+        } catch {
+          savedMainScrollRef.current = 0;
+        }
+      }
       setAskOpen(false);
       selectedRef.current = subjectId;
       setSelectedSubjectId(subjectId);
       if (selectedSubjectId) {
         // Already inside a child → replace keeps parent as Q&A Main
         // (no Subject→Subject stacking, so Back always lands on Main).
-        pushedInAppRef.current = true;
         router.replace(`/qa?subject=${encodeURIComponent(subjectId)}`, {
           scroll: false,
         });
         return;
       }
       // Q&A Main → Subject: push explicitly preserves `/qa` as parent.
-      pushedInAppRef.current = true;
       router.push(`/qa?subject=${encodeURIComponent(subjectId)}`, {
         scroll: false,
       });
@@ -204,28 +226,26 @@ export default function QaExplorer({
 
   const handleBackToSubjects = useCallback(() => {
     if (!selectedSubjectId && !selectedRef.current) return;
-    // Fixed flow: child → Q&A Main only. Never Home/Exam/Category.
-    if (pushedInAppRef.current) {
-      // Parent explicitly preserved as `/qa` → true Back pops the child
-      // (no duplicate entry, no loop). The popstate guard forces `/qa`
-      // even if history ever disagrees.
-      pushedInAppRef.current = false;
-      backInitiatedRef.current = true;
-      selectedRef.current = null;
-      setSelectedSubjectId(null);
-      setAskOpen(false);
-      router.back();
-      return;
-    }
-    // Deep link / refresh without Q&A parent → hierarchical parent inside
-    // Q&A via replace (never push → pressing Back on Main can't loop back
-    // to the Subject; never a foreign route).
-    pushedInAppRef.current = false;
-    backInitiatedRef.current = false;
+    // FINAL RULE: child → Q&A Main only, via the explicit `/qa` route.
+    // Never Home/Exam/Dashboard/Category. Never router.back() /
+    // history.back() / navigate(-1) / any generic previous-route logic.
+    // replace() removes the child entry → Back on Main can never loop
+    // back to the child. Works identically for:
+    //   Scenario 1: Home → Q&A → Biology → Back → Q&A Main
+    //   Scenario 2: Exam → Q&A → Chemistry → Back → Q&A Main
+    //   Scenario 3: Dashboard → Q&A → Physics → Back → Q&A Main
     selectedRef.current = null;
     setSelectedSubjectId(null);
     setAskOpen(false);
     router.replace("/qa", { scroll: false });
+    const restoreScroll = savedMainScrollRef.current;
+    requestAnimationFrame(() => {
+      try {
+        window.scrollTo(0, restoreScroll);
+      } catch {
+        // ignore
+      }
+    });
   }, [router, selectedSubjectId]);
   const [askCardSettings, setAskCardSettings] = useState<QaAskCardSettings | null>(
     initialAskCardSettings ?? null
@@ -444,10 +464,8 @@ export default function QaExplorer({
     <div>
       {selectedSubject && (
         <div className="mb-4">
-          {/* Website Back Button — history-first to Q&A Main (`/qa`), never
-              Exam. Uses the Q&A-owned history: true Back when the subject
-              was opened in-app (scroll + cards preserved), `/qa` fallback
-              for deep links. */}
+          {/* Website Back Button — explicit `/qa` route only (never global
+              history). Child → Q&A Main via replace: no loop, state kept. */}
           <a
             href="/qa"
             onClick={(event) => {
