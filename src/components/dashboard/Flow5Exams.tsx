@@ -218,11 +218,6 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mt-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Topic-wise Exam</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Select Subject</h1>
-        <p className="mt-1 text-sm text-neutral-400">Choose a subject to open its topic-wise exams.</p>
-      </header>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FLOW5_SUBJECTS.map((subject, index) => (
           <Link
