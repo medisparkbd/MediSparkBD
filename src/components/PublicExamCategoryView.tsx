@@ -68,12 +68,10 @@ export default function PublicExamCategoryView({
   exams,
   batches,
   categoryKey,
-  categoryLabel,
 }: {
   exams: PublicExam[];
   batches: string[];
   categoryKey: ExamCategory;
-  categoryLabel: string;
 }) {
   const [tab, setTab] = useState<ModeTab>("live");
   const [batch, setBatch] = useState("All Batches");

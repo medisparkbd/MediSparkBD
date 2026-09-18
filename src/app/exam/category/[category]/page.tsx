@@ -74,7 +74,6 @@ export default async function ExamCategoryPage({ params }: CategoryPageProps) {
         exams={exams}
         batches={batches}
         categoryKey={valid.key}
-        categoryLabel={valid.label}
       />
     </main>
   );
