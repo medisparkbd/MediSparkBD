@@ -11,7 +11,11 @@ export const metadata: Metadata = {
 
 export const revalidate = 300;
 
-export default async function QaPage() {
+export default async function QaPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ subject?: string | string[] }>;
+}) {
   const [dbSubjects, questions, askCardSettings] = await Promise.all([
     fetchQaBrowseSubjects(),
     fetchQaQuestions({}),
@@ -22,11 +26,19 @@ export default async function QaPage() {
     ...dbSubjects,
     { id: "guideline", name: "Guideline", order: 9999 },
   ];
+  // Deep-link support (`/qa?subject=<id>`): validate server-side so the
+  // first paint already shows the subject — Back then falls back to `/qa`.
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const rawSubject = resolvedParams?.subject;
+  const requestedSubject = Array.isArray(rawSubject) ? rawSubject[0] : rawSubject;
+  const validIds = new Set(subjects.map((subject) => subject.id));
+  const initialSubjectId =
+    requestedSubject && validIds.has(requestedSubject) ? requestedSubject : null;
 
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-        <QaPageClient subjects={subjects} questions={questions} askCardSettings={askCardSettings} />
+        <QaPageClient subjects={subjects} questions={questions} askCardSettings={askCardSettings} initialSubjectId={initialSubjectId} />
       </section>
     </main>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QaAskOptions, QaQuestion, QaSubject } from "@/lib/qa";
 import QaSubjectPicker from "@/components/QaSubjectPicker";
@@ -18,10 +18,13 @@ export default function QaExplorer({
   subjects,
   questions,
   askCardSettings: initialAskCardSettings,
+  initialSubjectId = null,
 }: {
   subjects: QaSubject[];
   questions: QaQuestion[];
   askCardSettings?: import("@/lib/qa-ask-card-settings").QaAskCardSettings | null;
+  /** Subject pre-selected from the server (`?subject=` deep link). */
+  initialSubjectId?: string | null;
 }) {
   const router = useRouter();
   const {
@@ -31,8 +34,14 @@ export default function QaExplorer({
     configured,
     signInWithGoogle,
   } = useAuth();
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
-    null
+  const validSubjectIds = useMemo(
+    () => new Set(subjects.map((subject) => subject.id)),
+    [subjects],
+  );
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(() =>
+    initialSubjectId && validSubjectIds.has(initialSubjectId)
+      ? initialSubjectId
+      : null,
   );
   const [askOpen, setAskOpen] = useState(false);
   const [askOptions, setAskOptions] = useState<QaAskOptions | null>(null);
@@ -41,6 +50,91 @@ export default function QaExplorer({
     null
   );
   const [signingIn, setSigningIn] = useState(false);
+  // ── Q&A-owned navigation history (never Exam) ──────────────────────────
+  // Subject selection is URL-driven (`/qa?subject=<id>`) so that:
+  // - Q&A Main → Subject creates exactly one history entry (no duplicates),
+  // - Browser / Android Back pops back to Q&A Main with state + scroll
+  //   preserved (no reload, no Exam page),
+  // - Deep links (`/qa?subject=x` with no in-app history) fall back to
+  //   `/qa` instead of the previous section.
+  // `pushedInAppRef` is true only when the subject entry was created from
+  // inside Q&A in this session — the only case where `router.back()` is
+  // guaranteed to return to Q&A Main. No Exam route is referenced anywhere.
+  const pushedInAppRef = useRef(false);
+
+  const readSubjectFromUrl = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const value = new URLSearchParams(window.location.search).get("subject");
+      return value && validSubjectIds.has(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }, [validSubjectIds]);
+
+  // Browser / Android Back/Forward: keep client state in sync with the URL
+  // without reloading or refetching — the main-page cards/layout props are
+  // unchanged, so the exact previous view (and its scroll position, restored
+  // by the browser) reappears.
+  useEffect(() => {
+    const onPopState = () => {
+      pushedInAppRef.current = false;
+      setSelectedSubjectId(readSubjectFromUrl());
+      setAskOpen(false);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [readSubjectFromUrl]);
+
+  // Clean an unknown `?subject=` value back to Q&A root (replace → no
+  // duplicate history entry).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let param: string | null = null;
+    try {
+      param = new URLSearchParams(window.location.search).get("subject");
+    } catch {
+      return;
+    }
+    if (param && !validSubjectIds.has(param)) {
+      // State is already Q&A Main for unknown ids (server passes null and
+      // readSubjectFromUrl() returns null) — just clean the URL with a
+      // replace so no duplicate history entry is left behind.
+      router.replace("/qa", { scroll: false });
+    }
+  }, [validSubjectIds, router]);
+
+  const handleSelectSubject = useCallback(
+    (subjectId: string) => {
+      // No duplicate history entry when re-selecting the current subject.
+      if (subjectId === selectedSubjectId) return;
+      pushedInAppRef.current = true;
+      setAskOpen(false);
+      setSelectedSubjectId(subjectId);
+      router.push(`/qa?subject=${encodeURIComponent(subjectId)}`, {
+        scroll: false,
+      });
+    },
+    [router, selectedSubjectId],
+  );
+
+  const handleBackToSubjects = useCallback(() => {
+    if (!selectedSubjectId) return;
+    if (pushedInAppRef.current) {
+      // In-app entry exists → true Back: restores Q&A Main cards/layout +
+      // scroll position, no reload, never Exam.
+      pushedInAppRef.current = false;
+      setSelectedSubjectId(null);
+      setAskOpen(false);
+      router.back();
+      return;
+    }
+    // Deep link / refresh (no Q&A history) → hierarchical parent inside Q&A.
+    // Never Exam, never a hardcoded foreign route.
+    setSelectedSubjectId(null);
+    setAskOpen(false);
+    router.push("/qa", { scroll: false });
+  }, [router, selectedSubjectId]);
   const [askCardSettings, setAskCardSettings] = useState<QaAskCardSettings | null>(
     initialAskCardSettings ?? null
   );
@@ -257,6 +351,28 @@ export default function QaExplorer({
   return (
     <div>
       {selectedSubject && (
+        <div className="mb-4">
+          {/* Website Back Button — history-first to Q&A Main (`/qa`), never
+              Exam. Uses the Q&A-owned history: true Back when the subject
+              was opened in-app (scroll + cards preserved), `/qa` fallback
+              for deep links. */}
+          <a
+            href="/qa"
+            onClick={(event) => {
+              event.preventDefault();
+              handleBackToSubjects();
+            }}
+            aria-label="Back to Q&A"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Q&amp;A
+          </a>
+        </div>
+      )}
+      {selectedSubject && (
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-extrabold text-heading">
@@ -264,7 +380,7 @@ export default function QaExplorer({
             </h2>
             <button
               type="button"
-              onClick={() => setSelectedSubjectId(null)}
+              onClick={handleBackToSubjects}
               className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
             >
               Change Subject
@@ -344,10 +460,7 @@ export default function QaExplorer({
         <QaSubjectPicker
           subjects={subjects}
           stats={subjectStats}
-          onSelect={(subjectId) => {
-            setSelectedSubjectId(subjectId);
-            setAskOpen(false);
-          }}
+          onSelect={handleSelectSubject}
         />
       ) : isGuideline ? (
         <QaGuideline />
