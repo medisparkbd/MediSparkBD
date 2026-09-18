@@ -279,22 +279,7 @@ export default function CourseProgressView() {
   const visible = courses ?? [];
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-heading">Course Progress</h1>
-          <p className="mt-1 text-sm text-neutral-400">
-            Your real learning progress — updated as you complete classes.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/enrolled-courses"
-          className="rounded-xl border border-ink/15 bg-ink/5 px-5 py-2.5 text-sm font-semibold text-heading transition hover:border-primary-500/60 hover:bg-ink/10"
-        >
-          My Enrolled Courses
-        </Link>
-      </div>
-
+    <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
       {visible.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-12 text-center">
           <p className="font-semibold text-heading">No progress yet</p>

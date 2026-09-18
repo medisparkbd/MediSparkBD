@@ -149,8 +149,7 @@ export default function EnrolledCoursesList() {
 
   if (state === "error") {
     return (
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <h1 className="text-2xl font-extrabold text-heading">My Enrolled Courses</h1>
+      <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
         <div className="mt-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center">
           <p className="font-bold text-red-300">Something went wrong</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-red-200/70">
@@ -176,20 +175,7 @@ export default function EnrolledCoursesList() {
   ).length;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-heading">
-            My Enrolled Courses
-          </h1>
-          <p className="mt-1 text-sm text-neutral-400">
-            {visible.length > 0
-              ? `${visible.length} active course${visible.length === 1 ? "" : "s"} — continue where you left off.`
-              : "Courses you are enrolled in will appear here."}
-          </p>
-        </div>
-      </div>
-
+    <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
       {pendingCount > 0 && (
         <p className="mt-6 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs leading-relaxed text-yellow-200/80">
           You have {pendingCount} pending enrollment request{pendingCount === 1 ? "" : "s"} waiting for payment/approval.

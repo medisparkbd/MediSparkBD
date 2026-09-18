@@ -66,16 +66,7 @@ export default function ExamResultPage() {
         loadingLabel="Loading your exam results..."
       >
         <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-          <header className="mt-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
-              Dashboard
-            </p>
-            <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">
-              Exam Results
-            </h1>
-          </header>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 sm:gap-5">
             {CARDS.map((card) => (
               <Link
                 key={card.href}

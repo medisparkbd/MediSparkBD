@@ -123,18 +123,7 @@ export default function RecentlyViewedView() {
     .filter((section) => section.items.length > 0);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mt-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
-          Dashboard
-        </p>
-        <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">
-          Recently Viewed
-        </h1>
-        <p className="mt-1 text-sm text-neutral-400">
-          Pick up where you left off — newest first.
-        </p>
-      </header>
+    <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
 
       {all.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-12 text-center">

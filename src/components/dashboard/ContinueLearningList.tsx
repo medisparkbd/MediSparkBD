@@ -164,26 +164,7 @@ export default function ContinueLearningList() {
   const visible = items ?? [];
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-heading">
-            Continue Learning
-          </h1>
-          <p className="mt-1 text-sm text-neutral-400">
-            {visible.length > 0
-              ? "Pick up exactly where you stopped — one entry per course."
-              : "Your in-progress classes will appear here as you study."}
-          </p>
-        </div>
-        <Link
-          href="/dashboard/enrolled-courses"
-          className="rounded-xl border border-ink/15 bg-ink/5 px-5 py-2.5 text-sm font-semibold text-heading transition hover:border-primary-500/60 hover:bg-ink/10"
-        >
-          My Enrolled Courses
-        </Link>
-      </div>
-
+    <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
       {visible.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-12 text-center">
           <svg
