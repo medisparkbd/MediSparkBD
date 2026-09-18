@@ -1,5 +1,10 @@
 import { query, exec, isMysqlConfigured } from "@/lib/mysql";
-import { batchFilterOptions, type BatchFilterOption } from "@/lib/courses";
+import { getCurrentYear } from "@/lib/student-categories";
+import {
+  getBatchFilterOptions,
+  type BatchFilterOption,
+  type BatchFilterScope,
+} from "@/lib/courses";
 
 /**
  * MySQL-backed batch filter options for the Course pages. The admin edits
@@ -8,7 +13,7 @@ import { batchFilterOptions, type BatchFilterOption } from "@/lib/courses";
  * until the row is seeded).
  */
 
-export type FilterScope = "ssc" | "hsc";
+export type FilterScope = BatchFilterScope;
 
 export const FILTER_SCOPES: FilterScope[] = ["ssc", "hsc"];
 
@@ -47,20 +52,36 @@ function parseOptions(raw: string | null): BatchFilterOption[] | null {
   }
 }
 
+/** Merge saved custom options with the current running-year filter range. */
+export function mergeBatchFilterOptions(
+  scope: BatchFilterScope,
+  savedOptions: readonly BatchFilterOption[] | null | undefined,
+  currentYear = new Date().getFullYear(),
+): BatchFilterOption[] {
+  const generated = getBatchFilterOptions(scope, currentYear);
+  if (!savedOptions?.length || savedOptions[0]?.id !== "all") return generated;
+
+  const generatedIds = new Set(generated.map((option) => option.id));
+  const customOptions = savedOptions.filter(
+    (option) => option.id !== "all" && !generatedIds.has(option.id),
+  );
+  return [generated[0], ...generated.slice(1), ...customOptions];
+}
+
 /** Saved options for a scope; falls back to the built-in defaults. */
 export async function fetchBatchFilterOptions(
   scope: FilterScope,
 ): Promise<BatchFilterOption[]> {
-  if (!isMysqlConfigured) return [...batchFilterOptions[scope]];
+  if (!isMysqlConfigured) return getBatchFilterOptions(scope);
   try {
     await ensureTable();
     const rows = await query<OptionRow[]>(
       "SELECT options FROM course_filter_options WHERE scope = ? LIMIT 1",
       [scope],
     );
-    return parseOptions(rows[0]?.options ?? null) ?? [...batchFilterOptions[scope]];
+    return mergeBatchFilterOptions(scope, parseOptions(rows[0]?.options ?? null));
   } catch {
-    return [...batchFilterOptions[scope]];
+    return getBatchFilterOptions(scope);
   }
 }
 
