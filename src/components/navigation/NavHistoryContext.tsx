@@ -1,12 +1,27 @@
 "use client";
 
-// Global in-app navigation history — the memory behind SmartBackButton.
+// Global in-app navigation history — the SINGLE navigation-history system
+// synchronizing all three back channels:
+//   Internal Website Navigation → Application Route History
+//   → Browser Back / Android System Back.
 //
-// Tracks visited pathnames (session-only, in-memory) so Back always prefers
-// the real previous page (preserving its filters/scroll via router.back())
-// and only falls back to the hierarchical parent when there is no in-app
-// history (e.g. deep link / refresh). Never pushes duplicate entries, never
-// rewrites browser history — browser / Android Back keep working untouched.
+// What it does:
+// - Tracks the visited pathname trail (session-only, in-memory) so Back can
+//   prefer the real previous page (filters/scroll preserved via router.back())
+//   and only falls back to the hierarchical parent when there is no in-app
+//   history (e.g. deep link / refresh). Never pushes duplicate entries.
+// - Owns the explicit-parent registry (see ./route-parents): pages with an
+//   unambiguous logical parent (Q&A subject → Q&A Main) ALWAYS resolve Back
+//   to that parent — via custom Back AND via Browser/Android Back — never to
+//   generic previous history (never history.back() / navigate(-1) for them).
+// - Global popstate guard: when Back starts from an explicit-child page and
+//   the browser would land anywhere except its parent (Home/Exam/Dashboard/
+//   random route), it redirects to the explicit parent with router.push —
+//   append-only, so no duplicate entries and no loops. Every other popstate
+//   passes through untouched (other sections keep native behavior).
+// - Never active during an exam lock: the existing exam back-trap,
+//   exit-confirmation, timer, answers and auto-submit are fully preserved
+//   (exam pages are not registered as explicit children anyway).
 
 import {
   createContext,
@@ -18,6 +33,11 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useExamLock } from "@/components/exam/ExamLockContext";
+import {
+  explicitParentFor,
+  splitUrl,
+} from "@/components/navigation/route-parents";
 
 const MAX_ENTRIES = 30;
 
@@ -47,16 +67,42 @@ export function useNavHistory(): NavHistoryValue {
   return useContext(NavHistoryContext);
 }
 
+function currentFullUrl(): string {
+  try {
+    return window.location.pathname + window.location.search;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Mount ONCE near the root (inside ExamLockProvider). Tracks pathname
  * changes: true back steps pop, forward steps push, replaces/duplicates
  * are ignored — the stack always mirrors the logical in-app trail.
+ * Additionally enforces explicit-parent Back for registered child pages
+ * across Browser Back and Android system Back (same popstate mechanism).
  */
 export function NavHistoryProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isLocked } = useExamLock();
+  const isLockedRef = useRef(isLocked);
   const stackRef = useRef<string[]>([]);
   const [depth, setDepth] = useState(0);
+  // Full current URL (path + search), refreshed after EVERY render so the
+  // popstate guard always knows which page Back started from. Read from
+  // window.location directly (client-only effect) so no Suspense boundary
+  // is needed anywhere up the tree.
+  const fromRef = useRef<string>("");
+
+  useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
+
+  useEffect(() => {
+    const full = currentFullUrl();
+    if (full) fromRef.current = full;
+  });
 
   useEffect(() => {
     if (!pathname) return;
@@ -72,8 +118,58 @@ export function NavHistoryProvider({ children }: { children: React.ReactNode }) 
     setDepth(stack.length);
   }, [pathname]);
 
+  // Browser Back / Android system Back enforcement for explicit-child pages.
+  // Native pops that already land on the explicit parent (or start from a
+  // page without one) are left completely untouched.
+  useEffect(() => {
+    const onPopState = () => {
+      // Active exam: the existing exam lock trap owns Back — never interfere
+      // (exit-confirmation, timer, answers, auto-submit all preserved).
+      if (isLockedRef.current) return;
+      const from = fromRef.current;
+      const to = currentFullUrl();
+      if (!from || !to || from === to) return;
+      const { pathname: fromPath, search: fromSearch } = splitUrl(from);
+      const parent = explicitParentFor(fromPath, fromSearch);
+      if (!parent) return; // no explicit parent → native behavior
+      const { pathname: toPath, search: toSearch } = splitUrl(to);
+      if (explicitParentFor(toPath, toSearch) != null) return; // forward into a child — legitimate
+      const { pathname: parentPath } = splitUrl(parent);
+      if (toPath === parentPath) return; // already on the explicit parent
+      // Back would land on a foreign page (pre-Q&A Home/Exam/Dashboard/
+      // random route) → redirect to the explicit parent. push() is
+      // append-only: no entry is destroyed, no duplicate is created, and no
+      // loop is possible (the parent itself has no explicit parent).
+      try {
+        router.push(parent);
+      } catch {
+        // If the redirect fails, the child page's own URL-sync keeps state
+        // consistent with wherever the browser landed.
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [router]);
+
   const goBack = useCallback(
     (fallbackHref: string) => {
+      // 1. Explicit parent wins over generic history: registered child pages
+      //    (Q&A subject → Q&A Main) always resolve to their logical parent
+      //    via an explicit route — never history.back() / navigate(-1).
+      //    replace() removes the child entry, so Back on the parent can
+      //    never loop back into the child.
+      const current = currentFullUrl();
+      if (current) {
+        const { pathname: currentPath, search: currentSearch } =
+          splitUrl(current);
+        const parent = explicitParentFor(currentPath, currentSearch);
+        if (parent && current !== parent) {
+          router.replace(parent, { scroll: false });
+          return;
+        }
+      }
+      // 2. History-first (existing behavior, untouched for all other pages):
+      //    real previous page with filters + scroll preserved.
       const stack = stackRef.current;
       if (stack.length >= 2) {
         router.back(); // real previous page: filters + scroll preserved
