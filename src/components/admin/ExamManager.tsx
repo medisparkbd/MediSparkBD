@@ -20,6 +20,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MediaUploadField } from "@/components/admin/MediaUploadField";
 import { examCategoryLabel, type ExamCategory } from "@/lib/public-exams";
+import { examToPublic } from "@/lib/public-exam-view";
+import ExamCard from "@/components/ExamCard";
 import {
   matchMedicalPracticeSubject,
   OTHER_PRACTICE_SUBJECT_KEY,
@@ -28,9 +30,10 @@ import {
 export type Exam = {
   id: string;
   title: string;
-  bannerUrl?: string | null;
+  description: string | null;
+  bannerUrl: string | null;
   kind: "public" | "practice" | "enrolled";
-  examMode?: "live" | "practice";
+  examMode: "live" | "practice";
   batchId: string;
   subject: string;
   courseType: "Academic" | "Admission";
@@ -38,27 +41,31 @@ export type Exam = {
   totalMarks: number;
   negativeMarks: number;
   /** Per-exam Admin setting: wrong answers cost negativePerWrong when ON. */
-  negativeEnabled?: boolean;
-  negativePerWrong?: number;
+  negativeEnabled: boolean;
+  negativePerWrong: number;
   /** Per-exam Admin setting: repeat attempt of THIS exam loses marks. */
-  secondTimerEnabled?: boolean;
-  secondTimerDeduction?: number;
+  secondTimerEnabled: boolean;
+  secondTimerDeduction: number;
   questionCount: number;
   status: "draft" | "published" | "closed";
   scheduledAt: string | null;
   endsAt: string | null;
   answerKey: Record<string, number> | null;
-  courseIds?: string[];
-  chapterId?: string | null;
-  sortOrder?: number | null;
+  courseIds: string[];
+  chapterId: string | null;
+  sortOrder: number;
   /** Public Exam Control category (Course Control id). */
-  categoryId?: string | null;
+  categoryId: string | null;
   /** Featured public exams auto-appear in the homepage slider. */
-  featured?: boolean;
+  featured: boolean;
   /** Flow 5 exam category (null/"" = legacy exam, old Exam flow). */
-  examFormat?: "topic-wise" | "paper-final" | "subject-final" | "final-model" | "" | null;
+  examFormat: "topic-wise" | "paper-final" | "subject-final" | "final-model" | null;
   /** Flow 5 topic-wise subject key (one of the 8 fixed subjects). */
-  topicSubject?: string | null;
+  topicSubject: string | null;
+  /** Unified access scope — derived from kind. */
+  scope: "PUBLIC" | "COURSE";
+  /** Selected rule template key (medical/academic/university). */
+  ruleTemplate: string | null;
 };
 
 /** When set, the manager is scoped to one Course Control category. */
@@ -890,116 +897,39 @@ export default function ExamManager({
           {filteredByMode!.map((exam) => {
             const phase = hasEnrolledExams ? flow4Phase(exam) : null;
             const phaseBadge = phase ? flow4PhaseBadge(phase) : null;
+            const publicExam = examToPublic(exam);
+            const adminControls = (
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink/10 pt-3">
+                <button type="button" onClick={() => setQuestionsExam(exam)} className={`${buttonPrimaryClass} min-w-[88px] shrink-0 px-4 py-2 text-xs`} title="Open Question Management">Questions</button>
+                <button type="button" onClick={() => startEdit(exam)} className={`${buttonSecondaryClass} min-w-[80px] shrink-0 px-4 py-2 text-xs`} title="Edit exam information">Manage</button>
+                <button type="button" disabled={busy} onClick={() => void toggleFeatured(exam)} className={`${exam.featured ? buttonPrimaryClass : buttonSecondaryClass} min-w-[88px] shrink-0 px-4 py-2 text-xs`} title={exam.featured ? "Featured — click to unfeature" : "Not featured — click to feature"}>{exam.featured ? "Featured" : "Feature"}</button>
+                <button type="button" disabled={busy} onClick={() => void toggleStatus(exam)} className={`${buttonSecondaryClass} min-w-[96px] shrink-0 px-4 py-2 text-xs`} title={exam.status === "published" ? "Unpublish exam" : "Publish exam"}>{exam.status === "published" ? "Unpublished" : "Publish"}</button>
+                <button type="button" onClick={() => void remove(exam.id, exam.title)} disabled={busy} aria-label={`Delete ${exam.title}`} className="min-w-[80px] shrink-0 rounded-xl border border-red-200 bg-[#fef2f2] px-4 py-2 text-xs font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 active:bg-red-100 disabled:opacity-50 admin-dark:border-red-900/30 admin-dark:bg-red-500/10 admin-dark:text-red-400 admin-dark:hover:border-red-800/50 admin-dark:hover:bg-red-500/20" title="Delete exam permanently">Delete</button>
+              </div>
+            );
             return (
-            <li key={exam.id} className={`${cardClass} flex flex-col gap-3 p-4 sm:p-5`}>
-              {/* Top row: Exam Name + Published badge — same row when width allows, wraps cleanly on mobile */}
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="min-w-0 flex-1 truncate text-base font-bold leading-tight text-[#0b1e3a] admin-dark:text-zinc-100">{exam.title}</h3>
-                {phaseBadge && (
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${phaseBadge.className}`}>
-                    {phaseBadge.label}
-                  </span>
-                )}
-                 <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${
-                    exam.status === "published"
-                      ? "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400"
-                      : exam.status === "closed"
-                        ? "bg-red-500/10 text-red-600 ring-1 ring-red-500/20"
-                        : "bg-zinc-500/10 text-slate-600 ring-1 ring-zinc-500/20 admin-dark:bg-zinc-500/10 admin-dark:text-slate-400"
-                  }`}
-                >
-                  {exam.status === "published" ? "Published" : exam.status === "draft" ? "Draft" : exam.status}
-                </span>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${
-                    (exam.examMode ?? "live") === "live"
-                      ? "bg-sky-500/10 text-sky-700 ring-sky-500/20 admin-dark:bg-sky-500/10 admin-dark:text-sky-400"
-                      : "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400"
-                  }`}
-                >
-                  {(exam.examMode ?? "live") === "live" ? "Live Exam" : "Practice Exam"}
-                </span>
-                {exam.featured && (
-                  <span
-                    title="Featured in the homepage slider"
-                    className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-amber-700 ring-1 ring-amber-500/20"
-                  >
-                    ★ Featured
-                  </span>
-                )}
-                {exam.examFormat && (
-                  <span
-                    title={exam.examFormat === "topic-wise" && exam.topicSubject ? `Topic-wise · ${exam.topicSubject}` : "Course Flow 4 exam category"}
-                    className="shrink-0 rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-500/20 admin-dark:bg-indigo-500/10 admin-dark:text-indigo-300"
-                  >
-                    {exam.examFormat === "topic-wise" ? "Topic-wise" : exam.examFormat === "paper-final" ? "Paper Final" : exam.examFormat === "subject-final" ? "Subject Final" : "Final Model"}
-                  </span>
-                )}
-              </div>
-              {/* Second line: ONLY Subject · Mark · Minute · Start · End — clean subtle style */}
-              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium leading-relaxed text-slate-500 admin-dark:text-slate-400">
-                <span className="font-semibold text-slate-600 admin-dark:text-slate-300">{exam.subject || "—"}</span>
-                <span className="text-slate-300 admin-dark:text-slate-600">·</span>
-                <span>{exam.totalMarks ?? 0} Marks</span>
-                <span className="text-slate-300 admin-dark:text-slate-600">·</span>
-                <span>{exam.durationMinutes ?? 0} Minutes</span>
-                <span className="text-slate-300 admin-dark:text-slate-600">·</span>
-                <span>Start: {formatExamTime(exam.scheduledAt)}</span>
-                <span className="text-slate-300 admin-dark:text-slate-600">·</span>
-                <span>End: {formatExamTime(exam.endsAt)}</span>
-              </p>
-              {/* Action buttons — dedicated second row at bottom, consistent height/padding/radius */}
-              <div className="flex flex-wrap items-center gap-2 border-t border-[#eef4ff] pt-3 admin-dark:border-[#1e3a65]/50">
-                <button
-                  type="button"
-                  onClick={() => setQuestionsExam(exam)}
-                  className={`${buttonPrimaryClass} min-w-[88px] shrink-0 px-4 py-2 text-xs`}
-                  title="Open Question Management"
-                >
-                  Questions
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startEdit(exam)}
-                  className={`${buttonSecondaryClass} min-w-[80px] shrink-0 px-4 py-2 text-xs`}
-                  title="Edit exam information"
-                >
-                  Manage
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void toggleFeatured(exam)}
-                  className={`${exam.featured ? buttonPrimaryClass : buttonSecondaryClass} min-w-[88px] shrink-0 px-4 py-2 text-xs`}
-                  title={exam.featured ? "Featured — click to unfeature" : "Not featured — click to feature"}
-                >
-                  {exam.featured ? "Featured" : "Feature"}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void toggleStatus(exam)}
-                  className={`${buttonSecondaryClass} min-w-[96px] shrink-0 px-4 py-2 text-xs`}
-                  title={exam.status === "published" ? "Unpublish exam" : "Publish exam"}
-                >
-                  {exam.status === "published" ? "Unpublished" : "Publish"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void remove(exam.id, exam.title)}
-                  disabled={busy}
-                  aria-label={`Delete ${exam.title}`}
-                  className="min-w-[80px] shrink-0 rounded-xl border border-red-200 bg-[#fef2f2] px-4 py-2 text-xs font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 active:bg-red-100 disabled:opacity-50 admin-dark:border-red-900/30 admin-dark:bg-red-500/10 admin-dark:text-red-400 admin-dark:hover:border-red-800/50 admin-dark:hover:bg-red-500/20"
-                  title="Delete exam permanently"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
+              <li key={exam.id} className={`${cardClass} p-4 sm:p-5`}>
+                {/* Admin header row — exam name + admin badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="min-w-0 flex-1 truncate text-base font-bold leading-tight text-[#0b1e3a] admin-dark:text-zinc-100">{exam.title}</h3>
+                  {phaseBadge && (
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${phaseBadge.className}`}>
+                      {phaseBadge.label}
+                    </span>
+                  )}
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${exam.status === "published" ? "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400" : exam.status === "closed" ? "bg-red-500/10 text-red-600 ring-1 ring-red-500/20" : "bg-zinc-500/10 text-slate-600 ring-1 ring-zinc-500/20 admin-dark:bg-zinc-500/10 admin-dark:text-slate-400"}`}>{exam.status === "published" ? "Published" : exam.status === "draft" ? "Draft" : exam.status}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ring-1 ${(exam.examMode ?? "live") === "live" ? "bg-sky-500/10 text-sky-700 ring-sky-500/20 admin-dark:bg-sky-500/10 admin-dark:text-sky-400" : "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400"}`}>{(exam.examMode ?? "live") === "live" ? "Live Exam" : "Practice Exam"}</span>
+                  {exam.featured && <span title="Featured in the homepage slider" className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-amber-700 ring-1 ring-amber-500/20">★ Featured</span>}
+                  {exam.examFormat && <span title={exam.examFormat === "topic-wise" && exam.topicSubject ? `Topic-wise · ${exam.topicSubject}` : "Course Flow 4 exam category"} className="shrink-0 rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-500/20 admin-dark:bg-indigo-500/10 admin-dark:text-indigo-300">{exam.examFormat === "topic-wise" ? "Topic-wise" : exam.examFormat === "paper-final" ? "Paper Final" : exam.examFormat === "subject-final" ? "Subject Final" : "Final Model"}</span>}
+                </div>
+                {/* Unified Exam Card body */}
+                <div className="mt-3">
+                  <ExamCard exam={publicExam} manage={adminControls} />
+                </div>
+              </li>
             );
           })}
-        </ul>
+          </ul>
       )}
 
       {/* Public Exam Category: bottom [+ Add Exam] removed — only top + New Exam remains (spec). Keep bottom button for Course Content Control chapter exams only. */}

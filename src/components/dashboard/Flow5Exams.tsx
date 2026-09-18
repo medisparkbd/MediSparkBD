@@ -325,41 +325,66 @@ function Flow5ExamListContent({
         <ul className="mt-6 space-y-3">
           {exams.map((exam, index) => {
             const phase = PHASE_META[exam.phase] ?? PHASE_META.live;
+            const hasTime = Boolean(exam.scheduledAt);
+            const buttonText = exam.phase === "upcoming" ? "View" : "Start";
             return (
-            <li key={exam.id}>
-              <Link
-                href={`/exam/${encodeURIComponent(exam.id)}/rules`}
-                onClick={() => recordRecentView(user, "exam", exam.id)}
-                className="group flex items-center gap-4 rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-sm font-black text-violet-400 transition group-hover:bg-violet-500 group-hover:text-white">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
+              <li key={exam.id}>
+                <Link
+                  href={`/exam/${encodeURIComponent(exam.id)}/rules`}
+                  onClick={() => recordRecentView(user, "exam", exam.id)}
+                  className="group flex items-start gap-4 rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5"
+                >
+                  {/* Numbered icon (kept as visual identifier) */}
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-sm font-black text-violet-400 transition group-hover:bg-violet-500 group-hover:text-white">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {/* Row 1: Exam Name */}
                     <span className="block truncate text-base font-extrabold text-heading transition group-hover:text-primary-400">
                       {exam.title}
                     </span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${phase.className}`}>
-                      {phase.label}
-                    </span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${exam.examMode === "practice" ? "bg-violet-500/15 text-violet-400" : "bg-sky-500/15 text-sky-400"}`}>
-                      {exam.examMode === "practice" ? "Practice" : "Live"}
-                    </span>
+                    {/* Row 2: Phase + Mode badges */}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${phase.className}`}>
+                        {phase.label}
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${exam.examMode === "practice" ? "bg-violet-500/15 text-violet-400" : "bg-sky-500/15 text-sky-400"}`}>
+                        {exam.examMode === "practice" ? "Practice" : "Live"}
+                      </span>
+                    </div>
+                    {/* Row 3: Total Marks + Duration */}
+                    <div className="mt-3 grid grid-cols-2 gap-2 max-w-[240px]">
+                      <div className="rounded-lg border border-ink/10 bg-ink/5 px-2.5 py-1.5">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">Total Marks</p>
+                        <p className="mt-0.5 text-xs font-bold text-heading">{exam.totalMarks || "—"}</p>
+                      </div>
+                      <div className="rounded-lg border border-ink/10 bg-ink/5 px-2.5 py-1.5">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">Duration</p>
+                        <p className="mt-0.5 text-xs font-bold text-heading">{exam.durationMinutes} min</p>
+                      </div>
+                    </div>
+                    {/* Row 4: Start + End Time (conditional) */}
+                    {hasTime && (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
+                        <span>
+                          Start:{" "}
+                          <span className="font-semibold text-heading">{formatDateTime(exam.scheduledAt)}</span>
+                        </span>
+                        {exam.endsAt && (
+                          <span>
+                            End:{" "}
+                            <span className="font-semibold text-heading">{formatDateTime(exam.endsAt)}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </span>
-                  <span className="mt-1 block text-xs text-neutral-500">
-                    {exam.subject ? `${exam.subject} · ` : ""}{exam.totalQuestions > 0 ? `${exam.totalQuestions} Questions · ` : ""}{exam.totalMarks > 0 ? `${exam.totalMarks} Marks · ` : ""}{exam.durationMinutes > 0 ? `${exam.durationMinutes} min` : ""}
-                    {exam.negativeEnabled && exam.negativePerWrong > 0 ? ` · −${exam.negativePerWrong} per wrong` : ""}
+                  {/* Row 5: Action Button */}
+                  <span className="shrink-0 self-center rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white transition group-hover:bg-primary-700">
+                    {buttonText}
                   </span>
-                  <span className="mt-0.5 block text-[11px] text-neutral-600">
-                    Start: {formatDateTime(exam.scheduledAt)} · End: {formatDateTime(exam.endsAt)}
-                  </span>
-                </span>
-                <span className="shrink-0 rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white transition group-hover:bg-primary-700">
-                  {exam.phase === "upcoming" ? "View" : "Start"}
-                </span>
-              </Link>
-            </li>
+                </Link>
+              </li>
             );
           })}
         </ul>
