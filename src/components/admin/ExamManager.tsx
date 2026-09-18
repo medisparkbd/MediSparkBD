@@ -128,31 +128,25 @@ function formatExamTime(iso: string | null): string {
   }
 }
 
-function flow4Phase(exam: { scheduledAt: string | null; endsAt: string | null; status?: string }): "upcoming" | "live" | "closed" | "archived" | "practice" | "no-window" {
+function flow4Phase(exam: { scheduledAt: string | null; endsAt: string | null; status?: string }): "upcoming" | "live" | "archived" | "practice" | "no-window" {
   const now = Date.now();
   const s = exam.scheduledAt ? new Date(exam.scheduledAt).getTime() : NaN;
   const e = exam.endsAt ? new Date(exam.endsAt).getTime() : NaN;
   const hasS = Number.isFinite(s);
   const hasE = Number.isFinite(e);
-  const DAY = 24 * 60 * 60 * 1000;
   if ((exam as { status?: string }).status === "closed") {
-    if (hasE && now - e > DAY) return "archived";
-    return "closed";
+    return "archived";
   }
   if (!hasS && !hasE) return "no-window";
   if (hasS && now < s) return "upcoming";
-  if (hasE && now > e) {
-    if (now - e > DAY) return "archived";
-    return "closed";
-  }
+  if (hasE && now > e) return "archived";
   return "live";
 }
 
 function flow4PhaseBadge(phase: ReturnType<typeof flow4Phase>): { label: string; className: string } {
   if (phase === "upcoming") return { label: "Upcoming", className: "bg-amber-500/10 text-amber-700 ring-amber-500/20 admin-dark:bg-amber-500/10 admin-dark:text-amber-400" };
   if (phase === "live") return { label: "Live", className: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400" };
-  if (phase === "closed") return { label: "Closed", className: "bg-red-500/10 text-red-700 ring-red-500/20 admin-dark:bg-red-500/10 admin-dark:text-red-400" };
-  if (phase === "practice" || phase === "archived") return { label: phase === "archived" ? "Archived" : "Practice", className: "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400" };
+  if (phase === "practice" || phase === "archived") return { label: "Archived", className: "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400" };
   return { label: "Live", className: "bg-sky-500/10 text-sky-700 ring-sky-500/20" };
 }
 

@@ -1,4 +1,5 @@
 import { fetchExams, hasEnrolledExamAccess } from "@/lib/exams-admin";
+import { hasPriorExamAttempt } from "@/lib/exam-taking";
 import { query } from "@/lib/mysql";
 
 /**
@@ -57,9 +58,8 @@ export async function checkCourseExamAccess(
   }
 
   // ── Enrolled (Course) Exam Lifecycle ────────────────────────────────
-  // Draft → Upcoming → Live → Closed (1 day) → Archived (practice).
-  // Closed blocks new official attempts; Archived allows Practice Again
-  // (practice attempts never affect official merit/ranking).
+  // Draft → Upcoming → Live → Archived (practice).
+  // Archived allows Practice Again (practice attempts never affect official merit/ranking).
   const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
   const enrolled = await isEnrolledExam(normalizedId);
 
@@ -68,25 +68,11 @@ export async function checkCourseExamAccess(
     if (phase === "upcoming") {
       return { allowed: false, reason: "This exam has not started yet." };
     }
-    if (phase === "closed") {
-      return { allowed: false, reason: "This exam has ended." };
-    }
     if (phase === "no-window") {
       // No schedule set — treat as always Live (legacy) — fall through.
-    } else if (isEnrolledPracticePhase(phase)) {
-      // Archived practice: require enrollment but allow entry regardless of
-      // prior Live attempt. Practice does NOT block on maxAttempts.
-      const isEnrolled = await hasEnrolledExamAccess(normalizedId, cleanUid);
-      if (!isEnrolled) {
-        return {
-          allowed: false,
-          reason: "You are not enrolled in the course for this exam.",
-        };
-      }
-      return { allowed: true };
     }
-    // phase === "live" — fall through to Live gates below (published +
-    // enrollment + attempt-limit for live).
+    // Live and Archived(practice) both fall through to gates below.
+    // One-attempt check happens after enrollment verification.
   }
 
   // Course-enrollment gate — delegates to the shared helper which checks
@@ -98,6 +84,20 @@ export async function checkCourseExamAccess(
       allowed: false,
       reason: "You are not enrolled in the course for this exam.",
     };
+  }
+
+  // One-attempt rule for course exams: if student has any prior result
+  // (scheduled OR practice), block access.
+  try {
+    const hasPrior = await hasPriorExamAttempt(normalizedId, cleanUid);
+    if (hasPrior) {
+      return {
+        allowed: false,
+        reason: "You have already appeared in this exam. View your result.",
+      };
+    }
+  } catch {
+    // Fail open for DB errors — other guards remain enforced.
   }
 
   // Attempt limits — same guard as the engine's startExamAttempt.
@@ -121,7 +121,7 @@ export async function checkCourseExamAccess(
       let count = 0;
       try {
         const liveRows = await query<{ n: number }[]>(
-          `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ? AND (attempt_type = 'live' OR attempt_type IS NULL)`,
+          `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
           [normalizedId, cleanUid],
         );
         count = liveRows[0]?.n ?? 0;

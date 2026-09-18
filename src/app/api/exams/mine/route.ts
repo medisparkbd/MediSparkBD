@@ -9,9 +9,8 @@ export const dynamic = "force-dynamic";
  * GET /api/exams/mine — published enrolled-kind exams the logged-in
  * student may take (enrolled in at least one assigned course).
  *
- * Course lifecycle: Draft → Upcoming → Live → Closed (1 day) → Archived.
- * Closed is shown but not startable; Archived remains accessible as
- * Practice Again (practice attempts never affect official merit).
+ * Course lifecycle: Draft → Upcoming → Live → Archived.
+ * Archived remains accessible as Practice Again (practice attempts never affect official merit).
  */
 export async function GET(request: NextRequest) {
   const user = await getFirebaseUser(request);
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
       phase = getEnrolledExamPhase(exam);
       if (phase === "upcoming") status = "Upcoming";
       else if (phase === "live") status = "Live";
-      else if (phase === "closed") status = "Expired";
       else if (phase === "archived" || phase === "practice") status = "Practice";
       else status = "Live";
     } else {

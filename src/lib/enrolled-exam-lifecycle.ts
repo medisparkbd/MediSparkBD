@@ -3,23 +3,20 @@
 // enrolled (private/course) exam lifecycle. Public Exam lifecycle stays in deriveStatus().
 //
 // Lifecycle for ALL enrolled exams (private/course exams):
-//   UPCOMING → LIVE → CLOSED (1 day) → ARCHIVED (practice)
+//   UPCOMING → LIVE → ARCHIVED
 //   Upcoming: before scheduledAt
 //   Live:     scheduledAt ≤ now ≤ endsAt  (no endsAt → stays Live)
-//   Closed:   0–24h after endsAt (no new official attempts)
-//   Archived: >24h after endsAt (eligible students practice; never ranked)
+//   Archived: >0h after endsAt (eligible students practice; never ranked)
 // Transitions are automatic, server-time based, no deletion.
 // "practice" is kept as a backward-compat alias of "archived" so existing
 // callers checking `phase === "practice"` keep working.
 //
 import { query } from "@/lib/mysql";
 import type { Exam } from "@/lib/exams-admin";
-import { COURSE_CLOSED_VISIBLE_MS } from "@/lib/exam-lifecycle";
 
 export type EnrolledExamPhase =
   | "upcoming"
   | "live"
-  | "closed"
   | "archived"
   | "practice"
   | "no-window";
@@ -33,16 +30,9 @@ export function getEnrolledExamPhase(
   const end = exam.endsAt ? new Date(exam.endsAt).getTime() : NaN;
   const hasStart = Number.isFinite(start);
   const hasEnd = Number.isFinite(end);
-  if ((exam as { status?: string }).status === "closed") {
-    if (hasEnd && now - end > COURSE_CLOSED_VISIBLE_MS) return "archived";
-    return "closed";
-  }
   if (!hasStart && !hasEnd) return "no-window";
   if (hasStart && now < start) return "upcoming";
-  if (hasEnd && now > end) {
-    if (now - end > COURSE_CLOSED_VISIBLE_MS) return "archived";
-    return "closed";
-  }
+  if (hasEnd && now > end) return "archived";
   // inside window or no window → live
   return "live";
 }
@@ -55,7 +45,6 @@ export function isEnrolledPracticePhase(phase: string | null | undefined): boole
 export function enrolledExamPhaseLabel(phase: EnrolledExamPhase): string {
   if (phase === "upcoming") return "Upcoming";
   if (phase === "live") return "Live";
-  if (phase === "closed") return "Closed";
   if (phase === "practice" || phase === "archived") return "Practice";
   return "Live";
 }

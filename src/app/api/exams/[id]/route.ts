@@ -82,12 +82,6 @@ export async function GET(
               { status: 403 },
             );
           }
-          if (phase === "closed") {
-            return NextResponse.json(
-              { error: "This exam has ended. You can no longer start it." },
-              { status: 403 },
-            );
-          }
           // Live and Archived(practice) both allow start.
           void isEnrolledPracticePhase;
         }

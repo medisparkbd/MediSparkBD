@@ -152,7 +152,7 @@ async function highestMarkFor(examId: string): Promise<number | null> {
     if (isEnrolled) {
       try {
         const liveRows = await query<{ best: string | number | null }[]>(
-          `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'live' OR attempt_type IS NULL)`,
+          `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
           [examId],
         );
         const best = liveRows[0]?.best;
@@ -185,13 +185,13 @@ async function highestMarkFor(examId: string): Promise<number | null> {
 async function updateMeritPositions(examId: string): Promise<void> {
   try {
     // Auto-ensure attempt_type column exists (best-effort, no error if missing).
-    try { await ensureColumn("exam_results", "attempt_type", "`attempt_type` ENUM('live','practice') NOT NULL DEFAULT 'live'"); } catch {}
+    try { await ensureColumn("exam_results", "attempt_type", "`attempt_type` ENUM('scheduled','practice') NOT NULL DEFAULT 'scheduled'"); } catch {}
     await withTransaction(async (connection) => {
       // For legacy rows (no attempt_type) treat as live. Practice attempts excluded.
       const [rows] = await connection.query<RowDataPacket[]>(
         `SELECT id FROM exam_results
          WHERE exam_id = ?
-           AND (attempt_type = 'live' OR attempt_type IS NULL)
+           AND (attempt_type = 'scheduled' OR attempt_type IS NULL)
          ORDER BY score DESC,
                   COALESCE(time_taken_seconds, 2147483647) ASC,
                   submitted_at ASC
@@ -401,9 +401,7 @@ async function startExamAttempt(
 ): Promise<string> {
   await ensureAttemptTables();
   const normalizedTimer: "first" | "second" = timerType === "second" ? "second" : "first";
-  // Strict One Attempt Per Public LIVE Exam: Student ID + Exam ID = max one
-  // completed attempt. Public Practice exams are retakable per attempt rules
-  // (dynamic merit). Enrolled exams keep existing maxAttempts logic.
+  // One-attempt rule: Public Live + all Enrolled/Course exams (Live and Practice) allow max 1 attempt total. Public Practice exams are retakable per attempt rules (dynamic merit).
   let isPublicExam = false;
   try {
     const { fetchExamById } = await import("@/lib/exams-admin");
@@ -415,13 +413,10 @@ async function startExamAttempt(
       if (examForCheck.kind === "enrolled") {
         const { getEnrolledExamPhase } = await import("@/lib/enrolled-exam-lifecycle");
         const phase = getEnrolledExamPhase(examForCheck);
-        if (phase === "upcoming" || phase === "closed") {
-          throw new Error(
-            phase === "upcoming"
-              ? "This exam has not started yet."
-              : "This exam has ended. You can no longer start it.",
-          );
+        if (phase === "upcoming") {
+          throw new Error("This exam has not started yet.");
         }
+        // Live and Archived(practice) both allow start.
       } else if (!isPracticeMode) {
         const { getPublicLiveState } = await import("@/lib/exam-lifecycle");
         const state = getPublicLiveState(examForCheck);
@@ -433,7 +428,7 @@ async function startExamAttempt(
         }
       }
     }
-    if (isPublicExam && !isPracticeMode) {
+    if (!isPracticeMode || (examForCheck?.kind === "enrolled")) {
       const hasCompleted = await hasPriorExamAttempt(examId, uid);
       if (hasCompleted) {
         throw new Error("You have already appeared in this exam. View your result.");
@@ -702,17 +697,15 @@ async function finalizeAttempt(
   const exams = await fetchExams();
   const found = exams.find((exam) => exam.id === examId);
   if (!found) return null;
-  // Strict one-attempt for public exams: if already has completed result, don't create duplicate — return existing
-  if (found.kind !== "enrolled") {
-    try {
-      const hasCompleted = await hasPriorExamAttempt(examId, uid);
-      if (hasCompleted) {
-        const existing = await latestOutcome(examId, uid);
-        if (existing) return existing;
-      }
-    } catch {
-      // best-effort
+  // One-attempt for all exams: if already has completed result, return existing and don't create duplicate
+  try {
+    const hasCompleted = await hasPriorExamAttempt(examId, uid);
+    if (hasCompleted) {
+      const existing = await latestOutcome(examId, uid);
+      if (existing) return existing;
     }
+  } catch {
+    // best-effort
   }
 
   const stored = await fetchStoredAnswers(examId, uid);
@@ -827,7 +820,7 @@ async function finalizeAttempt(
   // course exams; dynamically ranked for public practice via existing rules).
   // Enrolled exams: Archived submissions are practice. Public exams stay live
   // (public practice merit updates dynamically through the normal ranking).
-  let attemptType: "live" | "practice" = "live";
+  let attemptType: "scheduled" | "practice" = "scheduled";
   try {
     const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
     const isEnrolled = await isEnrolledExam(examId);
@@ -849,7 +842,7 @@ async function finalizeAttempt(
       await ensureColumn(
         "exam_results",
         "attempt_type",
-        "`attempt_type` ENUM('live','practice') NOT NULL DEFAULT 'live'",
+        "`attempt_type` ENUM('scheduled','practice') NOT NULL DEFAULT 'scheduled'",
       );
     } catch {}
     try {
@@ -1419,17 +1412,15 @@ export async function submitExamAttempt(
 
   await ensureAttemptTables();
 
-  // Strict one-attempt for public exams: if already has completed result, return existing and don't create duplicate
-  if (found.kind !== "enrolled") {
-    try {
-      const hasCompleted = await hasPriorExamAttempt(examId, uid);
-      if (hasCompleted) {
-        const existing = await latestOutcome(examId, uid);
-        if (existing) return existing;
-      }
-    } catch {
-      // best-effort
+  // One-attempt for all exams: if already has completed result, return existing and don't create duplicate
+  try {
+    const hasCompleted = await hasPriorExamAttempt(examId, uid);
+    if (hasCompleted) {
+      const existing = await latestOutcome(examId, uid);
+      if (existing) return existing;
     }
+  } catch {
+    // best-effort
   }
 
   // Already submitted (double-submit / auto-submit race / terminated by

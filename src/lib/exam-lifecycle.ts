@@ -6,16 +6,16 @@ import type { Exam } from "@/lib/exams-admin";
  * stored Start/End date-time with the server clock — never a frontend-only
  * timer — so refresh / restart / late-open all resolve correctly.
  *
- * Public Live Exam:  Upcoming → Live → Closed (12 hours visible) → Hidden
+ * Public Live Exam:  Upcoming → Live → Closed (1 day visible) → Hidden
  * Public Practice:   always Available (never time-gated)
- * Course Exam:       Draft → Upcoming → Live → Closed (1 day) → Archived
+ * Course Exam:       Draft → Upcoming → Live → Archived
  */
 
-export const PUBLIC_LIVE_CLOSED_VISIBLE_MS = 12 * 60 * 60 * 1000;
+export const PUBLIC_LIVE_CLOSED_VISIBLE_MS = 24 * 60 * 60 * 1000;
 export const COURSE_CLOSED_VISIBLE_MS = 24 * 60 * 60 * 1000;
 
 export type PublicLiveState = "draft" | "upcoming" | "live" | "closed" | "hidden" | "practice";
-export type CourseState = "draft" | "upcoming" | "live" | "closed" | "archived";
+export type CourseState = "draft" | "upcoming" | "live" | "archived";
 
 type ExamTime = Pick<Exam, "kind" | "examMode" | "status" | "scheduledAt" | "endsAt">;
 
@@ -58,13 +58,13 @@ export function getPublicLiveState(
   return "live";
 }
 
-/** True when a Public Live Exam must disappear from the Main Website list (12h after End). */
+/** True when a Public Live Exam must disappear from the Main Website list (1 day after End). */
 export function isPublicLiveHidden(exam: ExamTime, nowMs: number = Date.now()): boolean {
   if (!isPublicLiveExam(exam)) return false;
   return getPublicLiveState(exam, nowMs) === "hidden";
 }
 
-/** True when a Public Live Exam card stays visible on the website (Upcoming/Live/Closed≤12h). */
+/** True when a Public Live Exam card stays visible on the website (Upcoming/Live/Closed≤1 day). */
 export function isPublicLiveVisible(exam: ExamTime, nowMs: number = Date.now()): boolean {
   if (!isPublicLiveExam(exam)) return false;
   const state = getPublicLiveState(exam, nowMs);
@@ -75,16 +75,8 @@ export function getCourseState(exam: ExamTime, nowMs: number = Date.now()): Cour
   if (exam.status === "draft") return "draft";
   const startMs = toMs(exam.scheduledAt);
   const endMs = toMs(exam.endsAt);
-  if (exam.status === "closed") {
-    // Admin-closed: honor the 1-day Closed → Archived window when End is set.
-    if (endMs !== null && nowMs - endMs > COURSE_CLOSED_VISIBLE_MS) return "archived";
-    return "closed";
-  }
   if (startMs !== null && nowMs < startMs) return "upcoming";
-  if (endMs !== null && nowMs >= endMs) {
-    if (nowMs - endMs > COURSE_CLOSED_VISIBLE_MS) return "archived";
-    return "closed";
-  }
+  if (endMs !== null && nowMs >= endMs) return "archived";
   return "live";
 }
 
