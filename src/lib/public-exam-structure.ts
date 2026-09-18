@@ -4,7 +4,7 @@
 //
 //   Public Exam → Category → [ Live Exam | Practice Exam ] (default: Live)
 //
-// Live Exam lifecycle (unchanged): Upcoming → Live → Closed → 12 hours after
+// Live Exam lifecycle (unchanged): Upcoming → Live → Closed → 1 day after
 // closing → Hidden from the Main Website (Admin Panel keeps access).
 // Practice Exams stay continuously available while published/active.
 
@@ -14,7 +14,7 @@ import {
   PUBLIC_LIVE_CLOSED_VISIBLE_MS,
 } from "@/lib/exam-lifecycle";
 
-/** A Closed live exam stays visible on the Main Website for exactly 12h. */
+/** A Closed live exam stays visible on the Main Website for exactly 1 day. */
 export const PUBLIC_CLOSED_VISIBLE_MS = PUBLIC_LIVE_CLOSED_VISIBLE_MS;
 
 export type PublicLivePhase = "upcoming" | "live" | "closed" | "hidden";
@@ -32,7 +32,7 @@ export type PhaseInput = {
 /**
  * Live lifecycle phase for a PUBLIC live-mode exam — delegates to the
  * canonical `getPublicLiveState` in `@/lib/exam-lifecycle` (single source
- * of truth): Upcoming → Live → Closed → 12h after closing → Hidden from
+ * of truth): Upcoming → Live → Closed → 1 day after closing → Hidden from
  * the Main Website (Admin Panel keeps the exam, nothing is deleted or
  * moved to Practice).
  */
@@ -177,18 +177,15 @@ export function distinctSubjects<T extends { subject: unknown }>(
 
 /**
  * Whether a category's Practice view uses a subject-card layer:
- * - SSC: never (Biology-only → exams directly).
- * - HSC: subject cards (navigation/filter layer over existing subjects).
+ * - SSC: never (direct exam list).
+ * - HSC: never (direct exam list).
  * - Medical: the fixed 8 subject cards.
- * - Varsity: cards only when the existing data already has a meaningful
- *   subject structure (2+ distinct subjects), otherwise exams directly.
+ * - Varsity: never (direct exam list).
+ * Only Medical Admission has subject cards per requirements.
  */
 export function practiceUsesSubjectCards(
   categoryKey: ExamCategory,
-  practiceExams: Array<{ subject: unknown }>,
+  _practiceExams: Array<{ subject: unknown }>,
 ): boolean {
-  if (categoryKey === "ssc-academic") return false;
-  if (categoryKey === "hsc-academic") return true;
-  if (categoryKey === "medical-admission") return true;
-  return distinctSubjects(practiceExams).length >= 2;
+  return categoryKey === "medical-admission";
 }

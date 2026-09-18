@@ -67,12 +67,11 @@ export default function PublicExamCategoryManager({
     [snapshot],
   );
 
-  // Same subject-layer rule as the Main Website; custom (non-canonical)
-  // categories fall back to the varsity rule (cards only when the existing
-  // data already has a subject structure).
+  // Same subject-layer rule as the Main Website — only Medical Admission
+  // gets the fixed 8 subject cards; all other categories show exams directly.
   const useSubjectCards = categoryKey
     ? practiceUsesSubjectCards(categoryKey, practiceExams)
-    : distinctSubjects(practiceExams).length >= 2;
+    : false;
   const isMedical = categoryKey === "medical-admission";
 
   const practiceSubjects = useMemo(() => {
