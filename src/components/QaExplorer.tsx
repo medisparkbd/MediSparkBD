@@ -517,16 +517,10 @@ export default function QaExplorer({
       )}
 
       {!selectedSubject && (
-        <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-2 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-3">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
-          <h2 className="relative text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
-            Choose a Subject to View Questions
-          </h2>
-          <p className="relative mx-auto mt-1 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-            নিচের বিষয়গুলোতে ক্লিক করে বিভিন্ন প্রশ্ন ও তাদের উত্তর দেখতে পারো।
-          </p>
-        </div>
+        <ContextCard
+          title="Choose a Subject to View Questions"
+          instruction="নিচের বিষয়গুলোতে ক্লিক করে berbagai প্রশ্ন ও তাদের উত্তর দেখতে পারো।"
+        />
       )}
 
       {askGuidance && (
