@@ -107,6 +107,18 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, [profileOpen]);
 
+  // Close the mobile drawer ONLY after a menu item's route has actually
+  // changed. Removing the premature onClick handler from the items means
+  // clicks/taps are no longer intercepted — navigation fires first, and
+  // the drawer slides away once the new page mounts.
+  const lastPathRef = useRef(pathname);
+  useEffect(() => {
+    if (mobileOpen && pathname !== lastPathRef.current) {
+      lastPathRef.current = pathname;
+      setMobileOpen(false);
+    }
+  }, [mobileOpen, pathname]);
+
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -213,11 +225,10 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {/* HOME — completely separate and appears first */}
-        <Link
-          href={homeItem.href}
-          title={collapsed ? homeItem.label : undefined}
-          onClick={closeOverlays}
-          aria-current={isActive(homeItem.href) ? "page" : undefined}
+<Link
+        href={homeItem.href}
+        title={collapsed ? homeItem.label : undefined}
+        aria-current={isActive(homeItem.href) ? "page" : undefined}
           className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200 ${
             collapsed ? "justify-center" : ""
           } ${
@@ -247,7 +258,6 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
                 <Link
                   href={item.href}
                   title={collapsed ? item.label : undefined}
-                  onClick={closeOverlays}
                   aria-current={activeItem ? "page" : undefined}
                   className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200 ${
                     collapsed ? "justify-center" : ""
