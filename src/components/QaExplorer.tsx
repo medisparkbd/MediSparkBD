@@ -250,23 +250,6 @@ export default function QaExplorer({
     [router, selectedSubjectId],
   );
 
-  const handleBackToSubjects = useCallback(() => {
-    if (!selectedSubjectId) return;
-    // Subject filter reset — direct replace to Q&A Main (no custom Back
-    // history logic; Browser / device Back handles previous navigation).
-    // replace() removes the child entry so Back on Main never loops back.
-    setSelectedSubjectId(null);
-    setAskOpen(false);
-    router.replace("/qa", { scroll: false });
-    const restoreScroll = savedMainScrollRef.current;
-    requestAnimationFrame(() => {
-      try {
-        window.scrollTo(0, restoreScroll);
-      } catch {
-        // ignore
-      }
-    });
-  }, [router, selectedSubjectId]);
   const [askCardSettings, setAskCardSettings] = useState<QaAskCardSettings | null>(
     initialAskCardSettings ?? null
   );
@@ -482,22 +465,6 @@ export default function QaExplorer({
 
   return (
     <div>
-      {selectedSubject && (
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl font-extrabold text-heading">
-              {selectedSubject.name}
-            </h2>
-            <button
-              type="button"
-              onClick={handleBackToSubjects}
-              className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
-            >
-              Change Subject
-            </button>
-          </div>
-        </div>
-      )}
 
       {!selectedSubject && (
         <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-4 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-5">
