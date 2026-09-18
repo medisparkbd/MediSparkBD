@@ -8,6 +8,7 @@ import type { SubjectStats } from "@/components/QaSubjectPicker";
 import QaQuestionItem from "@/components/QaQuestionItem";
 import QaAskForm, { type QaAskPayload } from "@/components/QaAskForm";
 import QaGuideline from "@/components/QaGuideline";
+import ContextCard from "./ContextCard";
 import PermissionGuidanceCard, {
   type PermissionGuidance,
 } from "@/components/auth/PermissionGuidanceCard";
@@ -467,16 +468,15 @@ export default function QaExplorer({
     <div>
 
       {!selectedSubject && (
-        <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-4 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-5">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
-          <p className="relative mx-auto max-w-md text-sm leading-relaxed text-neutral-300 sm:text-base">
-            তোমার প্রশ্নটি করতে নিচের &ldquo;Ask Question&rdquo; বাটনে ক্লিক করো।
-          </p>
+        <ContextCard
+          title="Ask a Question"
+          instruction="তোমার প্রশ্নটি করতে নিচের &ldquo;Ask Question&rdquo; বাটনে ক্লিক করো।"
+          variant="with-action"
+        >
           <button
             type="button"
             onClick={() => void openAsk()}
-            className="relative mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
+            className="relative inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
           >
             <svg
               className="h-4 w-4"
@@ -513,7 +513,7 @@ export default function QaExplorer({
               )}
             </div>
           )}
-        </div>
+        </ContextCard>
       )}
 
       {!selectedSubject && (

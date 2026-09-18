@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import CategoryCard from "@/components/CategoryCard";
+import ContextCard from "./ContextCard";
 import BatchCourseList from "@/components/BatchCourseList";
 import {
   batchFilterOptions,
@@ -158,16 +159,10 @@ function DefaultGrid({
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-        <header className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-2 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-3">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
-          <h1 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
-            Explore Our Programs
-          </h1>
-          <p className="relative mx-auto mt-1 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-            তোমার পছন্দের কোর্স ক্যাটাগরিটি নির্বাচন করো
-          </p>
-        </header>
+        <ContextCard
+          title="Explore Our Programs"
+          instruction="তোমার পছন্দের কোর্স ক্যাটাগরিটি নির্বাচন করো"
+        />
 
         {/* Managed from Admin -> Courses -> Categories (course_categories table). */}
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">

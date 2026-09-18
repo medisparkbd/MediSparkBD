@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ContextCard from "./ContextCard";
 import type { ExamCategory } from "@/lib/public-exams";
 
 function BookIcon() {
@@ -123,16 +124,10 @@ export default function ExamCategoryCards({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-      <div className="relative mb-3 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 px-4 py-2 text-center shadow-lg shadow-black/20 sm:px-6 sm:py-3">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-600/10 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-medical-dots opacity-30" />
-        <h2 className="relative text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
-          Explore Public Exams
-        </h2>
-        <p className="relative mx-auto mt-1 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-          তোমার পছন্দের পরীক্ষার ক্যাটাগরি নির্বাচন করো
-        </p>
-      </div>
+      <ContextCard
+        title="Explore Public Exams"
+        instruction="তোমার পছন্দের পরীক্ষার ক্যাটাগরি নির্বাচন করো"
+      />
 
       {/* 4 cards — same grid as Course Section: gap-6 sm:grid-cols-2 xl:grid-cols-4 */}
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
