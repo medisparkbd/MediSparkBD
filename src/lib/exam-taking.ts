@@ -187,7 +187,7 @@ async function updateMeritPositions(examId: string): Promise<void> {
     // Auto-ensure attempt_type column exists (best-effort, no error if missing).
     try { await ensureColumn("exam_results", "attempt_type", "`attempt_type` ENUM('scheduled','practice') NOT NULL DEFAULT 'scheduled'"); } catch {}
     await withTransaction(async (connection) => {
-      // For legacy rows (no attempt_type) treat as live. Practice attempts excluded.
+      // For legacy rows (no attempt_type) treat as scheduled. Practice attempts excluded.
       const [rows] = await connection.query<RowDataPacket[]>(
         `SELECT id FROM exam_results
          WHERE exam_id = ?
