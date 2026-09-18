@@ -34,9 +34,13 @@ export function batchLabelFor(level: string): string {
     : "Admission Batch";
 }
 
+export function getCurrentYear(): number {
+  return new Date().getFullYear();
+}
+
 /** Batch years offered at registration (current year −6 … +2). */
 export function batchYearOptions(): string[] {
-  const currentYear = new Date().getFullYear();
+  const currentYear = getCurrentYear();
   const years: string[] = [];
   for (let year = currentYear - 6; year <= currentYear + 2; year++) {
     years.push(String(year));

@@ -1,3 +1,5 @@
+import { getCurrentYear } from "@/lib/student-categories";
+
 export type Batch = {
   id: string;
   label: string;
@@ -70,28 +72,41 @@ export const batches: Batch[] = [
 /** One batch-filter chip on a course category page. */
 export type BatchFilterOption = { id: string; label: string };
 
-/**
- * Per-category batch filters shown at the top of every Course Category
- * page — exactly 4 options each. Ids reuse the course `batchId` values so
- * filtering works against live catalog data.
- */
-export const batchFilterOptions: {
-  ssc: BatchFilterOption[];
-  hsc: BatchFilterOption[];
-} = {
-  ssc: [
+export type BatchFilterScope = "ssc" | "hsc";
+
+/** Running-year-relative years shown in course batch filters. */
+export const BATCH_FILTER_YEAR_OFFSETS = [-1, 0, 1, 2, 3] as const;
+
+/** Generate the built-in batch filters without changing catalog batch data. */
+export function getBatchFilterOptions(
+  scope: BatchFilterScope,
+  currentYear = getCurrentYear(),
+): BatchFilterOption[] {
+  const labelPrefix = scope === "ssc" ? "SSC" : "HSC";
+  return [
     { id: "all", label: "All Batch" },
-    { id: "ssc-29", label: "SSC 2029" },
-    { id: "ssc-28", label: "SSC 2028" },
-    { id: "ssc-27", label: "SSC 2027" },
-  ],
-  hsc: [
-    { id: "all", label: "All Batch" },
-    { id: "hsc-29", label: "HSC 2029" },
-    { id: "hsc-28", label: "HSC 2028" },
-    { id: "hsc-27", label: "HSC 2027" },
-  ],
-};
+    ...BATCH_FILTER_YEAR_OFFSETS.map((offset) => {
+      const year = currentYear + offset;
+      return {
+        id: `${scope}-${String(year).slice(-2)}`,
+        label: `${labelPrefix} ${year}`,
+      };
+    }),
+  ];
+}
+
+/** Built-in defaults for callers that need both course filter scopes. */
+export function getDefaultBatchFilterOptions(
+  currentYear = getCurrentYear(),
+): Record<BatchFilterScope, BatchFilterOption[]> {
+  return {
+    ssc: getBatchFilterOptions("ssc", currentYear),
+    hsc: getBatchFilterOptions("hsc", currentYear),
+  };
+}
+
+/** Backward-compatible snapshot for existing consumers. */
+export const batchFilterOptions = getDefaultBatchFilterOptions();
 
 export const courseTypes: CourseType[] = [
   "SSC Academic",
