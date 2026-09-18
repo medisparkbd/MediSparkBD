@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import PermissionGate from "@/components/auth/PermissionGate";
-import { recordRecentView } from "@/components/dashboard/CourseLevels";
 import {
   FLOW5_FORMATS,
   FLOW5_SUBJECTS,
@@ -20,6 +19,9 @@ import {
   type Flow5Format,
   type Flow5SubjectKey,
 } from "@/lib/flow5-shared";
+
+import ExamCard from "@/components/ExamCard";
+import type { PublicExam } from "@/lib/public-exams";
 
 export function examFlowBase(slug: string) {
   return `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/exam-flow`;
@@ -250,29 +252,36 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
 //     as Public Exams (/exam/[id]/rules → timer → result); only the access
 //     scope differs (COURSE → enrolled students, inside Course Content). ──
 
-const PHASE_META: Record<string, { label: string; className: string }> = {
-  upcoming: { label: "Upcoming", className: "bg-amber-500/15 text-amber-400" },
-  live: { label: "Live", className: "bg-emerald-500/15 text-emerald-400" },
-  practice: { label: "Archived", className: "bg-slate-500/15 text-slate-400 border border-slate-500/30" },
-  "no-window": { label: "Live", className: "bg-sky-500/15 text-sky-400" },
-};
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
-    return d.toLocaleString("en-US", {
-      day: "numeric",
-      month: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  } catch {
-    return "—";
-  }
+function courseItemToPublicExam(item: Flow5ExamItem): PublicExam {
+  const scheduledIso = item.scheduledAt;
+  return {
+    id: item.id,
+    name: item.title,
+    description: item.description ?? null,
+    bannerUrl: null,
+    examMode: item.examMode,
+    batch: "",
+    courseType: item.courseType,
+    subject: item.subject,
+    totalMarks: item.totalMarks,
+    totalQuestions: item.totalQuestions,
+    durationMinutes: item.durationMinutes,
+    negativeMarks: item.marksPerQuestion || 0,
+    negativeEnabled: item.negativeEnabled,
+    negativePerWrong: item.negativePerWrong || 0,
+    scheduledAt: scheduledIso,
+    endsAt: item.endsAt,
+    examDate: scheduledIso ? scheduledIso.slice(0, 10) : "",
+    examTime: "",
+    status: item.phase === "upcoming" ? "Upcoming" : item.phase === "live" ? "Live" : item.phase === "practice" ? "Archived" : "Live",
+    published: true,
+    secondTimerEnabled: item.secondTimerEnabled,
+    secondTimerDeduction: item.secondTimerDeduction,
+    eligibility: { mode: "all", rules: [] },
+    categoryId: null,
+  };
 }
+
 export function Flow5ExamListView({
   slug,
   format,
@@ -299,7 +308,6 @@ function Flow5ExamListContent({
   format: Flow5Format;
   subjectKey: Flow5SubjectKey | null;
 }) {
-  const { user } = useAuth();
   const { exams, state, load } = useFlow5Exams(slug, format, subjectKey);
   if (state === "loading" || exams === null) return <LoadingView label="Loading exams…" />;
   if (state === "error") return <ErrorView onRetry={() => void load()} />;
@@ -323,73 +331,11 @@ function Flow5ExamListContent({
         />
       ) : (
         <ul className="mt-6 space-y-3">
-          {exams.map((exam, index) => {
-            const phase = PHASE_META[exam.phase] ?? PHASE_META.live;
-            const hasTime = Boolean(exam.scheduledAt);
-            const isUpcoming = exam.phase === "upcoming";
-            const buttonText = isUpcoming ? "Coming Soon" : "Start";
-            return (
-              <li key={exam.id}>
-                <Link
-                  href={`/exam/${encodeURIComponent(exam.id)}/rules`}
-                  onClick={() => recordRecentView(user, "exam", exam.id)}
-                  className={`group flex items-start gap-4 rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5 ${
-                isUpcoming ? "cursor-not-allowed opacity-70" : ""
-              }}`}
-                >
-                  {/* Numbered icon (kept as visual identifier) */}
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-sm font-black text-violet-400 transition group-hover:bg-violet-500 group-hover:text-white">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    {/* Row 1: Exam Name */}
-                    <span className="block truncate text-base font-extrabold text-heading transition group-hover:text-primary-400">
-                      {exam.title}
-                    </span>
-                    {/* Row 2: Phase + Mode badges */}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${phase.className}`}>
-                        {phase.label}
-                      </span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${exam.examMode === "practice" ? "bg-violet-500/15 text-violet-400" : "bg-sky-500/15 text-sky-400"}`}>
-                        {exam.examMode === "practice" ? "Practice" : "Live"}
-                      </span>
-                    </div>
-                    {/* Row 3: Total Marks + Duration */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 max-w-[240px]">
-                      <div className="rounded-lg border border-ink/10 bg-ink/5 px-2.5 py-1.5">
-                        <p className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">Total Marks</p>
-                        <p className="mt-0.5 text-xs font-bold text-heading">{exam.totalMarks || "—"}</p>
-                      </div>
-                      <div className="rounded-lg border border-ink/10 bg-ink/5 px-2.5 py-1.5">
-                        <p className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">Duration</p>
-                        <p className="mt-0.5 text-xs font-bold text-heading">{exam.durationMinutes} min</p>
-                      </div>
-                    </div>
-                    {/* Row 4: Start + End Time (conditional) */}
-                    {hasTime && (
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
-                        <span>
-                          Start:{" "}
-                          <span className="font-semibold text-heading">{formatDateTime(exam.scheduledAt)}</span>
-                        </span>
-                        {exam.endsAt && (
-                          <span>
-                            End:{" "}
-                            <span className="font-semibold text-heading">{formatDateTime(exam.endsAt)}</span>
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </span>
-                  {/* Row 5: Action Button */}
-                  <span className="shrink-0 self-center rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white transition group-hover:bg-primary-700">
-                    {buttonText}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
+          {exams.map((exam) => (
+            <div key={exam.id} className="mb-4">
+              <ExamCard exam={courseItemToPublicExam(exam)} />
+            </div>
+          ))}
         </ul>
       )}
     </section>

@@ -12,7 +12,6 @@ function formatStartDate(iso: string | null): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-US", {
-    year: "numeric",
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -65,7 +64,7 @@ function TimeRow({ exam }: { exam: PublicExam }) {
         </p>
         <p className="mt-1 text-sm font-bold text-heading">
           {hasStart
-            ? `${formatStartDate(exam.scheduledAt)}, ${formatStartTime(
+            ? `${formatStartTime(exam.scheduledAt)}, ${formatStartDate(
                 exam.scheduledAt,
               )}`
             : "—"}
@@ -77,7 +76,7 @@ function TimeRow({ exam }: { exam: PublicExam }) {
         </p>
         <p className="mt-1 text-sm font-bold text-heading">
           {hasEnd
-            ? `${formatStartDate(exam.endsAt)}, ${formatEndTime(exam.endsAt)}`
+            ? `${formatEndTime(exam.endsAt)}, ${formatStartDate(exam.endsAt)}`
             : "—"}
         </p>
       </div>
@@ -288,7 +287,6 @@ export default function ExamCard({
   const status = statusMeta[exam.status];
   const action = actionMeta[exam.status];
   const category = categorizeExam(exam);
-  const CategoryIcon = categoryMeta[category].icon;
   const isLive = exam.status === "Live" || exam.status === "Available";
   const isAvailable = exam.status === "Available";
   const isPractice = exam.status === "Practice";
@@ -316,26 +314,6 @@ export default function ExamCard({
     <article
       className={`group flex flex-col overflow-hidden rounded-2xl bg-dark-900 transform-gpu transition duration-150 ease-out hover:-translate-y-1 active:scale-[0.99] ${cardClasses}`}
     >
-      <div className="relative h-32 w-full bg-gradient-to-br from-primary-600/25 via-dark-900 to-dark-950 sm:h-36">
-        {exam.bannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={exam.bannerUrl}
-            alt={`${exam.name} banner`}
-            className="h-full w-full object-cover transform-gpu transition duration-150 ease-out group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <CategoryIcon className="h-10 w-10 text-neutral-600" />
-          </div>
-        )}
-        {!exam.published && (
-          <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full border border-yellow-500/40 bg-yellow-500/10 px-3 py-1 text-[11px] font-extrabold tracking-wider text-yellow-300">
-            DRAFT
-          </span>
-        )}
-      </div>
-
       <div className="flex flex-1 flex-col p-5">
         <h3
           className={`text-lg font-bold leading-snug transition-colors duration-150 ease-out ${
