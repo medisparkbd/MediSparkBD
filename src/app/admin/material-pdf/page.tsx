@@ -57,7 +57,7 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 export default function MaterialPdfGeneratorPage() {
-  const { authLoading } = useAuth();
+  const { user, authLoading } = useAuth();
   const [materialName, setMaterialName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [questions, setQuestions] = useState<PdfMaterialQuestion[]>([]);
@@ -73,6 +73,13 @@ export default function MaterialPdfGeneratorPage() {
   const standaloneInputRef = useRef<HTMLInputElement>(null);
   const questionFileRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const pdfUrlRef = useRef<string | null>(null);
+  const [watermarkLogo, setWatermarkLogo] = useState<string | null>(null);
+  const [watermarkLoading, setWatermarkLoading] = useState(true);
+  const [watermarkSelectedFile, setWatermarkSelectedFile] = useState<File | null>(null);
+  const [watermarkPreviewUrl, setWatermarkPreviewUrl] = useState<string | null>(null);
+  const [watermarkBusy, setWatermarkBusy] = useState<"save" | "remove" | null>(null);
+  const [watermarkNotice, setWatermarkNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const watermarkFileRef = useRef<HTMLInputElement>(null);
 
   function sanitizeFileName(name: string): string {
     const raw = (name || "MediSpark-Material").trim();
@@ -105,6 +112,33 @@ export default function MaterialPdfGeneratorPage() {
         URL.revokeObjectURL(pdfUrlRef.current);
         pdfUrlRef.current = null;
       }
+    };
+  }, []);
+
+  // Revoke watermark preview URL on unmount or when replaced
+  useEffect(() => {
+    return () => {
+      if (watermarkPreviewUrl) URL.revokeObjectURL(watermarkPreviewUrl);
+    };
+  }, [watermarkPreviewUrl]);
+
+  // Fetch watermark logo on mount
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/watermark-logo", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.logo?.url) return;
+        setWatermarkLogo(data.logo.url);
+      })
+      .catch(() => {
+        // Watermark not available — proceed without it
+      })
+      .finally(() => {
+        if (!cancelled) setWatermarkLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -276,6 +310,82 @@ export default function MaterialPdfGeneratorPage() {
     input.click();
   };
 
+  const handleWatermarkFileChange = (file: File | undefined) => {
+    setWatermarkNotice(null);
+    if (!file) {
+      setWatermarkSelectedFile(null);
+      setWatermarkPreviewUrl(null);
+      return;
+    }
+    const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
+    const allowedExts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"];
+    if (ext && !allowedExts.includes(ext as never)) {
+      setWatermarkNotice({ kind: "error", text: `Unsupported file type "${ext}". Use PNG, JPG, WEBP or SVG.` });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setWatermarkNotice({ kind: "error", text: "File is too large. The logo must be 5 MB or smaller." });
+      return;
+    }
+    if (watermarkPreviewUrl) URL.revokeObjectURL(watermarkPreviewUrl);
+    setWatermarkSelectedFile(file);
+    setWatermarkPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleWatermarkUpload = async () => {
+    if (!watermarkSelectedFile) return;
+    setWatermarkBusy("save");
+    setWatermarkNotice(null);
+    try {
+      let token = "";
+      if (user) {
+        token = await user.getIdToken();
+      }
+      const formData = new FormData();
+      formData.append("logo", watermarkSelectedFile);
+      const response = await fetch("/api/admin/watermark-logo", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: formData,
+      });
+      const data = (await response.json()) as { error?: string; logo?: { url: string } };
+      if (!response.ok) {
+        setWatermarkNotice({ kind: "error", text: data.error ?? "Failed to save the watermark logo." });
+        return;
+      }
+      setWatermarkLogo(data.logo?.url ?? null);
+      setWatermarkSelectedFile(null);
+      setWatermarkPreviewUrl(null);
+      if (watermarkFileRef.current) watermarkFileRef.current.value = "";
+      setWatermarkNotice({ kind: "success", text: "Watermark logo saved — it will appear on every generated PDF." });
+      setToast("Watermark logo saved");
+    } catch {
+      setWatermarkNotice({ kind: "error", text: "Upload failed — please try again." });
+    } finally {
+      setWatermarkBusy(null);
+    }
+  };
+
+  const handleWatermarkRemove = async () => {
+    setWatermarkBusy("remove");
+    setWatermarkNotice(null);
+    try {
+      const response = await fetch("/api/admin/watermark-logo", { method: "DELETE" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setWatermarkNotice({ kind: "error", text: data.error ?? "Failed to remove the watermark logo." });
+        return;
+      }
+      setWatermarkLogo(null);
+      setWatermarkNotice({ kind: "success", text: "Watermark logo removed — future PDFs will have no watermark." });
+      setToast("Watermark logo removed");
+    } catch {
+      setWatermarkNotice({ kind: "error", text: "Remove failed — please try again." });
+    } finally {
+      setWatermarkBusy(null);
+    }
+  };
+
   // Shared core: build PDF Blob client-side (no server round-trip)
   const buildPdfBlob = async (): Promise<Blob> => {
     if (questions.length === 0) throw new Error("No questions to generate.");
@@ -285,7 +395,6 @@ export default function MaterialPdfGeneratorPage() {
       import("html2canvas"),
     ]);
     // Ensure Bangla fonts and images loaded
-    // @ts-ignore
     if (document.fonts?.ready) await document.fonts.ready;
     const imgs = Array.from(previewRef.current.querySelectorAll("img"));
     await Promise.all(
@@ -543,6 +652,91 @@ export default function MaterialPdfGeneratorPage() {
           />
         </div>
 
+        {/* 4. Watermark Logo */}
+        <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white p-4 sm:p-6 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+          <label className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">4. Watermark Logo</label>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 admin-dark:text-[#8da0c0]">
+            Upload a watermark logo once — it is saved permanently and automatically appears as a centered, transparent background mark on every generated PDF page. Upload once, use on every PDF.
+          </p>
+          {watermarkNotice && (
+            <div
+              className={`mt-3 rounded-xl px-4 py-2.5 text-xs font-semibold ${
+                watermarkNotice.kind === "success"
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700 admin-dark:border-emerald-900/40 admin-dark:bg-emerald-900/20 admin-dark:text-emerald-300"
+                  : "border border-red-200 bg-red-50 text-red-700 admin-dark:border-red-900/40 admin-dark:bg-red-900/20 admin-dark:text-red-300"
+              }`}
+            >
+              {watermarkNotice.text}
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap items-start gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={watermarkFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                className="hidden"
+                onChange={(e) => handleWatermarkFileChange(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => watermarkFileRef.current?.click()}
+                disabled={watermarkBusy === "save"}
+                className="rounded-xl bg-[#0b1e3a] px-5 py-2.5 text-sm font-extrabold text-white shadow hover:bg-[#123060] disabled:opacity-40 admin-dark:bg-[#234e9f]"
+              >
+                {watermarkLogo ? "Replace Logo" : "Upload Logo"}
+              </button>
+              {watermarkLogo && (
+                <button
+                  type="button"
+                  onClick={handleWatermarkRemove}
+                  disabled={watermarkBusy === "remove"}
+                  className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-40 admin-dark:border-red-900/40 admin-dark:bg-zinc-900 admin-dark:text-red-300 admin-dark:hover:bg-red-900/20"
+                >
+                  Remove Logo
+                </button>
+              )}
+              {watermarkSelectedFile && (
+                <button
+                  type="button"
+                  onClick={handleWatermarkUpload}
+                  disabled={watermarkBusy === "save"}
+                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-extrabold text-white shadow hover:bg-emerald-700 disabled:opacity-40"
+                >
+                  {watermarkLogo ? "Replace" : "Upload"}
+                </button>
+              )}
+            </div>
+            {watermarkLogo && (
+              <div className="rounded-xl border border-[#cbd5e1] bg-white p-2 admin-dark:border-[#1e3a65] admin-dark:bg-zinc-900">
+                <span className="text-[10px] font-bold text-slate-500 admin-dark:text-slate-400">Logo Preview</span>
+                <img
+                  src={watermarkLogo}
+                  alt="Watermark preview"
+                  className="mt-1 block h-14 w-auto max-w-[180px] object-contain"
+                  crossOrigin="anonymous"
+                />
+              </div>
+            )}
+            {watermarkPreviewUrl && (
+              <div className="rounded-xl border border-[#cbd5e1] bg-white p-2 admin-dark:border-[#1e3a65] admin-dark:bg-zinc-900">
+                <span className="text-[10px] font-bold text-slate-500 admin-dark:text-slate-400">Selected</span>
+                <img
+                  src={watermarkPreviewUrl}
+                  alt="Selected watermark"
+                  className="mt-1 block h-14 w-auto max-w-[180px] object-contain"
+                />
+              </div>
+            )}
+            {watermarkLoading && (
+              <span className="self-center text-xs text-slate-400 admin-dark:text-slate-500">Loading watermark setting…</span>
+            )}
+            <span className="ml-auto self-center text-xs text-slate-500 admin-dark:text-slate-400">
+              {watermarkLogo ? "Watermark active — will appear on all PDFs" : "No watermark — PDFs generate without watermark"}
+            </span>
+          </div>
+        </div>
+
         {/* 2. Paste MCQs + 3. Detect & Format */}
         <div className="mt-6 rounded-2xl border border-[#dbeafe] bg-white p-4 sm:p-6 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
           <label className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">2. Paste MCQs</label>
@@ -669,8 +863,26 @@ D. 150 দিন
                   minHeight: "297mm",
                   padding: "10mm 12mm 10mm 12mm",
                   fontFamily: "'Hind Siliguri','Noto Sans Bengali',sans-serif",
+                  zIndex: 0,
                 }}
               >
+                {watermarkLogo && (
+                  <img
+                    src={watermarkLogo}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      width: "280px",
+                      maxWidth: "35%",
+                      height: "auto",
+                      opacity: 0.07,
+                      zIndex: -1,
+                      pointerEvents: "none",
+                    }}
+                    crossOrigin="anonymous"
+                  />
+                )}
                 {/* 6. Top Header — fixed every page */}
                 <div className="flex items-center gap-2 text-[9px] font-semibold tracking-wide text-slate-700">
                   <span className="shrink-0 font-bold text-[#0b1e3a]">MediSpark Academic and Admission Care</span>
