@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import CategoryCard from "@/components/CategoryCard";
 import BatchCourseList from "@/components/BatchCourseList";
 import {
-  getBatchFilterOptions,
+  batchFilterOptions,
   getPayableFee,
   type BatchFilterOption,
   type Course,
@@ -103,7 +103,7 @@ function CoursesViewInner({
       ? scope === "ssc"
         ? sscFilterOptions!
         : hscFilterOptions!
-      : getBatchFilterOptions(scope);
+      : batchFilterOptions[scope];
   const searchParams = useSearchParams();
   const category = searchParams.get("category")?.toLowerCase();
   const kind = searchParams.get("kind")?.toLowerCase();

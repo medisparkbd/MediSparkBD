@@ -177,13 +177,6 @@ export function deriveStatus(exam: Exam): ExamStatus {
     if (exam.status === "closed") return "Completed";
     return "Practice";
   }
-  // Course (enrolled) exams: Archived phase (past End + 1 day) shows as Practice.
-  if (exam.kind === "enrolled" && exam.endsAt) {
-    const endsMs = new Date(exam.endsAt).getTime();
-    if (!Number.isNaN(endsMs) && Date.now() - endsMs > 24 * 60 * 60 * 1000) {
-      return "Practice";
-    }
-  }
   // Stored admin-closed public exams show as Closed (Expired badge).
   if (exam.status === "closed") return "Expired";
   const now = Date.now();
@@ -196,7 +189,7 @@ export function deriveStatus(exam: Exam): ExamStatus {
     return "Upcoming";
   }
   // Past the end time (when set) → Closed (Expired badge). A Public Live
-  // Exam NEVER moves to Practice; hiding after 1 day is handled by
+  // Exam NEVER moves to Practice; hiding after 12h is handled by
   // isPublicLiveHidden() at the listing layer, not here.
   if (endsAt !== null && !Number.isNaN(endsAt) && endsAt <= now) {
     return "Expired";

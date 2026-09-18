@@ -152,7 +152,7 @@ async function highestMarkFor(examId: string): Promise<number | null> {
     if (isEnrolled) {
       try {
         const liveRows = await query<{ best: string | number | null }[]>(
-          `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
+          `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'live' OR attempt_type IS NULL)`,
           [examId],
         );
         const best = liveRows[0]?.best;
@@ -178,20 +178,20 @@ async function highestMarkFor(examId: string): Promise<number | null> {
  * Uses idx_exam_results_ranking (exam_id, score, time_taken_seconds, submitted_at)
  * and caps to 5000 rows per run to bound work for large exams.
  *
- * Flow 4 Exam Batch: only SCHEDULED attempts are ranked. Practice attempts
- * (attempt_type='practice', after scheduled window) keep merit_position NULL
+ * Flow 4 Exam Batch: only LIVE attempts are ranked. Practice attempts
+ * (attempt_type='practice', after Live window) keep merit_position NULL
  * and never shift the frozen Live leaderboard.
  */
 async function updateMeritPositions(examId: string): Promise<void> {
   try {
     // Auto-ensure attempt_type column exists (best-effort, no error if missing).
-    try { await ensureColumn("exam_results", "attempt_type", "`attempt_type` ENUM('scheduled','practice') NOT NULL DEFAULT 'scheduled'"); } catch {}
+    try { await ensureColumn("exam_results", "attempt_type", "`attempt_type` ENUM('live','practice') NOT NULL DEFAULT 'live'"); } catch {}
     await withTransaction(async (connection) => {
-      // For legacy rows (no attempt_type) treat as scheduled. Practice attempts excluded.
+      // For legacy rows (no attempt_type) treat as live. Practice attempts excluded.
       const [rows] = await connection.query<RowDataPacket[]>(
-`SELECT id FROM exam_results
-          WHERE exam_id = ?
-            AND (attempt_type = 'scheduled' OR attempt_type IS NULL)
+        `SELECT id FROM exam_results
+         WHERE exam_id = ?
+           AND (attempt_type = 'live' OR attempt_type IS NULL)
          ORDER BY score DESC,
                   COALESCE(time_taken_seconds, 2147483647) ASC,
                   submitted_at ASC
@@ -827,7 +827,7 @@ async function finalizeAttempt(
   // course exams; dynamically ranked for public practice via existing rules).
   // Enrolled exams: Archived submissions are practice. Public exams stay live
   // (public practice merit updates dynamically through the normal ranking).
-  let attemptType: "scheduled" | "practice" = "scheduled";
+  let attemptType: "live" | "practice" = "live";
   try {
     const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
     const isEnrolled = await isEnrolledExam(examId);
@@ -836,7 +836,7 @@ async function finalizeAttempt(
       if (isEnrolledPracticePhase(phase)) attemptType = "practice";
     }
   } catch {
-    // Fallback to scheduled on error — never block submission.
+    // Fallback to live on error — never block submission.
   }
   // Insert with attempt_type when column exists; fallback without it for legacy DBs.
   // The locked Version/Set/Order snapshot travels with the result so the
@@ -849,7 +849,7 @@ async function finalizeAttempt(
       await ensureColumn(
         "exam_results",
         "attempt_type",
-        "`attempt_type` ENUM('scheduled','practice') NOT NULL DEFAULT 'scheduled'",
+        "`attempt_type` ENUM('live','practice') NOT NULL DEFAULT 'live'",
       );
     } catch {}
     try {

@@ -56,7 +56,7 @@ function parseOptions(raw: string | null): BatchFilterOption[] | null {
 export function mergeBatchFilterOptions(
   scope: BatchFilterScope,
   savedOptions: readonly BatchFilterOption[] | null | undefined,
-  currentYear = getCurrentYear(),
+  currentYear = new Date().getFullYear(),
 ): BatchFilterOption[] {
   const generated = getBatchFilterOptions(scope, currentYear);
   if (!savedOptions?.length || savedOptions[0]?.id !== "all") return generated;

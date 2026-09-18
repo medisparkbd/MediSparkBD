@@ -6,12 +6,12 @@ import type { Exam } from "@/lib/exams-admin";
  * stored Start/End date-time with the server clock — never a frontend-only
  * timer — so refresh / restart / late-open all resolve correctly.
  *
- * Public Live Exam:  Upcoming → Live → Closed (1 day visible) → Hidden
+ * Public Live Exam:  Upcoming → Live → Closed (12 hours visible) → Hidden
  * Public Practice:   always Available (never time-gated)
  * Course Exam:       Draft → Upcoming → Live → Closed (1 day) → Archived
  */
 
-export const PUBLIC_LIVE_CLOSED_VISIBLE_MS = 24 * 60 * 60 * 1000;
+export const PUBLIC_LIVE_CLOSED_VISIBLE_MS = 12 * 60 * 60 * 1000;
 export const COURSE_CLOSED_VISIBLE_MS = 24 * 60 * 60 * 1000;
 
 export type PublicLiveState = "draft" | "upcoming" | "live" | "closed" | "hidden" | "practice";

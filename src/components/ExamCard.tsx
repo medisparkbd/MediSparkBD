@@ -375,7 +375,7 @@ export default function ExamCard({
               View Result
               <span aria-hidden="true">&rarr;</span>
             </Link>
-          ) : isUpcoming || isClosed || isInactive || isUnpublished ? (
+          ) : action.disabled ? (
             <div
               className={`${buttonClasses} flex items-center justify-center gap-2 ${
                 isUpcoming
