@@ -220,7 +220,7 @@ export default function ExamRulesGate({ examId }: { examId: string }) {
         <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
           <p className="font-extrabold text-emerald-300">You have already appeared in this exam.</p>
           <p className="mt-1 text-sm leading-relaxed text-neutral-400">
-            Each Public Exam can be taken only once per student. You cannot start this exam again — view your existing result.
+            You have already appeared in this exam. You cannot start it again — view your existing result.
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
