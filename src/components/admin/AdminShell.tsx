@@ -225,7 +225,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {/* HOME — completely separate and appears first */}
-<Link
+        <Link
         href={homeItem.href}
         title={collapsed ? homeItem.label : undefined}
         aria-current={isActive(homeItem.href) ? "page" : undefined}
