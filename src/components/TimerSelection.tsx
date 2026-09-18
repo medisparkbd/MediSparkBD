@@ -16,8 +16,8 @@ export default function TimerSelection({
   secondTimerDeduction: number;
   hasPriorAttempt: boolean;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [selected, setSelected] = useState<TimerChoice | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -149,6 +149,14 @@ export default function TimerSelection({
       </div>
 
       <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => router.push(`/exam/${examId}`)}
+          className="rounded-xl border border-ink/10 bg-dark-850 px-5 py-3 text-sm font-bold text-neutral-300 transition hover:border-ink/20 hover:text-heading active:scale-[0.98]"
+        >
+          Back / Exit
+        </button>
         <button
           type="button"
           disabled={!selected || loading}

@@ -124,10 +124,10 @@ const statusMeta: Record<
     dot: "bg-white",
   },
   Archived: {
-    label: "Practice",
+    label: "Archived",
     badge:
-      "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
-    dot: "bg-white",
+      "bg-slate-500/10 text-slate-400 border border-slate-500/30",
+    dot: "bg-slate-400",
   },
   Inactive: {
     label: "Inactive",
@@ -171,7 +171,7 @@ const actionMeta: Record<
     disabled: false,
   },
   Archived: {
-    label: "Practice Again",
+    label: "Practice",
     disabled: false,
   },
   Inactive: {
