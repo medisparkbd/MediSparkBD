@@ -12,8 +12,16 @@ import PermissionGuidanceCard, {
   type PermissionGuidance,
 } from "@/components/auth/PermissionGuidanceCard";
 import { useAuth } from "@/lib/auth-context";
-import { splitUrl } from "@/components/navigation/route-parents";
 import type { QaAskCardSettings } from "@/lib/qa-ask-card-settings";
+
+function splitUrl(url: string): { pathname: string; search: string } {
+  const queryIndex = url.indexOf("?");
+  if (queryIndex === -1) return { pathname: url, search: "" };
+  return {
+    pathname: url.slice(0, queryIndex),
+    search: url.slice(queryIndex),
+  };
+}
 
 export default function QaExplorer({
   subjects,
@@ -472,6 +480,13 @@ export default function QaExplorer({
             <h2 className="text-2xl font-extrabold text-heading">
               {selectedSubject.name}
             </h2>
+            <button
+              type="button"
+              onClick={handleBackToSubjects}
+              className="rounded-lg border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs font-semibold text-neutral-400 transition hover:border-primary-500/60 hover:text-primary-400"
+            >
+              Change Subject
+            </button>
           </div>
         </div>
       )}

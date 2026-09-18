@@ -12,6 +12,29 @@ export function negativeMarksFor(courseType: string): number {
   return courseType === "Admission" ? NEGATIVE_MARKS_PER_WRONG : 0;
 }
 
+export function negativePerWrongFor(exam: {
+  negativeEnabled?: boolean;
+  negativePerWrong?: number;
+  courseType: string;
+  ruleTemplate?: string | null;
+}): number {
+  if (exam.ruleTemplate) {
+    switch (exam.ruleTemplate) {
+      case "medical":
+      case "university":
+        return 0.25;
+      case "academic":
+        return 0;
+      default:
+        break;
+    }
+  }
+  if (exam.negativeEnabled === undefined) {
+    return negativeMarksFor(exam.courseType);
+  }
+  return exam.negativeEnabled ? Math.max(0, exam.negativePerWrong ?? 0.25) : 0;
+}
+
 export type ExamStatus =
   | "Upcoming"
   | "Live"
@@ -19,6 +42,7 @@ export type ExamStatus =
   | "Completed"
   | "Expired"
   | "Practice"
+  | "Archived"
   | "Inactive"
   | "Unpublished";
 
@@ -170,10 +194,30 @@ export function formatExamTime(iso: string): string {
 }
 
 export function deriveStatus(exam: Exam): ExamStatus {
-  if (exam.status === "draft") return "Unpublished";
+  // Enrolled (course) exams: Draft → Upcoming → Live → Archived lifecycle.
+  if (exam.kind === "enrolled") {
+    if (exam.status === "draft") return "Unpublished";
+    if (exam.status === "closed") return "Archived";
+    const now = Date.now();
+    const endsAt = exam.endsAt ? new Date(exam.endsAt).getTime() : null;
+    // Past the end time → Archived.
+    if (endsAt !== null && !Number.isNaN(endsAt) && endsAt <= now) {
+      return "Archived";
+    }
+    const startsAt = exam.scheduledAt
+      ? new Date(exam.scheduledAt).getTime()
+      : null;
+    // Before the scheduled start time → Upcoming.
+    if (startsAt !== null && !Number.isNaN(startsAt) && startsAt > now) {
+      return "Upcoming";
+    }
+    // Within the window or no window set → Live (students can start).
+    return "Live";
+  }
+
   // Public Practice Exams are always available — never time-gated into
   // Upcoming/Live/Closed. Live/Closed logic below applies to Public Live only.
-  if (exam.kind !== "enrolled" && exam.examMode === "practice") {
+  if (exam.examMode === "practice") {
     if (exam.status === "closed") return "Completed";
     return "Practice";
   }

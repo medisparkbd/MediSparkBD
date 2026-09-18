@@ -5,7 +5,7 @@ import {
   formatExamTime,
   type PublicExam,
 } from "@/lib/public-exams";
-import { negativePerWrongFor } from "@/lib/exam-taking";
+import { negativePerWrongFor } from "@/lib/public-exams";
 
 /**
  * Map an admin Exam row onto the exact PublicExam shape the main website's

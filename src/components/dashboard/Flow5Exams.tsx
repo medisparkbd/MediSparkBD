@@ -253,7 +253,7 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
 const PHASE_META: Record<string, { label: string; className: string }> = {
   upcoming: { label: "Upcoming", className: "bg-amber-500/15 text-amber-400" },
   live: { label: "Live", className: "bg-emerald-500/15 text-emerald-400" },
-  practice: { label: "Practice", className: "bg-violet-500/15 text-violet-400" },
+  practice: { label: "Archived", className: "bg-slate-500/15 text-slate-400 border border-slate-500/30" },
   "no-window": { label: "Live", className: "bg-sky-500/15 text-sky-400" },
 };
 
@@ -326,13 +326,16 @@ function Flow5ExamListContent({
           {exams.map((exam, index) => {
             const phase = PHASE_META[exam.phase] ?? PHASE_META.live;
             const hasTime = Boolean(exam.scheduledAt);
-            const buttonText = exam.phase === "upcoming" ? "View" : "Start";
+            const isUpcoming = exam.phase === "upcoming";
+            const buttonText = isUpcoming ? "Coming Soon" : "Start";
             return (
               <li key={exam.id}>
                 <Link
                   href={`/exam/${encodeURIComponent(exam.id)}/rules`}
                   onClick={() => recordRecentView(user, "exam", exam.id)}
-                  className="group flex items-start gap-4 rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5"
+                  className={`group flex items-start gap-4 rounded-2xl border border-ink/10 bg-dark-900 p-4 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-0.5 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-5 ${
+                isUpcoming ? "cursor-not-allowed opacity-70" : ""
+              }}`}
                 >
                   {/* Numbered icon (kept as visual identifier) */}
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-sm font-black text-violet-400 transition group-hover:bg-violet-500 group-hover:text-white">

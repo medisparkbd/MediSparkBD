@@ -29,6 +29,7 @@ function emptyGroups(): CategoryGroups {
     Completed: [],
     Expired: [],
     Practice: [],
+    Archived: [],
     Inactive: [],
     Unpublished: [],
   };

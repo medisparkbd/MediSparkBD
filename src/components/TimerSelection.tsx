@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 type TimerChoice = "first" | "second";
@@ -16,6 +16,7 @@ export default function TimerSelection({
   secondTimerDeduction: number;
   hasPriorAttempt: boolean;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState<TimerChoice | null>(null);
   const [loading, setLoading] = useState(false);

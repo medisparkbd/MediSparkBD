@@ -123,6 +123,12 @@ const statusMeta: Record<
       "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
     dot: "bg-white",
   },
+  Archived: {
+    label: "Practice",
+    badge:
+      "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
+    dot: "bg-white",
+  },
   Inactive: {
     label: "Inactive",
     badge: "bg-dark-800 text-neutral-500 border border-ink/10",
@@ -161,6 +167,10 @@ const actionMeta: Record<
     disabled: true,
   },
   Practice: {
+    label: "Practice Again",
+    disabled: false,
+  },
+  Archived: {
     label: "Practice Again",
     disabled: false,
   },
@@ -282,11 +292,12 @@ export default function ExamCard({
   const isLive = exam.status === "Live" || exam.status === "Available";
   const isAvailable = exam.status === "Available";
   const isPractice = exam.status === "Practice";
+  const isArchived = exam.status === "Archived";
   const isUpcoming = exam.status === "Upcoming";
   const isClosed = exam.status === "Completed" || exam.status === "Expired";
   const isInactive = exam.status === "Inactive";
   const isUnpublished = exam.status === "Unpublished";
-  const canStart = !hasCompleted && (isLive || isAvailable || isPractice);
+  const canStart = !hasCompleted && (isLive || isAvailable || isPractice || isArchived);
   const href = detailsHref ?? `/exam/${exam.id}`;
   const effectiveStatus: ExamStatus = hasCompleted ? "Completed" : exam.status;
 
