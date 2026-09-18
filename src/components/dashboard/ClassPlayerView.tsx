@@ -130,6 +130,12 @@ function ClassPlayerBody({
   const [rate, setRate] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(0);
+  // Local completion flag so the UI (button + chapter checkmark) reflects a
+  // just-saved completion immediately; the persisted value lives in the
+  // database and is re-read on reload / other devices. Keyed by class id so
+  // opening a different class starts fresh without extra effects.
+  const [completedClassId, setCompletedClassId] = useState<string | null>(null);
+  const justCompleted = completedClassId === classId;
 
   useEffect(() => {
     if (videoRef.current) {
@@ -150,6 +156,11 @@ function ClassPlayerBody({
           },
           body: JSON.stringify({ classId, completed, lastSeenSeconds: Math.floor(seconds) }),
         });
+        // Persisted per authenticated account in the database — the
+        // Dashboard Course Progress re-reads it, so the bar + percentage
+        // update automatically on next load, after refresh, and on other
+        // devices. Reflect it here immediately without changing the layout.
+        if (completed) setCompletedClassId(classId);
       } catch {
         // Progress saving is best-effort.
       }
@@ -377,8 +388,11 @@ function ClassPlayerBody({
             </div>
           )}
 
-          {/* Materials / downloads */}
-          {(cls.noteUrl || !embed) && (
+          {/* Materials / downloads + completion.
+              YouTube embeds have no ended event, so an explicit
+              Mark as Completed action is the completion mechanism there;
+              HTML5 video additionally auto-completes on ended. */}
+          {(cls.noteUrl || cls.videoUrl) && (
             <div className="flex flex-wrap gap-3">
               {cls.noteUrl ? (
                 <a
@@ -393,15 +407,31 @@ function ClassPlayerBody({
                   Download Slide/PDF
                 </a>
               ) : null}
-              {!embed && cls.videoUrl ? (
+              {cls.videoUrl && !cls.completed && !justCompleted ? (
                 <button
                   type="button"
-                  onClick={() => void saveProgress(true, videoRef.current?.currentTime ?? 0)}
+                  onClick={() => {
+                    const seconds = embed
+                      ? 0
+                      : (videoRef.current?.currentTime ?? 0);
+                    const total = embed
+                      ? 0
+                      : (videoRef.current?.duration || seconds);
+                    void saveProgress(true, total || seconds);
+                  }}
                   className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/20"
                 >
                   Mark as Completed
                 </button>
               ) : null}
+              {(cls.completed || justCompleted) && (
+                <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-400">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Completed
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -423,7 +453,7 @@ function ClassPlayerBody({
                   }`}
                 >
                   <span className="truncate">{sibling.title}</span>
-                  {sibling.completed ? (
+                  {sibling.completed || (sibling.id === cls.id && justCompleted) ? (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4 shrink-0 text-emerald-400">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>

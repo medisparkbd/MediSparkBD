@@ -36,16 +36,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid class id." }, { status: 400 });
   }
   // Only accept progress for classes that belong to a course the student is
-  // actively enrolled in.
+  // actively enrolled in — through the EXISTING content structure, both the
+  // subject path (assignments, course_slug-isolated) and the direct path
+  // (course_slug-scoped chapters with no subject). No duplicate records:
+  // student_class_progress has a UNIQUE (student_uid, class_id) key and the
+  // write below is an idempotent upsert.
   try {
     const allowed = await query<{ found: number }[]>(
       `SELECT 1 AS found
          FROM course_classes cl
          JOIN course_chapters ch ON ch.id = cl.chapter_id
-         JOIN course_subject_assignments a ON a.subject_id = ch.subject_id
          JOIN enrollments e
-           ON e.course_id = a.course_slug AND e.student_uid = ?
-        WHERE cl.id = ? AND e.enrollment_status = 'active'
+           ON e.student_uid = ?
+          AND e.enrollment_status = 'active'
+          AND (
+            EXISTS (
+              SELECT 1 FROM course_subject_assignments a
+               WHERE a.course_slug = e.course_id
+                 AND a.subject_id = ch.subject_id
+                 AND (COALESCE(ch.course_slug, '') = '' OR ch.course_slug = e.course_id)
+            )
+            OR (
+              COALESCE(ch.subject_id, '') = ''
+              AND COALESCE(ch.course_slug, '') = e.course_id
+            )
+          )
+        WHERE cl.id = ?
         LIMIT 1`,
       [user.uid, classId],
     );

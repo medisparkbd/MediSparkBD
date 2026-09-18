@@ -94,7 +94,20 @@ function SubjectBlock({ subject }: { subject: SubjectProgress }) {
   );
 }
 
-function CourseProgressCard({ course }: { course: CourseProgressDetail }) {
+function CourseProgressCard({
+  course,
+  resumeClassId,
+}: {
+  course: CourseProgressDetail;
+  /** Resume target from Continue Learning (existing class-player flow) — falls back to the course page. */
+  resumeClassId?: string | null;
+}) {
+  const courseHref = `/dashboard/enrolled-courses/${encodeURIComponent(course.slug)}`;
+  // Existing flow: the class player URL is the current content location when
+  // the student has an in-progress class, otherwise the course page itself.
+  const continueHref = resumeClassId
+    ? `${courseHref}/classes/${encodeURIComponent(resumeClassId)}`
+    : courseHref;
   return (
     <article className="overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/60">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:p-6">
@@ -118,7 +131,7 @@ function CourseProgressCard({ course }: { course: CourseProgressDetail }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <Link
-              href={`/dashboard/enrolled-courses/${encodeURIComponent(course.slug)}`}
+              href={courseHref}
               className="text-lg font-extrabold leading-snug text-heading transition hover:text-primary-400"
             >
               {course.name}
@@ -166,7 +179,7 @@ function CourseProgressCard({ course }: { course: CourseProgressDetail }) {
 
       <div className="border-t border-ink/10 px-5 py-4 sm:px-6">
         <Link
-          href={`/dashboard/enrolled-courses/${encodeURIComponent(course.slug)}`}
+          href={continueHref}
           className="inline-block rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-900/40 transition hover:bg-primary-700 active:scale-[0.98]"
         >
           Continue Learning
@@ -179,6 +192,7 @@ function CourseProgressCard({ course }: { course: CourseProgressDetail }) {
 export default function CourseProgressView() {
   const { user, authLoading } = useAuth();
   const [courses, setCourses] = useState<CourseProgressDetail[] | null>(null);
+  const [resumeByCourse, setResumeByCourse] = useState<Record<string, string>>({});
   const [state, setState] = useState<LoadState>("loading");
 
   const load = useCallback(async () => {
@@ -196,6 +210,28 @@ export default function CourseProgressView() {
       };
       setCourses(Array.isArray(data.courses) ? data.courses : []);
       setState("ready");
+      // Resume targets (best-effort): map each enrolled course to its current
+      // in-progress class via the existing Continue Learning flow. A missing
+      // entry simply falls back to the course page — progress never depends
+      // on this.
+      try {
+        const resumeRes = await fetch("/api/my/continue-learning", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (resumeRes.ok) {
+          const resumeData = (await resumeRes.json()) as {
+            items?: { slug?: string; classId?: string }[];
+          };
+          const map: Record<string, string> = {};
+          for (const item of Array.isArray(resumeData.items) ? resumeData.items : []) {
+            if (item?.slug && item?.classId) map[item.slug] = item.classId;
+          }
+          setResumeByCourse(map);
+        }
+      } catch {
+        // Resume links stay on the course page.
+      }
     } catch {
       setState("error");
     }
@@ -276,7 +312,11 @@ export default function CourseProgressView() {
       ) : (
         <div className="mt-8 space-y-6">
           {visible.map((course) => (
-            <CourseProgressCard key={course.slug} course={course} />
+            <CourseProgressCard
+              key={course.slug}
+              course={course}
+              resumeClassId={resumeByCourse[course.slug] ?? null}
+            />
           ))}
         </div>
       )}

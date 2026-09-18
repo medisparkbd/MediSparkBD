@@ -230,25 +230,56 @@ export async function getMyEnrolledCourses(
   // Progress is supplementary — if the learning tables are missing or the
   // aggregate fails, courses must still render (with 0% progress) instead of
   // the whole request failing.
+  //
+  // Applicable content = active classes (course_classes) reachable through
+  // the EXISTING content structure, both paths:
+  //   1. subject path: enrollment course → course_subject_assignments →
+  //      course_chapters (course_slug-isolated) → course_classes
+  //   2. direct path: course_chapters scoped by course_slug with no subject
+  //      → course_classes (e.g. SSC Biology direct courses).
+  // Completed content = rows in the existing student_class_progress table
+  // with completed = 1 for THIS student (persisted per authenticated
+  // account, so refresh / logout / other devices all read the same data).
   try {
-    const progressRows = await query<
-      { course_slug: string; total: number; done: number }[]
-    >(
-      `SELECT a.course_slug,
-              COUNT(cl.id) AS total,
-              SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
-         FROM course_subject_assignments a
-         JOIN course_chapters ch ON ch.subject_id = a.subject_id AND ch.is_active = 1
-         JOIN course_classes cl ON cl.chapter_id = ch.id AND cl.is_active = 1
-         LEFT JOIN student_class_progress p
-                ON p.class_id = cl.id AND p.student_uid = ?
-        WHERE a.course_slug IN (${rows.map(() => "?").join(",")})
-        GROUP BY a.course_slug`,
-      [uid, ...rows.map((row) => row.slug)],
-    );
-    const progressMap = new Map(
-      progressRows.map((row) => [row.course_slug, row]),
-    );
+    const slugs = rows.map((row) => row.slug);
+    const placeholders = slugs.map(() => "?").join(",");
+    const [subjectProgress, directProgress] = await Promise.all([
+      query<{ course_slug: string; total: number; done: number }[]>(
+        `SELECT a.course_slug,
+                COUNT(cl.id) AS total,
+                SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
+           FROM course_subject_assignments a
+           JOIN course_chapters ch ON ch.subject_id = a.subject_id AND ch.is_active = 1
+                AND (COALESCE(ch.course_slug, '') = '' OR ch.course_slug = a.course_slug)
+           JOIN course_classes cl ON cl.chapter_id = ch.id AND cl.is_active = 1
+           LEFT JOIN student_class_progress p
+                  ON p.class_id = cl.id AND p.student_uid = ?
+          WHERE a.course_slug IN (${placeholders})
+          GROUP BY a.course_slug`,
+        [uid, ...slugs],
+      ),
+      query<{ course_slug: string; total: number; done: number }[]>(
+        `SELECT ch.course_slug,
+                COUNT(cl.id) AS total,
+                SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
+           FROM course_chapters ch
+           JOIN course_classes cl ON cl.chapter_id = ch.id AND cl.is_active = 1
+           LEFT JOIN student_class_progress p
+                  ON p.class_id = cl.id AND p.student_uid = ?
+          WHERE ch.is_active = 1
+            AND ch.course_slug IN (${placeholders})
+            AND COALESCE(ch.subject_id, '') = ''
+          GROUP BY ch.course_slug`,
+        [uid, ...slugs],
+      ),
+    ]);
+    const progressMap = new Map<string, { total: number; done: number }>();
+    for (const row of [...subjectProgress, ...directProgress]) {
+      const entry = progressMap.get(row.course_slug) ?? { total: 0, done: 0 };
+      entry.total += toNumber(row.total);
+      entry.done += toNumber(row.done);
+      progressMap.set(row.course_slug, entry);
+    }
 
     return rows.map((row) => {
       const progress = progressMap.get(row.slug);
@@ -1040,14 +1071,19 @@ export type CourseProgressDetail = {
   subjects: SubjectProgress[];
 };
 
-type ProgressRow = {
+type SubjectProgressRow = {
   course_slug: string;
-  course_name: string | null;
-  image_url: string | null;
   subject_id: string;
   subject_name: string;
-  chapter_id: string | null;
+  sort_order: number;
+};
+
+type ChapterProgressRow = {
+  course_slug: string;
+  subject_id: string | null;
+  chapter_id: string;
   chapter_name: string | null;
+  sort_order: number;
   total: number;
   done: number;
 };
@@ -1056,44 +1092,137 @@ function percentOf(done: number, total: number): number {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
 
-/** Real learning progress for every active enrollment, computed in MySQL. */
+/**
+ * Real learning progress for every active enrollment (free + paid),
+ * computed in MySQL from actual learning activity.
+ *
+ * Applicable content = active classes (course_classes) reachable through
+ * the EXISTING content structure — both the subject path
+ * (course_subject_assignments, course_slug-isolated) and the direct path
+ * (course_chapters scoped by course_slug with no subject). No duplicate
+ * course/content system is created.
+ *
+ * Completed content = rows in the existing student_class_progress table
+ * with completed = 1 for THIS authenticated student — persisted per
+ * account (UNIQUE student_uid + class_id, never duplicated), so refresh,
+ * logout/login and other devices all read the same saved progress.
+ *
+ * Every actively enrolled course is returned: courses without content or
+ * without any completion report 0%; a fully completed course reports 100%.
+ */
 export async function getMyCourseProgress(
   uid: string,
 ): Promise<CourseProgressDetail[]> {
-  const rows = await query<ProgressRow[]>(
-    `SELECT a.course_slug, c.name AS course_name, c.image_url,
-            s.id AS subject_id, s.name AS subject_name,
-            ch.id AS chapter_id, ch.name AS chapter_name,
-            COUNT(cl.id) AS total,
-            SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
-       FROM enrollments e
-       JOIN course_subject_assignments a ON a.course_slug = e.course_id
-       JOIN course_subjects s
-         ON s.id = a.subject_id AND s.is_active = 1
-       LEFT JOIN course_chapters ch
-         ON ch.subject_id = s.id AND ch.is_active = 1
-       LEFT JOIN course_classes cl
-         ON cl.chapter_id = ch.id AND cl.is_active = 1
-       LEFT JOIN student_class_progress p
-         ON p.class_id = cl.id AND p.student_uid = ?
-      WHERE e.student_uid = ? AND e.enrollment_status = 'active'
-      GROUP BY a.course_slug, c.name, c.image_url, s.id, s.name, ch.id, ch.name
-      ORDER BY a.course_slug, s.sort_order, s.name, ch.sort_order, ch.name`,
-    [uid, uid],
+  // 1) All active enrollments — free and paid. These define the course list;
+  //    progress rows below can only add numbers, never remove a course.
+  const enrollments = await query<
+    { course_id: string; course_name: string | null; course_kind: string }[]
+  >(
+    `SELECT course_id, course_name, course_kind FROM enrollments
+      WHERE student_uid = ? AND enrollment_status = 'active'`,
+    [uid],
   );
+  if (enrollments.length === 0) return [];
+
+  const slugs = enrollments.map((row) => row.course_id);
+  const placeholders = slugs.map(() => "?").join(",");
+
+  // 2) Catalog display info where a catalog row exists (legacy enrollments
+  //    may reference a course id with no catalog row — fall back to the
+  //    enrollment's stored course name, never drop the course).
+  const catalogRows = await safe<{ slug: string; name: string | null; image_url: string | null }[]>(
+    "progress catalog query",
+    () =>
+      query<{ slug: string; name: string | null; image_url: string | null }[]>(
+        `SELECT slug, name, image_url FROM catalog_courses WHERE slug IN (${placeholders})`,
+        slugs,
+      ),
+    [],
+  );
+  const catalogBySlug = new Map(
+    catalogRows.map((row) => [row.slug, row]),
+  );
+
+  // 3) Assigned subjects (subject path) + per-chapter class counts for BOTH
+  //    paths. LEFT JOINs keep empty subjects/chapters visible with 0 counts.
+  const [subjectRows, subjectChapters, directChapters] = await Promise.all([
+    safe<SubjectProgressRow[]>(
+      "progress subjects query",
+      () =>
+        query<SubjectProgressRow[]>(
+          `SELECT a.course_slug, s.id AS subject_id, s.name AS subject_name, s.sort_order
+             FROM course_subject_assignments a
+             JOIN course_subjects s ON s.id = a.subject_id AND s.is_active = 1
+            WHERE a.course_slug IN (${placeholders})
+            ORDER BY a.course_slug, s.sort_order, s.name`,
+          slugs,
+        ),
+      [],
+    ),
+    safe<ChapterProgressRow[]>(
+      "progress subject-chapters query",
+      () =>
+        query<ChapterProgressRow[]>(
+          `SELECT a.course_slug, ch.subject_id,
+                  ch.id AS chapter_id, ch.name AS chapter_name, ch.sort_order,
+                  COUNT(cl.id) AS total,
+                  SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
+             FROM course_subject_assignments a
+             JOIN course_subjects s ON s.id = a.subject_id AND s.is_active = 1
+             LEFT JOIN course_chapters ch
+               ON ch.subject_id = s.id AND ch.is_active = 1
+              AND (COALESCE(ch.course_slug, '') = '' OR ch.course_slug = a.course_slug)
+             LEFT JOIN course_classes cl
+               ON cl.chapter_id = ch.id AND cl.is_active = 1
+             LEFT JOIN student_class_progress p
+               ON p.class_id = cl.id AND p.student_uid = ?
+            WHERE a.course_slug IN (${placeholders})
+            GROUP BY a.course_slug, ch.subject_id, ch.id, ch.name, ch.sort_order
+            ORDER BY a.course_slug, s.sort_order, s.name, ch.sort_order, ch.name`,
+          [uid, ...slugs],
+        ),
+      [],
+    ),
+    safe<ChapterProgressRow[]>(
+      "progress direct-chapters query",
+      () =>
+        query<ChapterProgressRow[]>(
+          `SELECT ch.course_slug, NULL AS subject_id,
+                  ch.id AS chapter_id, ch.name AS chapter_name, ch.sort_order,
+                  COUNT(cl.id) AS total,
+                  SUM(CASE WHEN p.completed = 1 THEN 1 ELSE 0 END) AS done
+             FROM course_chapters ch
+             LEFT JOIN course_classes cl
+               ON cl.chapter_id = ch.id AND cl.is_active = 1
+             LEFT JOIN student_class_progress p
+               ON p.class_id = cl.id AND p.student_uid = ?
+            WHERE ch.is_active = 1
+              AND ch.course_slug IN (${placeholders})
+              AND COALESCE(ch.subject_id, '') = ''
+            GROUP BY ch.course_slug, ch.id, ch.name, ch.sort_order
+            ORDER BY ch.course_slug, ch.sort_order, ch.name`,
+          [uid, ...slugs],
+        ),
+      [],
+    ),
+  ]);
 
   const courses = new Map<
     string,
     CourseProgressDetail & { subjectMap: Map<string, SubjectProgress> }
   >();
-
-  for (const row of rows) {
-    let course = courses.get(row.course_slug);
+  const ensureCourse = (slug: string): CourseProgressDetail & { subjectMap: Map<string, SubjectProgress> } => {
+    let course = courses.get(slug);
     if (!course) {
+      const enrollment = enrollments.find((row) => row.course_id === slug);
+      const catalog = catalogBySlug.get(slug);
       course = {
-        slug: row.course_slug,
-        name: toStringOrNull(row.course_name) ?? row.course_slug,
-        imageUrl: toStringOrNull(row.image_url) ?? "",
+        slug,
+        name:
+          toStringOrNull(catalog?.name) ??
+          toStringOrNull(enrollment?.course_name) ??
+          slug,
+        imageUrl: toStringOrNull(catalog?.image_url) ?? "",
         totalClasses: 0,
         completedClasses: 0,
         remainingClasses: 0,
@@ -1101,41 +1230,98 @@ export async function getMyCourseProgress(
         subjects: [],
         subjectMap: new Map(),
       };
-      courses.set(row.course_slug, course);
+      courses.set(slug, course);
     }
-
-    const total = toNumber(row.total);
-    const done = toNumber(row.done);
-    course.totalClasses += total;
-    course.completedClasses += done;
-
-    if (!row.subject_id) continue;
-
-    let subject = course.subjectMap.get(row.subject_id);
+    return course;
+  };
+  const ensureSubject = (
+    course: CourseProgressDetail & { subjectMap: Map<string, SubjectProgress> },
+    subjectId: string,
+    subjectName: string,
+  ): SubjectProgress => {
+    let subject = course.subjectMap.get(subjectId);
     if (!subject) {
       subject = {
-        subjectId: row.subject_id,
-        subjectName: row.subject_name,
+        subjectId,
+        subjectName,
         totalClasses: 0,
         completedClasses: 0,
         percent: 0,
         chapters: [],
       };
-      course.subjectMap.set(row.subject_id, subject);
+      course.subjectMap.set(subjectId, subject);
       course.subjects.push(subject);
     }
+    return subject;
+  };
+
+  // Every enrolled course is present even before any content rows arrive.
+  for (const row of enrollments) ensureCourse(row.course_id);
+  // Subjects with no chapters yet still appear (0% subject-wise progress).
+  for (const row of subjectRows) {
+    ensureSubject(ensureCourse(row.course_slug), row.subject_id, row.subject_name);
+  }
+
+  const applyChapter = (
+    courseSlug: string,
+    subjectId: string | null,
+    subjectName: string | null,
+    chapterId: string | null,
+    chapterName: string | null,
+    total: number,
+    done: number,
+  ) => {
+    const course = ensureCourse(courseSlug);
+    course.totalClasses += total;
+    course.completedClasses += done;
+    if (!subjectId) return;
+    const subject = ensureSubject(
+      course,
+      subjectId,
+      subjectName ?? subjectId,
+    );
     subject.totalClasses += total;
     subject.completedClasses += done;
-
-    if (row.chapter_id) {
+    if (chapterId) {
       subject.chapters.push({
-        chapterId: row.chapter_id,
-        chapterName: toStringOrNull(row.chapter_name) ?? "",
+        chapterId,
+        chapterName: chapterName ?? "",
         totalClasses: total,
         completedClasses: done,
         percent: percentOf(done, total),
       });
     }
+  };
+
+  for (const row of subjectChapters) {
+    if (!row.chapter_id) continue;
+    const subjectInfo = subjectRows.find(
+      (item) => item.course_slug === row.course_slug && item.subject_id === row.subject_id,
+    );
+    applyChapter(
+      row.course_slug,
+      row.subject_id,
+      subjectInfo?.subject_name ?? row.subject_id ?? "",
+      row.chapter_id,
+      row.chapter_name,
+      toNumber(row.total),
+      toNumber(row.done),
+    );
+  }
+  // Direct-path chapters are grouped under one synthetic subject named after
+  // the course so subject-wise progress still renders for direct courses.
+  for (const row of directChapters) {
+    if (!row.chapter_id) continue;
+    const course = ensureCourse(row.course_slug);
+    applyChapter(
+      row.course_slug,
+      "__direct__",
+      course.name,
+      row.chapter_id,
+      row.chapter_name,
+      toNumber(row.total),
+      toNumber(row.done),
+    );
   }
 
   return [...courses.values()].map((course) => ({
@@ -1144,7 +1330,7 @@ export async function getMyCourseProgress(
     imageUrl: course.imageUrl,
     totalClasses: course.totalClasses,
     completedClasses: course.completedClasses,
-    remainingClasses: course.totalClasses - course.completedClasses,
+    remainingClasses: Math.max(0, course.totalClasses - course.completedClasses),
     percent: percentOf(course.completedClasses, course.totalClasses),
     subjects: course.subjects.map((subject) => ({
       subjectId: subject.subjectId,
@@ -1435,20 +1621,38 @@ export async function getContinueLearningItems(
   const slugs = enrolled.map((course) => course.slug);
   const placeholders = slugs.map(() => "?").join(",");
 
-  const [curriculum, stamps] = await Promise.all([
+  const [subjectCurriculum, directCurriculum, stamps] = await Promise.all([
     query<CurriculumClassRow[]>(
-      `SELECT a.course_slug, c.name AS course_name, c.image_url,
+      `SELECT a.course_slug, COALESCE(NULLIF(c.name, ''), e.course_name) AS course_name, c.image_url,
               cl.id AS class_id, cl.title AS class_title,
               ch.name AS chapter_name, s.name AS subject_name
          FROM course_subject_assignments a
-         JOIN catalog_courses c ON c.slug = a.course_slug
+         JOIN enrollments e ON e.course_id = a.course_slug AND e.student_uid = ?
+              AND e.enrollment_status = 'active'
+         LEFT JOIN catalog_courses c ON c.slug = a.course_slug
          JOIN course_subjects s ON s.id = a.subject_id AND s.is_active = 1
          JOIN course_chapters ch ON ch.subject_id = a.subject_id AND ch.is_active = 1
+              AND (COALESCE(ch.course_slug, '') = '' OR ch.course_slug = a.course_slug)
          JOIN course_classes cl ON cl.chapter_id = ch.id AND cl.is_active = 1
         WHERE a.course_slug IN (${placeholders})
         ORDER BY a.course_slug, s.sort_order, s.name,
                  ch.sort_order, ch.name, cl.sort_order, cl.created_at`,
-      slugs,
+      [uid, ...slugs],
+    ),
+    query<CurriculumClassRow[]>(
+      `SELECT ch.course_slug, COALESCE(NULLIF(c.name, ''), e.course_name) AS course_name, c.image_url,
+              cl.id AS class_id, cl.title AS class_title,
+              ch.name AS chapter_name, COALESCE(NULLIF(c.name, ''), e.course_name) AS subject_name
+         FROM course_chapters ch
+         JOIN enrollments e ON e.course_id = ch.course_slug AND e.student_uid = ?
+              AND e.enrollment_status = 'active'
+         LEFT JOIN catalog_courses c ON c.slug = ch.course_slug
+         JOIN course_classes cl ON cl.chapter_id = ch.id AND cl.is_active = 1
+        WHERE ch.is_active = 1
+          AND ch.course_slug IN (${placeholders})
+          AND COALESCE(ch.subject_id, '') = ''
+        ORDER BY ch.course_slug, ch.sort_order, ch.name, cl.sort_order, cl.created_at`,
+      [uid, ...slugs],
     ),
     query<ProgressStampRow[]>(
       `SELECT p.class_id, p.completed, p.last_seen_seconds, p.updated_at
@@ -1457,6 +1661,7 @@ export async function getContinueLearningItems(
       [uid],
     ),
   ]);
+  const curriculum = [...subjectCurriculum, ...directCurriculum];
 
   if (curriculum.length === 0) return [];
 
