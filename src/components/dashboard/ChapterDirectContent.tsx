@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
-  BackLink,
   LevelStates,
   recordRecentView,
   useCourseLearning,
 } from "@/components/dashboard/CourseLevels";
 import type { ContentKind } from "@/components/dashboard/CourseContentCards";
-import { contentBase, flatChapters } from "@/components/dashboard/CourseContentCards";
+import { flatChapters } from "@/components/dashboard/CourseContentCards";
 import MaterialCard from "@/components/dashboard/MaterialCard";
 
 const KIND_META: Record<ContentKind, { title: string; emptyLabel: string }> = {
@@ -62,7 +61,6 @@ export default function ChapterDirectContentView({
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Chapter not found</p>
-          <BackLink href={contentBase(slug)} label={`Back to ${course.name}`} />
         </div>
       </section>
     );
@@ -70,8 +68,6 @@ export default function ChapterDirectContentView({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={contentBase(slug)} label={course.name} />
-
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           {meta.title}

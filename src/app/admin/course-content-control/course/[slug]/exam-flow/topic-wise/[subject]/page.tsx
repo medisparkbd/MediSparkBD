@@ -21,9 +21,6 @@ export default function TopicSubjectExamsPage({
   if (!isFlow5SubjectKey(subject)) {
     return (
       <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <Link href={`${base}/exam-flow/topic-wise`} className="text-sm font-semibold text-neutral-400 hover:text-[#1a3a78]">
-          ← Subjects
-        </Link>
         <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm text-red-400">
           Unknown subject.
         </p>

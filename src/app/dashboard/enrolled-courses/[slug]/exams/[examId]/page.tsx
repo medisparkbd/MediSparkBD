@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import ExamParticipationArea from "@/components/auth/ExamParticipationArea";
 import HideDuringExam from "@/components/exam/HideDuringExam";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type ExamMeta = {
   id: string;
@@ -30,7 +28,6 @@ type ExamMeta = {
  */
 export default function CourseExamPage() {
   const { slug, examId } = useParams<{ slug: string; examId: string }>();
-  const router = useRouter();
   const { user, authLoading } = useAuth();
   const [exam, setExam] = useState<ExamMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +75,6 @@ export default function CourseExamPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
         <p className="text-sm font-semibold text-red-400">{error}</p>
-        <Link
-          href={`/dashboard/enrolled-courses/${slug}`}
-          className="mt-4 inline-block text-sm font-semibold text-primary-400 hover:underline"
-        >
-          ← Back to Course
-        </Link>
       </div>
     );
   }
@@ -92,12 +83,6 @@ export default function CourseExamPage() {
     <main className="flex-1 bg-dark-950">
       <section className="exam-page-section mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <HideDuringExam>
-          {/* Back link */}
-          <SmartBackButton
-            href={`/dashboard/enrolled-courses/${slug}`}
-            label="Back to Course"
-          />
-
           {/* Course exam header */}
           {exam && (
             <div className="mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">

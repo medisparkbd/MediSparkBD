@@ -12,9 +12,9 @@ const statusMeta: Record<
   { label: string; badge: string; dot: string }
 > = {
   Live: {
-    label: "LIVE",
+    label: "Exam is Live Now",
     badge:
-      "bg-primary-600 text-white shadow-md shadow-primary-600/50 ring-1 ring-primary-400/60",
+      "bg-emerald-600 text-white shadow-md shadow-emerald-600/50 ring-1 ring-emerald-400/60",
     dot: "bg-white animate-pulse",
   },
   Available: {
@@ -24,18 +24,18 @@ const statusMeta: Record<
     dot: "bg-white animate-pulse",
   },
   Upcoming: {
-    label: "UPCOMING",
+    label: "Upcoming Exam",
     badge:
       "bg-primary-500/10 text-primary-300 border border-primary-500/30",
     dot: "bg-primary-400",
   },
   Completed: {
-    label: "COMPLETED",
-    badge: "bg-dark-800 text-neutral-400 border border-ink/10",
-    dot: "bg-neutral-500",
+    label: "Exam is Closed",
+    badge: "bg-red-500/10 text-red-400 border border-red-500/30",
+    dot: "bg-red-400",
   },
   Expired: {
-    label: "EXPIRED",
+    label: "Exam is Closed",
     badge: "bg-red-500/10 text-red-400 border border-red-500/30",
     dot: "bg-red-400",
   },
@@ -106,7 +106,7 @@ const actionMeta: Record<ExamStatus, { label: string }> = {
   Upcoming: { label: "View Details" },
   Completed: { label: "View Result" },
   Expired: { label: "View Details" },
-  Practice: { label: "Start Practice" },
+  Practice: { label: "Practice Again" },
   Inactive: { label: "Not Available" },
   Unpublished: { label: "View Details" },
 };

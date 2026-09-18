@@ -5,5 +5,6 @@ export {
   getEnrolledExamPhase as getFlow4Phase,
   enrolledExamPhaseLabel as flow4PhaseLabel,
   isEnrolledExam as isFlow4Exam,
+  isEnrolledPracticePhase as isFlow4PracticePhase,
   filterEnrolledExamIds as filterFlow4ExamIds,
 } from "@/lib/enrolled-exam-lifecycle";

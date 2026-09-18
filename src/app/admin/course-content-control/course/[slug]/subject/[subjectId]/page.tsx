@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading } from "@/components/auth/AccessGuard";
@@ -85,9 +84,6 @@ export default function SubjectContentsPage({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href={`/admin/course-content-control/course/${encodeURIComponent(slug)}`} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-        ← {decodeURIComponent(slug).replace(/-/g, " ")}
-      </Link>
       <h1 className="mt-3 text-xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Subject Contents</h1>
       <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
         <span className="font-bold text-[#1a3a78] admin-dark:text-primary-400">Course Content → Subject → Content</span> · {subjectName || subjectId} — Manage contents directly under this subject (video, PDF, notes, image, audio, quiz, etc.)

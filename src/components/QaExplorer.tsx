@@ -476,26 +476,6 @@ export default function QaExplorer({
   return (
     <div>
       {selectedSubject && (
-        <div className="mb-4">
-          {/* Website Back Button — explicit `/qa` route only (never global
-              history). Child → Q&A Main via replace: no loop, state kept. */}
-          <a
-            href="/qa"
-            onClick={(event) => {
-              event.preventDefault();
-              handleBackToSubjects();
-            }}
-            aria-label="Back to Q&A"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Q&amp;A
-          </a>
-        </div>
-      )}
-      {selectedSubject && (
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-extrabold text-heading">

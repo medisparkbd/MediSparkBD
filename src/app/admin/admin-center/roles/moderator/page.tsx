@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
@@ -99,9 +98,6 @@ export default function ModeratorRolesPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href="/admin/admin-center" className="text-sm font-semibold text-[#234e9f] hover:text-[#1a3a78] admin-dark:text-[#93c5fd]">
-        ← Admin Center
-      </Link>
       <header className="mt-3">
         <h1 className="text-2xl font-extrabold tracking-tight text-[#0b1e3a] admin-dark:text-white">Moderator Role</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-500 admin-dark:text-slate-400">

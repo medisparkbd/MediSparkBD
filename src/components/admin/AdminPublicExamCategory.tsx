@@ -114,12 +114,6 @@ export default function AdminPublicExamCategory({
   return (
     <main className="flex-1 bg-[#f1f5f9] admin-dark:bg-[#0a162e]">
       <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
-        <Link
-          href="/admin/exams/public"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
-        >
-          ← All Categories
-        </Link>
         <h1 className="mt-3 text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white sm:text-3xl">
           {categoryLabels[category]} Public Exams
         </h1>

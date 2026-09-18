@@ -4,15 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import PermissionGate from "@/components/auth/PermissionGate";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type Subject = { id: string; name: string; sortOrder: number; chapters: Array<{ id: string; name: string; sortOrder: number; contents: Array<{ id: string; title: string; contentType: string; videoUrl: string | null; fileUrl: string | null; durationMinutes: number }> }> };
 
 type DirectSubject = { id: string; name: string; sortOrder: number; contents: Array<{ id: string; title: string; contentType: string; videoUrl: string | null; fileUrl: string | null; durationMinutes: number }> };
-
-function BackLink({ href, label }: { href: string; label: string }) {
-  return <SmartBackButton href={href} label={label} />;
-}
 
 function useFlow4(slug: string) {
   const { user, authLoading } = useAuth();
@@ -102,7 +97,6 @@ function Flow4CourseContent({ slug }: { slug: string }) {
   // Navigation must remain even if no subjects → show No Content Available
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href="/dashboard/enrolled-courses" label="My Enrolled Courses" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Course Content</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Subjects</h1>
@@ -170,14 +164,12 @@ function Flow4SubjectContent({ slug, subjectId }: { slug: string; subjectId: str
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Subject not found</p>
-          <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Back to Course" />
         </div>
       </section>
     );
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Course Content" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">{subject.name}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Chapters</h1>
@@ -247,7 +239,6 @@ function Flow4ChapterContent({ slug, subjectId, chapterId }: { slug: string; sub
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Chapter not found</p>
-          <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subjectId)}`} label="Back to Chapters" />
         </div>
       </section>
     );
@@ -262,7 +253,6 @@ function Flow4ChapterContent({ slug, subjectId, chapterId }: { slug: string; sub
   };
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subjectId)}`} label={subject.name} />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">{chapter.name}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Contents</h1>
@@ -334,7 +324,6 @@ function Flow4DirectCourseContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href="/dashboard/enrolled-courses" label="My Enrolled Courses" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Course Content</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Subjects</h1>
@@ -402,7 +391,6 @@ function Flow4DirectSubjectContent({ slug, subjectId }: { slug: string; subjectI
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Subject not found</p>
-          <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Back to Course" />
         </div>
       </section>
     );
@@ -420,7 +408,6 @@ function Flow4DirectSubjectContent({ slug, subjectId }: { slug: string; subjectI
   };
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Course Content" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">{subject.name}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Contents</h1>

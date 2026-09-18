@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading } from "@/components/auth/AccessGuard";
@@ -131,13 +130,6 @@ export default function CourseApplicationsPage({
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <Link
-        href={`/admin/enrollment-control/${kind}`}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
-      >
-        ← {kind === "free" ? "Free Course" : "Paid Course"} Enrollment
-      </Link>
-
       <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         Applications
       </h1>

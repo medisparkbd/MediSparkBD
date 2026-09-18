@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { isActiveEnrollment } from "@/lib/enrollments";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 import PermissionGate, {
   courseDeniedGuidance,
 } from "@/components/auth/PermissionGate";
@@ -305,11 +304,6 @@ function ClassPlayerBody({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-      <SmartBackButton
-        href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`}
-        label={course?.name ?? "Course"}
-      />
-
       <div className="mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">
         {/* Player */}
         <div className="relative aspect-video w-full bg-black">

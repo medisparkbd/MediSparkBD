@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useOverlayBackClose } from "@/components/navigation/useOverlayBackClose";
 import { useCourseAccess } from "@/lib/course-access";
 import { enrollInCourse } from "@/lib/enrollments";
 import { formatFee, getPayableFee } from "@/lib/courses";
@@ -112,6 +113,8 @@ export default function EnrollModal({
   const isPaid = finalAmount > 0;
   const [senderMobile, setSenderMobile] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Browser/device Back closes the modal first (no navigation away).
+  useOverlayBackClose(open, onClose);
   // Live payment card from MySQL (Admin Payment Card manager) — shows
   // students exactly where to send the money. All labels, placeholders and
   // toggles are admin-controlled via the Payment Card editor.

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useOverlayBackClose } from "@/components/navigation/useOverlayBackClose";
 
 /**
  * Centered Access Permission Card — shown when a registered student without
@@ -17,6 +18,8 @@ export default function AccessPermissionModal({
   onClose: () => void;
 }) {
   // Close on Escape + lock body scroll while open.
+  // Browser/device Back closes the modal first (no navigation).
+  useOverlayBackClose(open, onClose);
   useEffect(() => {
     if (!open) return;
     const handleKey = (event: KeyboardEvent) => {

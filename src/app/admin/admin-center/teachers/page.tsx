@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
@@ -115,12 +114,6 @@ export default function ViewTeachersPage() {
             All staff members with the Teacher role.
           </p>
         </div>
-        <Link
-          href="/admin/admin-center"
-          className="rounded-xl bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-200 admin-dark:bg-[#1e3a65] admin-dark:text-white admin-dark:hover:bg-[#234e9f] transition"
-        >
-          ← Back to Admin Center
-        </Link>
       </div>
 
       {loadError ? (

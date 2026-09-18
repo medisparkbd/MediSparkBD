@@ -59,10 +59,9 @@ export async function GET(
       );
     }
 
-    // Enrolled exam lifecycle: ALL enrolled (private/course) exams use
-    // UPCOMING → LIVE → PRACTICE based on server time.
-    // After End Time the exam is still startable as Practice for enrolled students.
-    // Public exams keep the existing deriveStatus-based Expired check.
+    // Lifecycle gates (server time): Public Live Upcoming/Closed/Hidden block
+    // start; Public Practice always startable; Course Upcoming/Closed block,
+    // Archived allows Practice Again.
     let isEnrolled = false;
     try {
       const { isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
@@ -71,9 +70,8 @@ export async function GET(
       isEnrolled = false;
     }
     if (isEnrolled) {
-      // Enrolled: only UPCOMING blocks start; PRACTICE is allowed for practice.
       try {
-        const { getEnrolledExamPhase } = await import("@/lib/enrolled-exam-lifecycle");
+        const { getEnrolledExamPhase, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
         const { fetchExamById } = await import("@/lib/exams-admin");
         const raw = await fetchExamById(id);
         if (raw) {
@@ -84,7 +82,14 @@ export async function GET(
               { status: 403 },
             );
           }
-          // Live and Practice both allow start — Practice via enrolled path.
+          if (phase === "closed") {
+            return NextResponse.json(
+              { error: "This exam has ended. You can no longer start it." },
+              { status: 403 },
+            );
+          }
+          // Live and Archived(practice) both allow start.
+          void isEnrolledPracticePhase;
         }
       } catch {
         // Fallback to original check if lookup fails
@@ -96,12 +101,42 @@ export async function GET(
         }
       }
     } else {
-      // Public exams keep existing lifecycle — Expired/Completed blocks start.
-      if (examMeta.status === "Completed" || examMeta.status === "Expired") {
-        return NextResponse.json(
-          { error: "This exam has ended. You can no longer start it." },
-          { status: 403 },
-        );
+      // Public: Practice always startable; Live follows Upcoming→Live→Closed→Hidden.
+      if (examMeta.examMode === "practice") {
+        // Always allow start while published — no time gate.
+      } else {
+        try {
+          const { getPublicLiveState } = await import("@/lib/exam-lifecycle");
+          const { fetchExamById } = await import("@/lib/exams-admin");
+          const raw = await fetchExamById(id);
+          if (raw) {
+            const state = getPublicLiveState(raw);
+            if (state === "upcoming" || state === "draft") {
+              return NextResponse.json(
+                { error: "This exam has not started yet." },
+                { status: 403 },
+              );
+            }
+            if (state === "closed" || state === "hidden") {
+              return NextResponse.json(
+                { error: "This exam has ended. You can no longer start it." },
+                { status: 403 },
+              );
+            }
+          } else if (examMeta.status === "Completed" || examMeta.status === "Expired") {
+            return NextResponse.json(
+              { error: "This exam has ended. You can no longer start it." },
+              { status: 403 },
+            );
+          }
+        } catch {
+          if (examMeta.status === "Completed" || examMeta.status === "Expired") {
+            return NextResponse.json(
+              { error: "This exam has ended. You can no longer start it." },
+              { status: 403 },
+            );
+          }
+        }
       }
     }
 

@@ -290,7 +290,6 @@ function InfoTab({
 
       <div className="mt-6 flex flex-wrap gap-3">
         <button type="button" onClick={() => void save()} disabled={busy} className={buttonPrimaryClass}>{busy ? "Saving…" : "Save Information"}</button>
-        <Link href="/admin/public-exam" className={buttonSecondaryClass}>Back to Public Exams</Link>
       </div>
       {notice && <p role="status" className={noticeClass(notice)}>{notice.text}</p>}
 
@@ -501,7 +500,6 @@ export default function ExamManageClient({ examId }: { examId: string }) {
         <p className="text-sm font-bold text-red-600">Could not load exam “{examId}”.</p>
         <div className="mt-4 flex justify-center gap-2">
           <button type="button" onClick={() => void loadExam()} className={buttonPrimaryClass}>Try Again</button>
-          <Link href="/admin/exams/public" className={buttonSecondaryClass}>Back to Exams</Link>
         </div>
       </div>
     );
@@ -526,7 +524,6 @@ export default function ExamManageClient({ examId }: { examId: string }) {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Link href="/admin/exams/public" className={buttonSecondaryClass}>← Exams</Link>
           <button
             type="button"
             onClick={async () => {

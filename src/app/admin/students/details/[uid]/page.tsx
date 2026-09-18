@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
@@ -148,9 +147,6 @@ export default function StudentDetailsPage({
   if (loadError || !student) {
     return (
       <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <Link href="/admin/students/all" className="text-sm font-semibold text-[#234e9f] hover:text-[#1a3a78] admin-dark:text-[#93c5fd]">
-          ← Back to All Students
-        </Link>
         <div className={`${cardClass} mt-6 p-8 text-center`}>
           <p className="text-sm font-bold text-red-500">Student not found.</p>
           <p className="mt-1 text-xs text-slate-500">The student may have been removed or the link is invalid.</p>
@@ -165,11 +161,6 @@ export default function StudentDetailsPage({
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      {/* Back link */}
-      <Link href="/admin/students/all" className="text-sm font-semibold text-[#234e9f] hover:text-[#1a3a78] admin-dark:text-[#93c5fd]">
-        ← Back to All Students
-      </Link>
-
       {/* Profile header */}
       <div className={`${cardClass} mt-6 p-6`}>
         <div className="flex flex-wrap items-center gap-4">

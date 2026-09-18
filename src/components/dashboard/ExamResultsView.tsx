@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 import type {
   StudentExamResultGroup,
   StudentExamResultRow,
@@ -285,8 +284,6 @@ export default function ExamResultsView() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <SmartBackButton href="/dashboard" label="Back to Dashboard" />
-
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           Dashboard

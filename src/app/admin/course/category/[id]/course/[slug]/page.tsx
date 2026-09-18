@@ -117,9 +117,6 @@ export default async function AdminCourseDetailsPage({
             <Link href={`${categoryBase}?edit=${encodeURIComponent(course.slug)}`} className={buttonPrimaryClass}>
               Edit
             </Link>
-            <Link href={categoryBase} className={buttonSecondaryClass}>
-              Back to List
-            </Link>
           </div>
         </div>
 

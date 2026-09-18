@@ -9,6 +9,7 @@ import { AccessLoading } from "@/components/auth/AccessGuard";
 import AdminToastProvider from "@/components/admin/AdminToastProvider";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/AdminThemeProvider";
 import AdminThemeToggle from "@/components/admin/AdminThemeToggle";
+import { useOverlayBackClose } from "@/components/navigation/useOverlayBackClose";
 
 /**
  * Website-styled Admin shell — Premium Navy Blue Smart Theme
@@ -56,6 +57,8 @@ function WebsiteAdminShellInner({
   const { user, logout: signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { theme } = useAdminTheme();
+  // Browser/device Back closes the drawer first (no navigation).
+  useOverlayBackClose(menuOpen, () => setMenuOpen(false));
 
   if (!gate.ready) {
     return gate.denied ? (

@@ -19,7 +19,11 @@ import ExamRulesEditor from "@/components/admin/ExamRulesEditor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MediaUploadField } from "@/components/admin/MediaUploadField";
-import { examCategoryLabel } from "@/lib/public-exams";
+import { examCategoryLabel, type ExamCategory } from "@/lib/public-exams";
+import {
+  matchMedicalPracticeSubject,
+  OTHER_PRACTICE_SUBJECT_KEY,
+} from "@/lib/public-exam-structure";
 
 export type Exam = {
   id: string;
@@ -117,22 +121,31 @@ function formatExamTime(iso: string | null): string {
   }
 }
 
-function flow4Phase(exam: { scheduledAt: string | null; endsAt: string | null }): "upcoming" | "live" | "practice" | "no-window" {
+function flow4Phase(exam: { scheduledAt: string | null; endsAt: string | null; status?: string }): "upcoming" | "live" | "closed" | "archived" | "practice" | "no-window" {
   const now = Date.now();
   const s = exam.scheduledAt ? new Date(exam.scheduledAt).getTime() : NaN;
   const e = exam.endsAt ? new Date(exam.endsAt).getTime() : NaN;
   const hasS = Number.isFinite(s);
   const hasE = Number.isFinite(e);
+  const DAY = 24 * 60 * 60 * 1000;
+  if ((exam as { status?: string }).status === "closed") {
+    if (hasE && now - e > DAY) return "archived";
+    return "closed";
+  }
   if (!hasS && !hasE) return "no-window";
   if (hasS && now < s) return "upcoming";
-  if (hasE && now > e) return "practice";
+  if (hasE && now > e) {
+    if (now - e > DAY) return "archived";
+    return "closed";
+  }
   return "live";
 }
 
 function flow4PhaseBadge(phase: ReturnType<typeof flow4Phase>): { label: string; className: string } {
   if (phase === "upcoming") return { label: "Upcoming", className: "bg-amber-500/10 text-amber-700 ring-amber-500/20 admin-dark:bg-amber-500/10 admin-dark:text-amber-400" };
   if (phase === "live") return { label: "Live", className: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-400" };
-  if (phase === "practice") return { label: "Practice", className: "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400" };
+  if (phase === "closed") return { label: "Closed", className: "bg-red-500/10 text-red-700 ring-red-500/20 admin-dark:bg-red-500/10 admin-dark:text-red-400" };
+  if (phase === "practice" || phase === "archived") return { label: phase === "archived" ? "Archived" : "Practice", className: "bg-violet-500/10 text-violet-700 ring-violet-500/20 admin-dark:bg-violet-500/10 admin-dark:text-violet-400" };
   return { label: "Live", className: "bg-sky-500/10 text-sky-700 ring-sky-500/20" };
 }
 
@@ -161,6 +174,11 @@ export default function ExamManager({
   fixedCourse,
   fixedFormat,
   fixedTopicSubject,
+  controlledMode,
+  controlledSubjectKey,
+  publicCategoryKey,
+  hideModeTabs = false,
+  onExamsChange,
 }: {
   title: string;
   description: string;
@@ -178,6 +196,22 @@ export default function ExamManager({
   fixedFormat?: "topic-wise" | "paper-final" | "subject-final" | "final-model";
   /** Topic-wise subject lock (one of the 8 fixed subjects) — implies topic-wise. */
   fixedTopicSubject?: string;
+  /**
+   * Public Exam Control structure — Category → Live Exam | Practice Exam.
+   * When set, the parent drives filtering (segmented filter + subject
+   * navigation) and the internal mode tabs are hidden.
+   */
+  controlledMode?: "live" | "practice";
+  /**
+   * Practice subject filter: a medical subject key (or "other") for the
+   * medical category, an exact subject name otherwise. Null = all subjects.
+   */
+  controlledSubjectKey?: string | null;
+  /** Public Exam category key of the surrounding page (subject matching). */
+  publicCategoryKey?: ExamCategory | null;
+  hideModeTabs?: boolean;
+  /** Emits the loaded exams so the parent can build subject cards/counts. */
+  onExamsChange?: (exams: Exam[]) => void;
 }) {
   const gate = useAdminGate();
   const router = useRouter();
@@ -195,16 +229,22 @@ export default function ExamManager({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [questionsExam, setQuestionsExam] = useState<Exam | null>(null);
-  const [modeFilter, setModeFilter] = useState<"all" | "live" | "practice">("all");
-  const [phaseFilter, setPhaseFilter] = useState<"all" | "upcoming" | "live" | "practice">("all");
+  const [modeFilter, setModeFilter] = useState<"all" | "live" | "practice">(
+    // Public Exam Control structure defaults to the Live Exam tab.
+    fixedCategory ? "live" : "all",
+  );
+  const [phaseFilter, setPhaseFilter] = useState<"all" | "upcoming" | "live" | "closed" | "archived" | "practice">("all");
 
   const load = useCallback(async () => {
     setLoadError(false);
     try {
       const params = new URLSearchParams();
       if (fixedCategory) {
-        // Database/API-level isolation — only this category's public exams.
-        params.set("kind", "public");
+        // Database/API-level isolation — only this category's exams, both
+        // live-mode (kind public) and practice exams (legacy kind practice
+        // or exam_mode practice) so the Live/Practice structure matches the
+        // Main Website. Course (enrolled) exams stay excluded.
+        params.set("kind", "public,practice");
         params.set("categoryId", fixedCategory.id);
         if (fixedChapter) params.set("chapterId", fixedChapter.id);
       } else if (fixedCourse) {
@@ -236,6 +276,12 @@ export default function ExamManager({
   useEffect(() => {
     if (gate.ready) void Promise.resolve().then(load);
   }, [gate.ready, load]);
+
+  // Let the Public Exam Control parent build subject cards/counts from the
+  // same loaded exams (no duplicate fetching).
+  useEffect(() => {
+    if (exams) onExamsChange?.(exams);
+  }, [exams, onExamsChange]);
 
   // Course Control categories — required for public exams created outside a
   // category page so they never end up invisible in Public Exam Control.
@@ -699,6 +745,13 @@ export default function ExamManager({
   const hasEnrolledExams = Array.isArray(kindFilter)
     ? kindFilter.includes("enrolled")
     : kindFilter === "enrolled";
+  // Static Live vs Practice — legacy `kind = "practice"` rows count as
+  // practice even when their exam_mode column kept the "live" default.
+  const examIsPractice = (exam: Exam) =>
+    exam.examMode === "practice" || exam.kind === "practice";
+  // Parent-controlled (segmented filter + subject navigation) or internal.
+  const effectiveMode: "all" | "live" | "practice" =
+    controlledMode ?? modeFilter;
   const filteredByMode = (() => {
     if (!exams) return null;
     // Course Content Control exam-flow lock — one Flow-5 category (and
@@ -714,10 +767,36 @@ export default function ExamManager({
     if (hasEnrolledExams) {
       return scoped.filter((e) => {
         if (phaseFilter === "all") return true;
-        return flow4Phase(e) === phaseFilter;
+        const ph = flow4Phase(e);
+        if (phaseFilter === "practice") return ph === "practice" || ph === "archived";
+        return ph === phaseFilter;
       });
     }
-    return scoped.filter((e) => modeFilter === "all" || (e.examMode ?? "live") === modeFilter);
+    const byMode = scoped.filter((e) =>
+      effectiveMode === "all"
+        ? true
+        : effectiveMode === "practice"
+          ? examIsPractice(e)
+          : !examIsPractice(e),
+    );
+    // Practice subject layer (Public Exam Control structure) — only narrows
+    // the Practice tab; Live and management controls are untouched.
+    if (
+      effectiveMode === "practice" &&
+      controlledSubjectKey &&
+      publicCategoryKey
+    ) {
+      return byMode.filter((e) => {
+        if (publicCategoryKey === "medical-admission") {
+          const matched = matchMedicalPracticeSubject(e.subject);
+          return controlledSubjectKey === OTHER_PRACTICE_SUBJECT_KEY
+            ? !matched
+            : matched === controlledSubjectKey;
+        }
+        return e.subject === controlledSubjectKey;
+      });
+    }
+    return byMode;
   })();
 
   const filteredCount = filteredByMode?.length ?? 0;
@@ -732,12 +811,13 @@ export default function ExamManager({
         <button type="button" onClick={startCreate} className={buttonPrimaryClass}>+ New Exam</button>
       </header>
 
-      {/* Public Exam Control: filter by static Live/Practice examMode */}
-      {fixedCategory && exams !== null && !loadError && (
+      {/* Public Exam Control: Live Exam | Practice Exam segmented filter
+          (default: Live). Hidden when the parent drives the structure. */}
+      {fixedCategory && !hideModeTabs && exams !== null && !loadError && (
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-          {(["all", "live", "practice"] as const).map((m) => {
-            const label = m === "all" ? "All Exams" : m === "live" ? "Live Exam" : "Practice Exam";
-            const active = modeFilter === m;
+          {(["live", "practice"] as const).map((m) => {
+            const label = m === "live" ? "Live Exam" : "Practice Exam";
+            const active = effectiveMode === m;
             return (
               <button
                 key={m}
@@ -759,11 +839,11 @@ export default function ExamManager({
         </div>
       )}
 
-      {/* Enrolled exams: show Upcoming / Live / Practice phase tabs */}
+      {/* Enrolled exams: show Upcoming / Live / Closed / Archived phase tabs */}
       {hasEnrolledExams && exams !== null && !loadError && (
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-          {(["all", "upcoming", "live", "practice"] as const).map((ph) => {
-            const label = ph === "all" ? "All Exams" : ph === "upcoming" ? "Upcoming" : ph === "live" ? "Live" : "Practice";
+          {(["all", "upcoming", "live", "closed", "archived"] as const).map((ph) => {
+            const label = ph === "all" ? "All Exams" : ph === "upcoming" ? "Upcoming" : ph === "live" ? "Live" : ph === "closed" ? "Closed" : "Archived";
             const active = phaseFilter === ph;
             return (
               <button
@@ -803,7 +883,7 @@ export default function ExamManager({
         <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
       ) : (filteredByMode?.length ?? 0) === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
-          {exams.length === 0 ? "No exams yet." : (fixedFormat || fixedTopicSubject) ? "No exams in this category yet — create the first one with + New Exam." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "practice" ? "Practice" : "exams"} found.` : `No ${modeFilter === "live" ? "Live Exams" : modeFilter === "practice" ? "Practice Exams" : "exams"} found.`}
+          {exams.length === 0 ? "No exams yet." : (fixedFormat || fixedTopicSubject) ? "No exams in this category yet — create the first one with + New Exam." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "closed" ? "Closed" : phaseFilter === "archived" ? "Archived" : "exams"} found.` : `No ${effectiveMode === "live" ? "Live Exams" : effectiveMode === "practice" ? "Practice Exams" : "exams"} found.`}
         </p>
       ) : (
         <ul className="mt-5 space-y-3">

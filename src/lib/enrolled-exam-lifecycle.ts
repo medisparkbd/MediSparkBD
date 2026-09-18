@@ -1,37 +1,62 @@
-// Enrolled Exam lifecycle (Live-to-Practice)
+// Enrolled (Course) Exam lifecycle.
 // Pure + server helpers. This file is the canonical definition of the
 // enrolled (private/course) exam lifecycle. Public Exam lifecycle stays in deriveStatus().
 //
 // Lifecycle for ALL enrolled exams (private/course exams):
-//   UPCOMING → LIVE → PRACTICE
+//   UPCOMING → LIVE → CLOSED (1 day) → ARCHIVED (practice)
 //   Upcoming: before scheduledAt
 //   Live:     scheduledAt ≤ now ≤ endsAt  (no endsAt → stays Live)
-//   Practice: now > endsAt
-// Transition LIVE→PRACTICE is automatic, server-time based, no deletion.
-// PRACTICE preserves question paper; attempts are not ranked.
+//   Closed:   0–24h after endsAt (no new official attempts)
+//   Archived: >24h after endsAt (eligible students practice; never ranked)
+// Transitions are automatic, server-time based, no deletion.
+// "practice" is kept as a backward-compat alias of "archived" so existing
+// callers checking `phase === "practice"` keep working.
 //
 import { query } from "@/lib/mysql";
 import type { Exam } from "@/lib/exams-admin";
+import { COURSE_CLOSED_VISIBLE_MS } from "@/lib/exam-lifecycle";
 
-export type EnrolledExamPhase = "upcoming" | "live" | "practice" | "no-window";
+export type EnrolledExamPhase =
+  | "upcoming"
+  | "live"
+  | "closed"
+  | "archived"
+  | "practice"
+  | "no-window";
 
-export function getEnrolledExamPhase(exam: Pick<Exam, "scheduledAt" | "endsAt">): EnrolledExamPhase {
-  const now = Date.now();
+export function getEnrolledExamPhase(
+  exam: Pick<Exam, "scheduledAt" | "endsAt" | "status">,
+  nowMs: number = Date.now(),
+): EnrolledExamPhase {
+  const now = nowMs;
   const start = exam.scheduledAt ? new Date(exam.scheduledAt).getTime() : NaN;
   const end = exam.endsAt ? new Date(exam.endsAt).getTime() : NaN;
   const hasStart = Number.isFinite(start);
   const hasEnd = Number.isFinite(end);
+  if ((exam as { status?: string }).status === "closed") {
+    if (hasEnd && now - end > COURSE_CLOSED_VISIBLE_MS) return "archived";
+    return "closed";
+  }
   if (!hasStart && !hasEnd) return "no-window";
   if (hasStart && now < start) return "upcoming";
-  if (hasEnd && now > end) return "practice";
+  if (hasEnd && now > end) {
+    if (now - end > COURSE_CLOSED_VISIBLE_MS) return "archived";
+    return "closed";
+  }
   // inside window or no window → live
   return "live";
+}
+
+/** True for post-live practice (archived + legacy "practice" alias). */
+export function isEnrolledPracticePhase(phase: string | null | undefined): boolean {
+  return phase === "archived" || phase === "practice";
 }
 
 export function enrolledExamPhaseLabel(phase: EnrolledExamPhase): string {
   if (phase === "upcoming") return "Upcoming";
   if (phase === "live") return "Live";
-  if (phase === "practice") return "Practice";
+  if (phase === "closed") return "Closed";
+  if (phase === "practice" || phase === "archived") return "Practice";
   return "Live";
 }
 

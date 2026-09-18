@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 import StudentResultCard from "@/components/dashboard/StudentResultCard";
 import type {
   ResultCardKind,
@@ -100,8 +99,6 @@ export default function ExamResultTypeView({ kind }: { kind: ResultCardKind }) {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <SmartBackButton href="/dashboard/exam-result" label="Exam Results" />
-
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           Dashboard

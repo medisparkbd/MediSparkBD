@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import {
@@ -14,7 +13,6 @@ import { fetchCourseMentorIds } from "@/lib/courses-admin";
 import { fetchMentors, type Mentor } from "@/lib/mentors";
 import CourseEnrollFlow from "@/components/auth/CourseEnrollFlow";
 import CourseRoutineViewer from "@/components/CourseRoutineViewer";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 // Cached at the edge; admin changes appear within 60s.
 export const revalidate = 300;
@@ -69,8 +67,6 @@ export default async function CourseDetailsPage({
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <SmartBackButton href="/courses" label="All Courses" />
-
         {/* ── Course Card (student-facing card view) ── */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">
           {/* Banner with category (top-left) + batch (top-right) overlays */}
@@ -160,12 +156,6 @@ export default async function CourseDetailsPage({
               >
                 <CourseEnrollFlow course={course} />
               </Suspense>
-              <Link
-                href="/courses"
-                className="w-full rounded-xl border border-ink/15 bg-ink/5 px-6 py-3 text-center font-semibold text-heading transition hover:border-primary-500/60 hover:bg-ink/10"
-              >
-                Back to Courses
-              </Link>
             </div>
           </div>
         </div>

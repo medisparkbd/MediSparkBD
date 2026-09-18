@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { useAdminGate, cardClass, inputClass, labelClass, buttonPrimaryClass, type Notice } from "@/components/admin/admin-ui";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import ExamManager from "@/components/admin/ExamManager";
@@ -59,9 +58,6 @@ export default function CourseExamAdminPage() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-center">
         <p className="text-sm font-semibold text-red-600 admin-dark:text-red-400">Course not found.</p>
-        <Link href="/admin/exams" className="mt-4 inline-block text-sm font-semibold text-[#1a3a78] hover:underline admin-dark:text-primary-400">
-          ← Back to Exams
-        </Link>
       </div>
     );
   }
@@ -70,13 +66,6 @@ export default function CourseExamAdminPage() {
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/admin/exams"
-          className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
-        >
-          ← Exams
-        </Link>
-        <span className="text-slate-400 admin-dark:text-slate-500">/</span>
         <h1 className="text-2xl font-extrabold text-[#0b1e3a] admin-dark:text-white">Course Exams</h1>
       </div>
 

@@ -115,18 +115,11 @@ export default function TypeChaptersPage({
     return true;
   }
 
-  const backHref = `/admin/course-content-control/course/${encodeURIComponent(slug)}${
-    sp.subject ? `?subject=${encodeURIComponent(sp.subject)}` : ""
-  }${sp.paper ? `${sp.subject ? "&" : "?"}paper=${encodeURIComponent(sp.paper)}` : ""}`;
-
   if (authLoading || !user || chapters === null)
     return <AccessLoading label="Loading chapters…" />;
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <Link href={backHref} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-        ← Back
-      </Link>
       <h1 className="mt-3 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         {ctype} — Chapters
       </h1>

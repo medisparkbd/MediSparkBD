@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessGate } from "@/components/auth/AccessGuard";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const metadata: Metadata = {
   title: "Exam Results",
@@ -67,8 +66,6 @@ export default function ExamResultPage() {
         loadingLabel="Loading your exam results..."
       >
         <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-          <SmartBackButton href="/dashboard" label="Back to Dashboard" />
-
           <header className="mt-5">
             <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
               Dashboard

@@ -17,7 +17,6 @@ import type {
 } from "@/lib/my-learning";
 import { isDirectContent } from "@/lib/course-content";
 import DirectContentView from "@/components/dashboard/CourseContentCards";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type LoadState = "loading" | "error" | "forbidden" | "ready";
 
@@ -150,10 +149,6 @@ function ProgressBar({ percent }: { percent: number }) {
   );
 }
 
-export function BackLink({ href, label }: { href: string; label: string }) {
-  return <SmartBackButton href={href} label={label} />;
-}
-
 function countsOf(chapters: ChapterItem[]) {
   return chapters.reduce(
     (acc, chapter) => ({
@@ -207,7 +202,6 @@ function PaperSelection({
   backLabel: string;
   heading?: string;
 }) {
-  const showBack = Boolean(backHref && backLabel);
   const base = `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subject.id)}`;
   const entries: {
     id: string;
@@ -235,9 +229,6 @@ function PaperSelection({
 
   return (
     <div>
-      {showBack && (
-        <BackLink href={backHref} label={backLabel} />
-      )}
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           Paper Selection
@@ -343,8 +334,6 @@ function CourseSubjectsContent({ slug }: { slug: string }) {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href="/dashboard/enrolled-courses" label="My Enrolled Courses" />
-
       {/* Course header */}
       <header className="mt-5 grid gap-6 md:grid-cols-[minmax(0,320px)_1fr]">
         <div className="aspect-video w-full overflow-hidden rounded-2xl border border-ink/10 bg-dark-800">
@@ -638,10 +627,6 @@ function SubjectPapersContent({
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
             <p className="font-bold text-yellow-300">Subject not found</p>
-            <BackLink
-              href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`}
-              label={`Back to ${course?.name ?? "course"}`}
-            />
           </div>
         </section>
       );
@@ -676,11 +661,6 @@ function SubjectPapersContent({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink
-        href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`}
-        label={course.name}
-      />
-
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           Paper / Segment
@@ -806,10 +786,6 @@ function PaperChapterView({
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
             <p className="font-bold text-yellow-300">Not found</p>
-            <BackLink
-              href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`}
-              label={`Back to ${course?.name ?? "course"}`}
-            />
           </div>
         </section>
       );
@@ -824,12 +800,9 @@ function PaperChapterView({
       : paper
         ? `${paper.kind === "segment" ? "Segment" : "Paper"} — ${paper.name}`
         : "Paper";
-  const base = `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subjectId)}`;
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={base} label={subject.name} />
-
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           {paperName}

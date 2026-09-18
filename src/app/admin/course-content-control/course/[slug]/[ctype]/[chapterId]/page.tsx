@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
@@ -157,9 +156,6 @@ export default function ChapterClassesPage({
   if (!isClass && !isExam) {
     return (
       <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <Link href={backChaptersHref} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-          ← Back
-        </Link>
         <div className="mt-6 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">This view is for Class / Exam only</p>
           <p className="mt-1 text-sm text-yellow-800/70 admin-dark:text-yellow-200/70">Chapter content management is only available when ctype is &quot;class&quot; or &quot;exam&quot;.</p>
@@ -173,9 +169,6 @@ export default function ChapterClassesPage({
   if (!chapter) {
     return (
       <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <Link href={backChaptersHref} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-          ← Back
-        </Link>
         <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center">
           <p className="font-bold text-red-600 admin-dark:text-red-300">Chapter not found</p>
           <p className="mt-1 text-sm text-red-700/70 admin-dark:text-red-200/70">This chapter does not exist in this course scope.</p>
@@ -288,9 +281,6 @@ export default function ChapterClassesPage({
   if (isExam) {
     return (
       <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-        <Link href={backChaptersHref} className="text-sm font-semibold text-slate-500 hover:text-[#1a3a78] admin-dark:text-slate-400">
-          ← Back to Chapters
-        </Link>
         <header className="mt-3">
           <p className="text-xs font-bold uppercase tracking-widest text-[#234e9f] admin-dark:text-[#93c5fd]">
             {decodedSlug.replace(/-/g, " ")} → {chapter.name}
@@ -320,10 +310,6 @@ export default function ChapterClassesPage({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <Link href={backChaptersHref} className="text-sm font-semibold text-slate-500 hover:text-[#1a3a78] admin-dark:text-slate-400">
-        ← Back to Chapters
-      </Link>
-
       <header className="mt-3">
         <p className="text-xs font-bold uppercase tracking-widest text-[#234e9f] admin-dark:text-[#93c5fd]">
           {decodedSlug.replace(/-/g, " ")} → {chapter.name}

@@ -56,11 +56,11 @@ export async function checkCourseExamAccess(
     return { allowed: false, reason };
   }
 
-  // ── Enrolled Exam Lifecycle — LIVE → PRACTICE ───────────────────────
-  // ALL enrolled (private/course) exams use UPCOMING → LIVE → PRACTICE
-  // based on server time. After End Time, the exam remains visible for
-  // Practice but Live leaderboard is frozen.
-  const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+  // ── Enrolled (Course) Exam Lifecycle ────────────────────────────────
+  // Draft → Upcoming → Live → Closed (1 day) → Archived (practice).
+  // Closed blocks new official attempts; Archived allows Practice Again
+  // (practice attempts never affect official merit/ranking).
+  const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
   const enrolled = await isEnrolledExam(normalizedId);
 
   if (enrolled) {
@@ -68,13 +68,14 @@ export async function checkCourseExamAccess(
     if (phase === "upcoming") {
       return { allowed: false, reason: "This exam has not started yet." };
     }
+    if (phase === "closed") {
+      return { allowed: false, reason: "This exam has ended." };
+    }
     if (phase === "no-window") {
       // No schedule set — treat as always Live (legacy) — fall through.
-    } else if (phase === "practice") {
-      // Practice after Live ends: require enrollment but allow entry
-      // regardless of prior Live attempt. Practice does NOT block on
-      // maxAttempts — spec §6: "enrolled students can still open and attempt
-      // it as a Practice Exam. The same question paper remains available."
+    } else if (isEnrolledPracticePhase(phase)) {
+      // Archived practice: require enrollment but allow entry regardless of
+      // prior Live attempt. Practice does NOT block on maxAttempts.
       const isEnrolled = await hasEnrolledExamAccess(normalizedId, cleanUid);
       if (!isEnrolled) {
         return {
@@ -82,9 +83,6 @@ export async function checkCourseExamAccess(
           reason: "You are not enrolled in the course for this exam.",
         };
       }
-      // Strict one-live-attempt check does NOT apply to practice.
-      // Practice can be retaken according to course-exam rules — do not
-      // enforce maxAttempts here; startExamAttempt handles practice bypass.
       return { allowed: true };
     }
     // phase === "live" — fall through to Live gates below (published +

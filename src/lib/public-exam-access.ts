@@ -54,15 +54,27 @@ export async function checkPublicExamAccess(
     return { allowed: false, reason };
   }
 
-  // Must be live within the scheduled_at / ends_at window.
-  // deriveStatus() is the canonical live-window check (same logic used to
-  // render Live/Upcoming/Closed badges and to gate getExamForTaking).
-  const status = deriveStatus(exam);
-  if (status !== "Live") {
-    if (status === "Upcoming") {
+  // Practice exams are always available while published (never time-gated).
+  if (exam.examMode === "practice") {
+    // Fall through to auth + attempt checks below.
+  } else {
+    // Public Live: Upcoming → Live → Closed (12h) → Hidden, server-time based.
+    const { getPublicLiveState } = await import("@/lib/exam-lifecycle");
+    const state = getPublicLiveState(exam);
+    if (state === "draft" || state === "upcoming") {
       return { allowed: false, reason: "This exam has not started yet." };
     }
-    return { allowed: false, reason: "This exam has ended." };
+    if (state === "closed" || state === "hidden") {
+      return { allowed: false, reason: "This exam has ended." };
+    }
+    // Fallback to the canonical display status for legacy rows without a window.
+    const status = deriveStatus(exam);
+    if (status !== "Live" && status !== "Practice" && status !== "Available") {
+      if (status === "Upcoming") {
+        return { allowed: false, reason: "This exam has not started yet." };
+      }
+      return { allowed: false, reason: "This exam has ended." };
+    }
   }
 
   // Public exams are viewable without sign-in, but starting an attempt
@@ -76,21 +88,23 @@ export async function checkPublicExamAccess(
     };
   }
 
-  // Strict One Attempt Per Public Exam: Student ID + Exam ID = max one completed attempt
-  // Public exams (kind !== 'enrolled') enforce exactly one attempt regardless of exam_settings.
-  try {
-    const countRows = await query<{ n: number }[]>(
-      `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,
-      [normalizedId, uid.trim()],
-    );
-    if ((countRows[0]?.n ?? 0) > 0) {
-      return {
-        allowed: false,
-        reason: "You have already appeared in this exam. View your result.",
-      };
+  // Strict One Attempt Per Public LIVE Exam only. Public Practice exams are
+  // retakable per attempt rules (dynamic merit) — skip the one-attempt block.
+  if (exam.examMode !== "practice") {
+    try {
+      const countRows = await query<{ n: number }[]>(
+        `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,
+        [normalizedId, uid.trim()],
+      );
+      if ((countRows[0]?.n ?? 0) > 0) {
+        return {
+          allowed: false,
+          reason: "You have already appeared in this exam. View your result.",
+        };
+      }
+    } catch {
+      // On query failure, continue to maxAttempts fallback below
     }
-  } catch {
-    // On query failure, continue to maxAttempts fallback below
   }
 
   // Attempt limits (shared with the engine's startExamAttempt guard) — fallback for enrolled / legacy

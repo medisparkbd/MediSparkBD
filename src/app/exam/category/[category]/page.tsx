@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import PublicExamList from "@/components/PublicExamList";
+import PublicExamCategoryView from "@/components/PublicExamCategoryView";
 import {
   examCategories,
   batches,
@@ -10,7 +10,6 @@ import {
   fetchPublicExams,
   resolveExamCategoryId,
 } from "@/lib/public-exams-server";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const revalidate = 300;
 
@@ -69,15 +68,13 @@ export default async function ExamCategoryPage({ params }: CategoryPageProps) {
 
   return (
     <main className="flex-1 bg-dark-950">
-      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <SmartBackButton href="/exam" label="All Categories" />
-      </section>
-
-      {/* Inside every category: Live Exams → Upcoming Exams → Previous Exams */}
-      <PublicExamList
+      {/* Category → Live Exam | Practice Exam (default: Live). */}
+      <PublicExamCategoryView
+        key={valid.key}
         exams={exams}
         batches={batches}
-        categoryId={categoryId}
+        categoryKey={valid.key}
+        categoryLabel={valid.label}
       />
     </main>
   );

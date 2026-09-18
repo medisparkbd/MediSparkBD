@@ -31,12 +31,6 @@ export default async function BannerControlPage() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
       <header>
-        <Link
-          href="/admin/home-control"
-          className="text-xs font-bold text-primary-600 transition hover:text-primary-500"
-        >
-          ← Back to Home Control
-        </Link>
         <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-[#0b1e3a] admin-dark:text-white">
           Sliding Banner
         </h2>

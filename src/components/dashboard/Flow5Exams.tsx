@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import PermissionGate from "@/components/auth/PermissionGate";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 import { recordRecentView } from "@/components/dashboard/CourseLevels";
 import {
   FLOW5_FORMATS,
@@ -32,10 +31,6 @@ export function examFlowFormatHref(slug: string, format: Flow5Format) {
 
 export function examFlowSubjectHref(slug: string, subjectKey: Flow5SubjectKey) {
   return `${examFlowBase(slug)}/topic-wise/${encodeURIComponent(subjectKey)}`;
-}
-
-function BackLink({ href, label }: { href: string; label: string }) {
-  return <SmartBackButton href={href} label={label} />;
 }
 
 function LoadingView({ label }: { label: string }) {
@@ -177,7 +172,6 @@ function Flow5CourseContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href="/dashboard/enrolled-courses" label="My Enrolled Courses" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Course Exams</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Select Exam Type</h1>
@@ -223,7 +217,6 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={examFlowBase(slug)} label="Exam Types" />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Topic-wise Exam</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Select Subject</h1>
@@ -313,14 +306,11 @@ function Flow5ExamListContent({
 
   const meta = FLOW5_FORMATS.find((f) => f.key === format);
   const isTopic = format === "topic-wise";
-  const backHref = isTopic ? examFlowFormatHref(slug, "topic-wise") : examFlowBase(slug);
-  const backLabel = isTopic ? "Subjects" : "Exam Types";
   const heading = isTopic && subjectKey ? flow5SubjectTitle(subjectKey) : (meta?.title ?? "Exams");
   const eyebrow = isTopic && subjectKey ? "Topic-wise Exam" : "Course Exams";
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={backHref} label={backLabel} />
       <header className="mt-5">
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">{eyebrow}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">{heading}</h1>

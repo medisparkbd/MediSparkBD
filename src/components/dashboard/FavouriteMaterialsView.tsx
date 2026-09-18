@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessGate } from "@/components/auth/AccessGuard";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 type FavMaterial = {
   item_id: string;
@@ -67,7 +66,6 @@ export default function FavouriteMaterialsView() {
   return (
     <AccessGate requirement="enrolled" loadingLabel="Loading favourite materials...">
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        <SmartBackButton href="/dashboard/favourites" label="Favourite" />
         <header className="mt-4">
           <h1 className="text-2xl font-extrabold text-heading sm:text-3xl">Favourite Materials</h1>
           <p className="mt-1 text-sm text-neutral-400">PDFs and materials you saved — only yours.</p>

@@ -28,9 +28,6 @@ export default function FormatExamsPage({
   if (!isFlow5Format(format) || !FINAL_FORMATS.includes(format as Flow5Format)) {
     return (
       <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-        <Link href={base} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-          ← {courseName}
-        </Link>
         <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm text-red-600 admin-dark:text-red-400">
           Unknown exam category.
         </p>

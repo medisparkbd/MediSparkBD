@@ -111,20 +111,6 @@ function AdminLevelStates({
   return null;
 }
 
-function AdminBackLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition hover:text-primary-500 admin-dark:text-slate-400 admin-dark:hover:text-[#93c5fd]"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      {label}
-    </Link>
-  );
-}
-
 function AdminManageButton({ href, label }: { href: string; label: string }) {
   return (
     <Link
@@ -264,8 +250,6 @@ export function AdminCourseSubjectsView({ slug }: { slug: string }) {
 
   return (
     <section className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink href="/admin/enrolled-courses" label="Enrolled Courses" />
-
       <header className="grid gap-6 md:grid-cols-[minmax(0,320px)_1fr]">
         <div className="aspect-video w-full overflow-hidden rounded-2xl border border-neutral-200 bg-[#f1f5f9] admin-dark:border-zinc-800 admin-dark:bg-dark-800">
           {course.imageUrl ? (
@@ -377,12 +361,6 @@ export function AdminSubjectPapersView({
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
             <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">Subject not found</p>
-            <div className="mt-4 flex justify-center">
-              <AdminBackLink
-                href={`/admin/enrolled-courses/${encodeURIComponent(slug)}`}
-                label={`Back to ${course?.name ?? "course"}`}
-              />
-            </div>
           </div>
         </section>
       );
@@ -415,11 +393,6 @@ export function AdminSubjectPapersView({
 
   return (
     <section className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink
-        href={`/admin/enrolled-courses/${encodeURIComponent(slug)}`}
-        label={course.name}
-      />
-
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
@@ -517,12 +490,6 @@ export function AdminPaperContentView({
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
             <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">Not found</p>
-            <div className="mt-4 flex justify-center">
-              <AdminBackLink
-                href={`/admin/enrolled-courses/${encodeURIComponent(slug)}`}
-                label={`Back to ${course?.name ?? "course"}`}
-              />
-            </div>
           </div>
         </section>
       );
@@ -541,8 +508,6 @@ export function AdminPaperContentView({
 
   return (
     <section className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink href={base} label={subject.name} />
-
       <header>
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           {paperName}
@@ -674,9 +639,6 @@ export function AdminChapterView({
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">Chapter not found</p>
-          <div className="mt-4 flex justify-center">
-            <AdminBackLink href={base} label={`Back to ${subject.name}`} />
-          </div>
         </div>
       </section>
     );
@@ -719,8 +681,6 @@ export function AdminChapterView({
 
   return (
     <section className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink href={base} label={`${subject.name} — ${paperName}`} />
-
       <header>
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           {kindLabel}
@@ -855,8 +815,6 @@ export function AdminContentView({
   }
   return (
     <section className="mx-auto max-w-4xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink href={chapterHref} label={chapter?.name ?? "Back"} />
-
       <header>
         <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
           Content Details · {subtitle}
@@ -897,13 +855,11 @@ function DetailNotFound({
   backHref: string;
 }) {
   void slug;
+  void backHref;
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
         <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">{label}</p>
-        <div className="mt-4 flex justify-center">
-          <AdminBackLink href={backHref} label="Back to Chapter" />
-        </div>
       </div>
     </section>
   );
@@ -942,12 +898,6 @@ export function AdminClassView({
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-700 admin-dark:text-yellow-300">Class not found</p>
-          <div className="mt-4 flex justify-center">
-            <AdminBackLink
-              href={`/admin/enrolled-courses/${encodeURIComponent(slug)}`}
-              label={`Back to ${course.name}`}
-            />
-          </div>
         </div>
       </section>
     );
@@ -958,11 +908,6 @@ export function AdminClassView({
 
   return (
     <section className="mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
-      <AdminBackLink
-        href={`/admin/enrolled-courses/${encodeURIComponent(slug)}`}
-        label={course.name}
-      />
-
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-primary-500">

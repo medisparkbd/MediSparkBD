@@ -33,6 +33,7 @@ import AdminToastProvider from "@/components/admin/AdminToastProvider";
 import AdminSearch from "@/components/admin/AdminSearch";
 import { hasControlAccess, useAdminGate } from "@/components/admin/admin-ui";
 import { useAuth } from "@/lib/auth-context";
+import { useOverlayBackClose } from "@/components/navigation/useOverlayBackClose";
 
 const SIDEBAR_STORAGE_KEY = "medispark-admin-sidebar-collapsed";
 
@@ -80,6 +81,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  // Browser/device Back closes open drawers/overlays first (no navigation).
+  useOverlayBackClose(mobileOpen, () => setMobileOpen(false));
+  useOverlayBackClose(mobileSearchOpen, () => setMobileSearchOpen(false));
 
   useEffect(() => {
     // localStorage is only available after mount (SSR-safe restore)

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BackLink, LevelStates, useCourseLearning } from "@/components/dashboard/CourseLevels";
+import { LevelStates, useCourseLearning } from "@/components/dashboard/CourseLevels";
 import type { ChapterItem } from "@/lib/my-learning";
 
 export type ContentKind = "classes" | "exams" | "materials" | "archive";
@@ -130,24 +130,15 @@ export default function DirectContentView({
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Subject not found</p>
-          <BackLink
-            href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`}
-            label={`Back to ${course.name}`}
-          />
         </div>
       </section>
     );
   }
 
   // Minimal landing: ONLY 4 cards (no banner/name/description)
-  const backHref = subjectId
-    ? `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subjectId)}`
-    : "/dashboard/enrolled-courses";
-  const backLabel = subjectId ? "Back" : "My Enrolled Courses";
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={backHref} label={backLabel} />
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {CARDS.map((card) => (
           <Link
@@ -189,7 +180,6 @@ export function CourseKindChaptersView({
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Subject not found</p>
-          <BackLink href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Back" />
         </div>
       </section>
     );
@@ -211,11 +201,6 @@ export function CourseKindChaptersView({
   const chaptersToShow = displayChapters.length > 0 ? displayChapters : filtered;
   const cardTitle = CARDS.find((c) => c.key === kind)?.title ?? kind;
 
-  const backHref = subjectId
-    ? `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/subjects/${encodeURIComponent(subjectId)}/content`
-    : contentBase(slug);
-  const backLabel = subjectId ? "Course Content" : "Course Content";
-
   // For Class, show exactly 12 chapter cards (course-specific, order from Admin Panel)
   const isClassView = kind === "classes";
   const classChapters = isClassView
@@ -230,7 +215,6 @@ export function CourseKindChaptersView({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackLink href={backHref} label={backLabel} />
       <h1 className="mt-4 text-2xl font-extrabold text-heading sm:text-3xl">{cardTitle}</h1>
       <p className="mt-1 text-sm text-neutral-400">
         {isClassView

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useOverlayBackClose } from "@/components/navigation/useOverlayBackClose";
 
 export default function AdminConfirmDialog({
   open,
@@ -21,6 +22,8 @@ export default function AdminConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  // Browser/device Back closes the dialog first (no navigation).
+  useOverlayBackClose(open, onClose);
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {

@@ -37,7 +37,9 @@ function toPublicExam(exam: Exam): PublicExam {
     name: exam.title,
     description: exam.description ?? null,
     bannerUrl: exam.bannerUrl ?? null,
-    examMode: exam.examMode ?? "live",
+    // Static Live vs Practice mode — legacy `kind = "practice"` rows count
+    // as practice even when their exam_mode column kept the "live" default.
+    examMode: exam.examMode === "practice" || exam.kind === "practice" ? "practice" : "live",
     batch,
     courseType: exam.courseType,
     subject: exam.subject,
@@ -69,12 +71,16 @@ function toPublicExam(exam: Exam): PublicExam {
  * (SQL-level WHERE category_id = ? — same records as the Admin Panel).
  */
 export const fetchPublicExams = unstable_cache(async (options: { categoryId?: string } = {}): Promise<PublicExam[]> => {
+  const { isPublicLiveHidden } = await import("@/lib/exam-lifecycle");
   const exams = options.categoryId
     ? await fetchPublishedPublicExams(options.categoryId)
     : await fetchExams().then((all) =>
         all.filter((exam) => exam.status !== "draft" && exam.kind !== "enrolled"),
       );
-  return exams.map(toPublicExam);
+  // Public Live Exams hidden 12h after End disappear from the Main Website
+  // list (kept in DB + Admin Panel). Practice exams are never hidden by time.
+  const visible = exams.filter((exam) => !isPublicLiveHidden(exam));
+  return visible.map(toPublicExam);
 }, ['publicExams'], { revalidate: 30, tags: ['exams'] });
 
 /**
@@ -176,6 +182,8 @@ export const fetchLiveExamCounts = unstable_cache(async (): Promise<Record<ExamC
     const exams = await fetchPublicExams();
     for (const exam of exams) {
       if (exam.status !== "Live") continue;
+      // Live Exam counts only — practice-mode exams belong to Practice Exam.
+      if ((exam.examMode ?? "live") === "practice") continue;
       // Must be published (fetchPublicExams already filters drafts, but
       // double-check for the admin variant path).
       if (!exam.published) continue;

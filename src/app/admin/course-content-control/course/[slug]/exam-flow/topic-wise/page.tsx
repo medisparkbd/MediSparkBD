@@ -48,9 +48,6 @@ export default function TopicSubjectsPage({ params }: { params: Promise<{ slug: 
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link href={`${base}`} className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white">
-        ← {courseName}
-      </Link>
       <p className="mt-3 text-xs font-bold uppercase tracking-widest text-primary-500">Topic-wise Exam</p>
       <h1 className="mt-1 break-words text-2xl font-extrabold capitalize text-[#0b1e3a] admin-dark:text-white">
         Select Subject

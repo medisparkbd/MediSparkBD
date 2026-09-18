@@ -66,12 +66,13 @@ export function AdminBackButton({
 export default function AdminPageHeader({
   title,
   description,
-  back = true,
+  back = false,
 }: {
   title: string;
   description?: string;
   back?: boolean;
 }) {
+  void back;
   return (
     <header className="animate-fade-up">
       <AdminBreadcrumbs />
@@ -86,11 +87,6 @@ export default function AdminPageHeader({
             </p>
           )}
         </div>
-        {back && (
-          <div className="shrink-0 pt-1">
-            <AdminBackButton />
-          </div>
-        )}
       </div>
     </header>
   );

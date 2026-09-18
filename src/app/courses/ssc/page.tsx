@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 import BatchCourseList from "@/components/BatchCourseList";
 import { fetchBatchFilterOptions } from "@/lib/course-filters";
 import { getLivePublicCourses } from "@/lib/course-catalog";
@@ -24,7 +23,6 @@ export default async function SscCoursesPage() {
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-6xl px-4 pt-4 pb-10 sm:px-6 sm:pt-6">
-        <SmartBackButton href="/courses" label="All Courses" />
         <div className="mt-4">
           <BatchCourseList options={filterOptions} courses={sscCourses} />
         </div>

@@ -21,7 +21,7 @@ export default async function AdminPublicExamCategoryPage({
 
   return (
     <PublicExamCategoryManager
-      category={{ id: category.id, name: category.name }}
+      category={{ id: category.id, name: category.name, slug: category.slug }}
     />
   );
 }

@@ -218,13 +218,6 @@ export default function SubjectQuestionsPage({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <Link
-        href="/admin/qa"
-        className="text-sm font-semibold text-slate-500 transition hover:text-[#1a3a78] admin-dark:text-slate-400 admin-dark:hover:text-white"
-      >
-        ← Q&A Control
-      </Link>
-
       {state === "invalid" && (
         <div className="mt-6 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-6 text-center">
           <p className="text-sm font-bold text-yellow-700 admin-dark:text-yellow-300">

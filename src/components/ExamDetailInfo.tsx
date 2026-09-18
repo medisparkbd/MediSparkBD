@@ -4,9 +4,9 @@ import type { PublicExam, ExamStatus } from "@/lib/public-exams";
 
 const statusStyles: Record<ExamStatus, { label: string; badge: string }> = {
   Live: {
-    label: "Live",
+    label: "Exam is Live Now",
     badge:
-      "bg-primary-600 text-white shadow-md shadow-primary-600/50 ring-1 ring-primary-400/60",
+      "bg-emerald-600 text-white shadow-md shadow-emerald-600/50 ring-1 ring-emerald-400/60",
   },
   Available: {
     label: "Available",
@@ -14,15 +14,15 @@ const statusStyles: Record<ExamStatus, { label: string; badge: string }> = {
       "bg-emerald-600 text-white shadow-md shadow-emerald-600/50 ring-1 ring-emerald-400/60",
   },
   Upcoming: {
-    label: "Upcoming",
+    label: "Upcoming Exam",
     badge: "bg-primary-500/10 text-primary-300 border border-primary-500/30",
   },
   Completed: {
-    label: "Completed",
-    badge: "bg-dark-800 text-neutral-400 border border-ink/10",
+    label: "Exam is Closed",
+    badge: "bg-red-500/10 text-red-400 border border-red-500/30",
   },
   Expired: {
-    label: "Expired",
+    label: "Exam is Closed",
     badge: "bg-red-500/10 text-red-400 border border-red-500/30",
   },
   Practice: {

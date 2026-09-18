@@ -171,7 +171,14 @@ export function formatExamTime(iso: string): string {
 
 export function deriveStatus(exam: Exam): ExamStatus {
   if (exam.status === "draft") return "Unpublished";
-  if (exam.status === "closed") return "Completed";
+  // Public Practice Exams are always available — never time-gated into
+  // Upcoming/Live/Closed. Live/Closed logic below applies to Public Live only.
+  if (exam.kind !== "enrolled" && exam.examMode === "practice") {
+    if (exam.status === "closed") return "Completed";
+    return "Practice";
+  }
+  // Stored admin-closed public exams show as Closed (Expired badge).
+  if (exam.status === "closed") return "Expired";
   const now = Date.now();
   const startsAt = exam.scheduledAt
     ? new Date(exam.scheduledAt).getTime()
@@ -181,8 +188,10 @@ export function deriveStatus(exam: Exam): ExamStatus {
   if (startsAt !== null && !Number.isNaN(startsAt) && startsAt > now) {
     return "Upcoming";
   }
-  // Past the end time (when set) → Expired.
-  if (endsAt !== null && !Number.isNaN(endsAt) && endsAt < now) {
+  // Past the end time (when set) → Closed (Expired badge). A Public Live
+  // Exam NEVER moves to Practice; hiding after 12h is handled by
+  // isPublicLiveHidden() at the listing layer, not here.
+  if (endsAt !== null && !Number.isNaN(endsAt) && endsAt <= now) {
     return "Expired";
   }
   // Within the window or no window set → Live (students can start).

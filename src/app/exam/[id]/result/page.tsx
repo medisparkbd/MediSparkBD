@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchExamPageById } from "@/lib/public-exams-server";
 import ExamResultClient from "@/components/exam/ExamResultClient";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +33,6 @@ export default async function ExamResultPage({ params }: ResultPageProps) {
   return (
     <main className="flex-1 bg-dark-950">
       <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        <SmartBackButton href={`/exam/${exam.id}`} label="Back to Exam" />
         <div className="mt-4">
           <ExamResultClient examId={exam.id} examName={exam.name} />
         </div>

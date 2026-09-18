@@ -35,8 +35,8 @@ export type TakingExam = {
   totalMarks: number;
   negativeMarks: number;
   startedAt: string | null;
-  /** Flow 4 lifecycle phase — null for non-Flow4 / no window */
-  phase?: "upcoming" | "live" | "practice" | "no-window" | null;
+  /** Course lifecycle phase — null for non-course / public exams */
+  phase?: "upcoming" | "live" | "closed" | "archived" | "practice" | "no-window" | null;
   /** True when this is a Flow 4 Exam Batch exam */
   isFlow4?: boolean;
 };
@@ -401,21 +401,46 @@ async function startExamAttempt(
 ): Promise<string> {
   await ensureAttemptTables();
   const normalizedTimer: "first" | "second" = timerType === "second" ? "second" : "first";
-  // Strict One Attempt Per Public Exam: Student ID + Exam ID = max one completed attempt
-  // Public exams are those with kind !== 'enrolled' (public/practice). Enrolled exams keep existing maxAttempts logic.
+  // Strict One Attempt Per Public LIVE Exam: Student ID + Exam ID = max one
+  // completed attempt. Public Practice exams are retakable per attempt rules
+  // (dynamic merit). Enrolled exams keep existing maxAttempts logic.
   let isPublicExam = false;
   try {
     const { fetchExamById } = await import("@/lib/exams-admin");
     const examForCheck = await fetchExamById(examId);
+    const isPracticeMode = !!examForCheck && examForCheck.examMode === "practice";
     isPublicExam = !!examForCheck && examForCheck.kind !== "enrolled";
-    if (isPublicExam) {
+    // Server-time lifecycle gate — reliable without any frontend timer.
+    if (examForCheck) {
+      if (examForCheck.kind === "enrolled") {
+        const { getEnrolledExamPhase } = await import("@/lib/enrolled-exam-lifecycle");
+        const phase = getEnrolledExamPhase(examForCheck);
+        if (phase === "upcoming" || phase === "closed") {
+          throw new Error(
+            phase === "upcoming"
+              ? "This exam has not started yet."
+              : "This exam has ended. You can no longer start it.",
+          );
+        }
+      } else if (!isPracticeMode) {
+        const { getPublicLiveState } = await import("@/lib/exam-lifecycle");
+        const state = getPublicLiveState(examForCheck);
+        if (state === "upcoming" || state === "draft") {
+          throw new Error("This exam has not started yet.");
+        }
+        if (state === "closed" || state === "hidden") {
+          throw new Error("This exam has ended. You can no longer start it.");
+        }
+      }
+    }
+    if (isPublicExam && !isPracticeMode) {
       const hasCompleted = await hasPriorExamAttempt(examId, uid);
       if (hasCompleted) {
         throw new Error("You have already appeared in this exam. View your result.");
       }
     }
   } catch (e) {
-    if (e instanceof Error && e.message.includes("already appeared")) throw e;
+    if (e instanceof Error && (e.message.includes("already appeared") || e.message.includes("not started") || e.message.includes("has ended"))) throw e;
     // If exam lookup fails, fall through to normal handling
   }
   // Max attempts enforcement: check exam_settings.maxAttempts if the table exists (for enrolled / fallback)
@@ -423,11 +448,11 @@ async function startExamAttempt(
   // retake for practice even when maxAttempts would otherwise block (spec §6).
   let bypassMaxAttempts = false;
   try {
-    const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+    const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
     const { fetchExamById } = await import("@/lib/exams-admin");
     const examForPhase = await fetchExamById(examId);
     if (examForPhase && (await isEnrolledExam(examId))) {
-      if (getEnrolledExamPhase(examForPhase) === "practice") bypassMaxAttempts = true;
+      if (isEnrolledPracticePhase(getEnrolledExamPhase(examForPhase))) bypassMaxAttempts = true;
     }
   } catch {
     // Best-effort — keep default enforcement.
@@ -798,16 +823,17 @@ async function finalizeAttempt(
      ON DUPLICATE KEY UPDATE student_name = VALUES(student_name)`,
     [examId, uid, studentName],
   );
-  // Enrolled exam lifecycle — determine live vs practice at submission time (server time).
-  // Public exams keep existing behavior (always live). Enrolled exams use
-  // UPCOMING → LIVE → PRACTICE based on scheduledAt/endsAt.
+  // Attempt typing — scheduled (official, ranked) vs practice (unranked for
+  // course exams; dynamically ranked for public practice via existing rules).
+  // Enrolled exams: Archived submissions are practice. Public exams stay live
+  // (public practice merit updates dynamically through the normal ranking).
   let attemptType: "live" | "practice" = "live";
   try {
-    const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
+    const { getEnrolledExamPhase, isEnrolledExam, isEnrolledPracticePhase } = await import("@/lib/enrolled-exam-lifecycle");
     const isEnrolled = await isEnrolledExam(examId);
     if (isEnrolled) {
       const phase = getEnrolledExamPhase(found);
-      if (phase === "practice") attemptType = "practice";
+      if (isEnrolledPracticePhase(phase)) attemptType = "practice";
     }
   } catch {
     // Fallback to live on error — never block submission.

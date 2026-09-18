@@ -6,7 +6,6 @@ import { categoryLabels, type ExamCategory } from "@/lib/public-exams";
 import ExamParticipationArea from "@/components/auth/ExamParticipationArea";
 import ExamDetailInfo from "@/components/ExamDetailInfo";
 import HideDuringExam from "@/components/exam/HideDuringExam";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 export const revalidate = 300;
 
@@ -38,15 +37,15 @@ export default async function ExamDetailPage({ params }: ExamPageProps) {
     notFound();
   }
 
-  const canStart = exam.status === "Live" || exam.status === "Available";
+  const canStart =
+    exam.status === "Live" ||
+    exam.status === "Available" ||
+    exam.status === "Practice";
 
   return (
     <main className="flex-1 bg-dark-950">
       <section className="exam-page-section mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <HideDuringExam>
-          {/* Back link */}
-          <SmartBackButton href="/exam" label="All Categories" />
-
           {/* Exam banner */}
           <div className="mt-4 overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20">
             <div className="relative h-36 w-full bg-gradient-to-br from-primary-600/30 via-dark-900 to-dark-950 sm:h-48">

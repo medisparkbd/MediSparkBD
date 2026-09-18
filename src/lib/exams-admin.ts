@@ -1904,9 +1904,9 @@ export async function fetchPublishedPublicExams(
   try {
     await ensureTables();
     const params: unknown[] = [];
-    // PUBLIC scope category listing — keep the legacy `kind = 'public'` filter
-    // so Public Exam Control category pages behave exactly as before.
-    let where = `kind = 'public' AND status <> 'draft'`;
+    // PUBLIC scope category listing — both public + practice kinds belong to
+    // the Main Website (course/enrolled exams never leak here).
+    let where = `kind IN ('public','practice') AND status <> 'draft'`;
     if (categoryId && categoryId.trim()) {
       where += ` AND category_id = ?`;
       params.push(categoryId.trim());

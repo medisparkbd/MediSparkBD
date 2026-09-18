@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import type { CourseLearningData } from "@/lib/my-learning";
-import SmartBackButton from "@/components/navigation/SmartBackButton";
 
 function isPdf(url: string): boolean {
   return /\.pdf(\?|$)/i.test(url);
@@ -91,7 +90,6 @@ export default function MaterialPdfViewer({
   if (state === "notfound") {
     return (
       <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-        <SmartBackButton href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label="Back to course" />
         <div className="mt-8 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-8 text-center">
           <p className="font-bold text-yellow-300">Material not found</p>
           <p className="mt-1 text-sm text-yellow-200/70">This material is not available or you don&apos;t have access to this course.</p>
@@ -115,8 +113,6 @@ export default function MaterialPdfViewer({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <SmartBackButton href={`/dashboard/enrolled-courses/${encodeURIComponent(slug)}`} label={courseName || "Back to course"} />
-
       <header className="mt-5">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-extrabold text-heading sm:text-2xl">{material.title}</h1>
