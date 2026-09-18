@@ -330,13 +330,11 @@ function Flow5ExamListContent({
           hint={isTopic ? "No topic-wise exams have been published for this subject yet." : `No ${heading.toLowerCase()} have been published for this course yet.`}
         />
       ) : (
-        <ul className="mt-6 space-y-3">
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {exams.map((exam) => (
-            <div key={exam.id} className="mb-4">
-              <ExamCard exam={courseItemToPublicExam(exam)} />
-            </div>
+            <ExamCard key={exam.id} exam={courseItemToPublicExam(exam)} />
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

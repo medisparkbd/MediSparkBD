@@ -123,8 +123,8 @@ const statusMeta: Record<
   Archived: {
     label: "Archived",
     badge:
-      "bg-slate-500/10 text-slate-400 border border-slate-500/30",
-    dot: "bg-slate-400",
+      "bg-amber-500/10 text-amber-400 border border-amber-500/30",
+    dot: "bg-amber-400",
   },
   Inactive: {
     label: "Inactive",
