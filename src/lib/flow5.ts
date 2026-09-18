@@ -32,6 +32,7 @@ export {
   isFlow5Format,
   isFlow5SubjectKey,
   type Flow5ExamItem,
+  type Flow5ExamPhase,
   type Flow5Format,
   type Flow5SubjectKey,
 } from "@/lib/flow5-shared";
@@ -64,12 +65,37 @@ function toIso(value: Date | string | null): string | null {
 type Flow5Row = {
   id: string;
   title: string;
+  description: string | null;
+  banner_url: string | null;
   exam_format: Flow5Format;
   topic_subject: string | null;
+  subject: string | null;
+  course_type: string | null;
+  exam_mode: string | null;
   duration_minutes: number;
   total_marks: number;
+  marks_per_question: string | number | null;
+  negative_enabled: number | boolean | null;
+  negative_per_wrong: string | number | null;
+  second_timer_enabled: number | boolean | null;
+  second_timer_deduction: string | number | null;
   scheduled_at: Date | string | null;
+  ends_at: Date | string | null;
+  question_count: number | null;
 };
+
+/** Upcoming → Live → Practice lifecycle — same rule as the enrolled engine. */
+function phaseForRow(scheduledAt: string | null, endsAt: string | null): Flow5ExamItem["phase"] {
+  const now = Date.now();
+  const start = scheduledAt ? new Date(scheduledAt).getTime() : NaN;
+  const end = endsAt ? new Date(endsAt).getTime() : NaN;
+  const hasStart = Number.isFinite(start);
+  const hasEnd = Number.isFinite(end);
+  if (!hasStart && !hasEnd) return "no-window";
+  if (hasStart && now < start) return "upcoming";
+  if (hasEnd && now > end) return "practice";
+  return "live";
+}
 
 /**
  * Exams of ONE Flow-5 category belonging to a course.
@@ -92,13 +118,18 @@ export async function getFlow5Exams(
       params.push(topicSubject);
     }
   }
-  params.push(courseSlug, courseSlug);
+  params.push(courseSlug, courseSlug, courseSlug);
   const rows = await query<Flow5Row[]>(
-    `SELECT ex.id, ex.title, ex.exam_format, ex.topic_subject,
-            ex.duration_minutes, ex.total_marks, ex.scheduled_at
+    `SELECT ex.id, ex.title, ex.description, ex.banner_url,
+            ex.exam_format, ex.topic_subject, ex.subject, ex.course_type,
+            ex.exam_mode, ex.duration_minutes, ex.total_marks,
+            ex.marks_per_question, ex.negative_enabled, ex.negative_per_wrong,
+            ex.second_timer_enabled, ex.second_timer_deduction,
+            ex.scheduled_at, ex.ends_at, ex.question_count
        FROM exams ex
       WHERE ex.exam_format = ?
         AND ex.status = 'published'
+        AND ex.kind = 'enrolled'
         ${subjectClause}
         AND (
           EXISTS (SELECT 1 FROM exam_courses ec WHERE ec.exam_id = ex.id AND ec.course_id = ?)
@@ -107,21 +138,70 @@ export async function getFlow5Exams(
               JOIN course_subject_assignments a ON a.subject_id = ch.subject_id
              WHERE ch.id = ex.chapter_id AND a.course_slug = ?
           )
+          OR EXISTS (
+            SELECT 1 FROM course_chapters ch2
+             WHERE ch2.id = ex.chapter_id AND ch2.course_slug = ?
+          )
         )
       ORDER BY ex.sort_order ASC, ex.scheduled_at DESC, ex.created_at DESC`,
     params,
   );
+  // Live totals from the same question rows the grader uses (never stale).
+  const liveTotals = new Map<string, { total: number; cnt: number }>();
+  try {
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      const ph = ids.map(() => "?").join(",");
+      const totals = await query<{ exam_id: string; total: string | number | null; cnt: number }[]>(
+        `SELECT exam_id, SUM(marks) AS total, COUNT(*) AS cnt FROM exam_questions WHERE exam_id IN (${ph}) AND is_active = 1 GROUP BY exam_id`,
+        ids,
+      );
+      for (const t of totals) {
+        liveTotals.set(t.exam_id, {
+          total: Math.round((Number(t.total ?? 0) || 0) * 100) / 100,
+          cnt: Number(t.cnt ?? 0) || 0,
+        });
+      }
+    }
+  } catch {
+    // Fall back to stored totals below.
+  }
   return rows
     .filter((r) => isFlow5Format(r.exam_format))
-    .map((r) => ({
-      id: r.id,
-      title: r.title,
-      format: r.exam_format,
-      topicSubject: isFlow5SubjectKey(r.topic_subject) ? r.topic_subject : null,
-      durationMinutes: Number(r.duration_minutes ?? 0) || 0,
-      totalMarks: Number(r.total_marks ?? 0) || 0,
-      scheduledAt: toIso(r.scheduled_at),
-    }));
+    .map((r) => {
+      const live = liveTotals.get(r.id);
+      const scheduledAt = toIso(r.scheduled_at);
+      const endsAt = toIso(r.ends_at);
+      const negEnabled = r.negative_enabled === undefined || r.negative_enabled === null
+        ? String(r.course_type ?? "") === "Admission"
+        : Boolean(r.negative_enabled);
+      const negPerWrong = r.negative_per_wrong === undefined || r.negative_per_wrong === null
+        ? 0.25
+        : Number(r.negative_per_wrong) || 0;
+      return {
+        id: r.id,
+        title: r.title,
+        format: r.exam_format,
+        topicSubject: isFlow5SubjectKey(r.topic_subject) ? r.topic_subject : null,
+        durationMinutes: Number(r.duration_minutes ?? 0) || 0,
+        totalMarks: live ? live.total : Number(r.total_marks ?? 0) || 0,
+        scheduledAt,
+        scope: "COURSE" as const,
+        subject: String(r.subject ?? ""),
+        courseType: String(r.course_type ?? "") === "Admission" ? "Admission" as const : "Academic" as const,
+        bannerUrl: r.banner_url ?? null,
+        description: r.description ?? null,
+        totalQuestions: live ? live.cnt : Number(r.question_count ?? 0) || 0,
+        marksPerQuestion: Number(r.marks_per_question ?? 1) || 1,
+        endsAt,
+        examMode: r.exam_mode === "practice" ? "practice" as const : "live" as const,
+        negativeEnabled: negEnabled,
+        negativePerWrong: negEnabled ? negPerWrong : 0,
+        secondTimerEnabled: Boolean(r.second_timer_enabled),
+        secondTimerDeduction: Number(r.second_timer_deduction ?? 3) || 0,
+        phase: phaseForRow(scheduledAt, endsAt),
+      };
+    });
 }
 
 /** Exam counts per Flow-5 category (+ per-subject for topic-wise) for card badges. */
@@ -152,6 +232,7 @@ export async function getFlow5Counts(courseSlug: string): Promise<{
          FROM exams ex
         WHERE ex.exam_format IS NOT NULL
           AND ex.status = 'published'
+          AND ex.kind = 'enrolled'
           AND (
             EXISTS (SELECT 1 FROM exam_courses ec WHERE ec.exam_id = ex.id AND ec.course_id = ?)
             OR EXISTS (
@@ -159,9 +240,13 @@ export async function getFlow5Counts(courseSlug: string): Promise<{
                 JOIN course_subject_assignments a ON a.subject_id = ch.subject_id
                WHERE ch.id = ex.chapter_id AND a.course_slug = ?
             )
+            OR EXISTS (
+              SELECT 1 FROM course_chapters ch2
+               WHERE ch2.id = ex.chapter_id AND ch2.course_slug = ?
+            )
           )
         GROUP BY ex.exam_format, ex.topic_subject`,
-      [courseSlug, courseSlug],
+      [courseSlug, courseSlug, courseSlug],
     );
     for (const row of rows) {
       const n = Number(row.cnt ?? 0) || 0;

@@ -8,6 +8,7 @@ import {
   deleteExam,
   setExamStatus,
   reorderExams,
+  normalizeExamScope,
   EXAM_KINDS,
   type ExamKind,
   type ExamStatus,
@@ -47,12 +48,15 @@ export async function GET(request: NextRequest) {
   const categoryId = request.nextUrl.searchParams.get("categoryId")?.trim() || undefined;
   const chapterId = request.nextUrl.searchParams.get("chapterId")?.trim() || undefined;
   const courseId = request.nextUrl.searchParams.get("courseId")?.trim() || undefined;
+  // Unified scope filter (?scope=PUBLIC|COURSE) — same engine, access differs.
+  const scope = normalizeExamScope(request.nextUrl.searchParams.get("scope")) ?? undefined;
   const archivedParam = request.nextUrl.searchParams.get("archived");
   if (archivedParam === "0" || archivedParam === "false") {
     // Hide archived (closed) when explicitly requested, otherwise show all.
   }
   const exams = await fetchExams({
     kinds,
+    scope,
     categoryId,
     chapterId,
     courseId,

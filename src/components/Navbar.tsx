@@ -43,6 +43,14 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
   const actionLabel = user ? "Dashboard" : "Login";
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  /**
+   * Unread notification count — database-backed (survives refresh).
+   * The indicator dot renders ONLY when this is > 0. Null = unknown /
+   * logged out → hidden. Refreshed instantly via the
+   * "medispark:notifications-read" event, on window focus, and by polling
+   * so newly arrived notifications light the dot again.
+   */
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 32);
@@ -50,6 +58,49 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const userUid = user?.uid ?? null;
+  useEffect(() => {
+    if (!userUid || !user) return;
+    let cancelled = false;
+    async function loadUnread() {
+      try {
+        const token = await user!.getIdToken();
+        const response = await fetch("/api/notifications?count=1", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = (await response.json().catch(() => null)) as {
+          unreadCount?: unknown;
+        } | null;
+        const count = Number(data?.unreadCount ?? 0) || 0;
+        if (!cancelled) setUnreadCount(count);
+      } catch {
+        // Keep the last known state — never flash a stale dot on errors.
+      }
+    }
+    void loadUnread();
+    const onRead = (event: Event) => {
+      const detail = (event as CustomEvent<{ unreadCount?: unknown }>).detail;
+      if (detail && typeof detail.unreadCount === "number") {
+        setUnreadCount(detail.unreadCount);
+      } else {
+        void loadUnread();
+      }
+    };
+    const onFocus = () => void loadUnread();
+    window.addEventListener("medispark:notifications-read", onRead as EventListener);
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(loadUnread, 60_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("medispark:notifications-read", onRead as EventListener);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user is stable per uid; refetch on account switch only
+  }, [userUid]);
 
   if (!settings.showNavbar) return null;
 
@@ -149,7 +200,12 @@ export default function Navbar({ config }: { config?: NavbarConfig }) {
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary-500" />
+            {userUid && unreadCount !== null && unreadCount > 0 && (
+              <span
+                className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary-500"
+                aria-label={`${unreadCount} unread notifications`}
+              />
+            )}
           </Link>
 
           {/* Compact theme toggle — sits immediately beside the notification icon. */}

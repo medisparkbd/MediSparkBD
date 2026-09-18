@@ -27,6 +27,35 @@ export type ExamKind = "public" | "practice" | "enrolled";
 export type ExamStatus = "draft" | "published" | "closed";
 export type ExamMode = "live" | "practice";
 
+/**
+ * Unified Exam System — access scope.
+ * ONE engine, TWO scopes (no separate architectures):
+ *  - "PUBLIC" → publicly visible, everyone can access/attempt (kind public/practice).
+ *  - "COURSE" → only enrolled + eligible students of the linked course_id
+ *    (kind enrolled, linked via exam_courses or the chapter → subject → course chain).
+ * The scope is derived from `kind` (single source of truth) and mirrored into
+ * the `type` column (public/course) for SQL-level filtering. Existing rows are
+ * migrated, never deleted.
+ */
+export type ExamScope = "PUBLIC" | "COURSE";
+
+export function getExamScope(exam: Pick<Exam, "kind"> | { kind?: string }): ExamScope {
+  const kind = (exam as { kind?: string })?.kind;
+  return kind === "enrolled" ? "COURSE" : "PUBLIC";
+}
+
+export function isCourseExam(exam: Pick<Exam, "kind"> | { kind?: string }): boolean {
+  return getExamScope(exam) === "COURSE";
+}
+
+/** Normalize a scope/type input ("PUBLIC"/"COURSE", "public"/"course") or null. */
+export function normalizeExamScope(value: unknown): ExamScope | null {
+  const token = String(value ?? "").trim().toLowerCase();
+  if (token === "course" || token === "enrolled") return "COURSE";
+  if (token === "public" || token === "practice") return "PUBLIC";
+  return null;
+}
+
 /** Flow 5 exam category. NULL/undefined = legacy exam (never listed in Flow 5). */
 export type Flow5ExamFormat = "topic-wise" | "paper-final" | "subject-final" | "final-model";
 
@@ -77,6 +106,12 @@ export type Exam = {
   answerKey: Record<string, number> | null;
   /** Courses whose enrolled students may take this exam (kind = "enrolled"). */
   courseIds: string[];
+  /**
+   * Unified access scope — derived from `kind` (COURSE when kind is
+   * "enrolled", otherwise PUBLIC). PUBLIC → public access; COURSE →
+   * restricted to the linked course_id(s) above (or the chapter chain).
+   */
+  scope: ExamScope;
   /** Chapter this exam belongs to (course content Exam card). */
   chapterId: string | null;
   /** Admin-controlled display order inside a chapter. */
@@ -199,17 +234,19 @@ function rowToExam(row: ExamRow): Exam {
     parsedKey && typeof parsedKey === "object" && !Array.isArray(parsedKey)
       ? (parsedKey as Record<string, number>)
       : null;
+  const kind: ExamKind =
+    row.kind === "practice"
+      ? "practice"
+      : row.kind === "enrolled"
+        ? "enrolled"
+        : "public";
   return {
     id: row.id,
     title: row.title,
     description: row.description ?? null,
     bannerUrl: row.banner_url ?? null,
-    kind:
-      row.kind === "practice"
-        ? "practice"
-        : row.kind === "enrolled"
-          ? "enrolled"
-          : "public",
+    kind,
+    scope: kind === "enrolled" ? "COURSE" : "PUBLIC",
     examMode: row.exam_mode === "practice" ? "practice" : "live",
     batchId: row.batch_id ?? "",
     subject: row.subject ?? "",
@@ -480,10 +517,17 @@ async function ensureTables(): Promise<void> {
     // Best effort — column may already exist.
   }
   try {
+    // Unified scope backfill — kind stays the source of truth; type mirrors it.
+    // Idempotent: safe to run on every boot, never deletes or moves rows.
     await exec(`UPDATE exams SET type = 'course' WHERE kind = 'enrolled'`);
     await exec(`UPDATE exams SET type = 'public' WHERE kind IN ('public','practice')`);
   } catch {
     // Best effort — type column may not exist yet.
+  }
+  try {
+    await exec(`CREATE INDEX idx_exams_scope_status ON exams(kind, status)`);
+  } catch {
+    // Best effort — index may already exist.
   }
   try {
     await ensureColumn("exams", "active", "`active` TINYINT(1) NOT NULL DEFAULT 1 AFTER featured");
@@ -686,6 +730,8 @@ async function applyLiveTotals(exams: Exam[]): Promise<Exam[]> {
 export type ExamListFilters = {
   kind?: ExamKind;
   kinds?: ExamKind[];
+  /** Unified access scope — PUBLIC (public access) or COURSE (linked course only). */
+  scope?: ExamScope;
   ids?: string[];
   categoryId?: string;
   chapterId?: string;
@@ -704,6 +750,7 @@ function normalizeExamFilters(
   const cacheable =
     !filters.kind &&
     (!filters.kinds || filters.kinds.length === 0) &&
+    !filters.scope &&
     (!filters.ids || filters.ids.length === 0) &&
     !filters.categoryId &&
     !filters.chapterId &&
@@ -733,6 +780,12 @@ export async function fetchExams(
     if (kinds.length > 0) {
       where.push(`kind IN (${kinds.map(() => "?").join(",")})`);
       params.push(...kinds);
+    }
+    // Unified scope filter — derived from kind (single engine, no split tables).
+    if (filters.scope === "COURSE") {
+      where.push(`kind = 'enrolled'`);
+    } else if (filters.scope === "PUBLIC") {
+      where.push(`kind <> 'enrolled'`);
     }
     if (filters.ids?.length) {
       where.push(`id IN (${filters.ids.map(() => "?").join(",")})`);
@@ -836,18 +889,34 @@ export async function saveExam(
     answerKeyJson = JSON.stringify(input.answerKey);
   }
 
-  const kind: ExamKind = EXAM_KINDS.includes(input.kind as ExamKind)
+  // ── Unified scope → kind resolution ──
+  // One engine: scope PUBLIC (public access) vs COURSE (linked course_id only).
+  // Accepts `scope` ("PUBLIC"/"COURSE") or legacy `type` ("public"/"course")
+  // as aliases; explicit scope wins over kind, otherwise kind is the truth.
+  const requestedScope =
+    normalizeExamScope((input as Record<string, unknown>).scope) ??
+    normalizeExamScope((input as Record<string, unknown>).type);
+  let kind: ExamKind = EXAM_KINDS.includes(input.kind as ExamKind)
     ? (input.kind as ExamKind)
     : "public";
+  if (requestedScope === "COURSE") {
+    kind = "enrolled";
+  } else if (requestedScope === "PUBLIC" && kind === "enrolled") {
+    kind = "public";
+  }
+  const scope: ExamScope = kind === "enrolled" ? "COURSE" : "PUBLIC";
   const rawExamMode = asString((input as Record<string, unknown>).examMode) || asString((input as Record<string, unknown>).exam_mode as string);
   const examMode: ExamMode = rawExamMode === "practice" ? "practice" : "live";
   const courseIds = Array.isArray(input.courseIds)
     ? Array.from(new Set(input.courseIds.map(String).map((value) => value.trim()).filter(Boolean)))
     : [];
-  if (kind === "enrolled" && courseIds.length === 0) {
-    throw new Error("Assign at least one course to an enrolled exam.");
-  }
   const chapterId = asString(input.chapterId) || null;
+  // COURSE scope must stay linked to a course: direct exam_courses assignment
+  // OR the chapter → subject → course chain. Chapter-linked course exams keep
+  // working without a direct assignment (backward compatible, no data loss).
+  if (kind === "enrolled" && courseIds.length === 0 && !chapterId) {
+    throw new Error("Assign at least one course to a course exam.");
+  }
   const categoryId = asString(input.categoryId) || null;
   // ── Rule template auto-detection ──
   let ruleTemplate = asString((input as Record<string, unknown>).ruleTemplate) || asString((input as Record<string, unknown>).rule_template as string) || "";
@@ -1068,7 +1137,9 @@ export async function saveExam(
     }
   }
 
-  // Keep course assignments in sync (enrolled exams).
+  // Keep course assignments in sync (COURSE scope).
+  // Chapter-linked course exams (chapter_id chain) keep working with an empty
+  // assignment list — the link itself carries the course scope.
   await exec(`DELETE FROM exam_courses WHERE exam_id = ?`, [id]);
   for (const courseId of courseIds) {
     await exec(
@@ -1076,12 +1147,24 @@ export async function saveExam(
       [id, courseId],
     );
   }
+  // Mirror the unified scope into the `type` column (public/course) so
+  // SQL-level scope filtering stays consistent with `kind`. Best-effort on
+  // legacy DBs where the column may not exist yet.
+  try {
+    await exec(`UPDATE exams SET type = ? WHERE id = ?`, [
+      scope === "COURSE" ? "course" : "public",
+      id,
+    ]);
+  } catch {
+    // Best effort — kind remains the source of truth.
+  }
 
   const rows = await query<ExamRow[]>(`SELECT ${EXAM_COLUMNS} FROM exams WHERE id = ? LIMIT 1`, [id]);
   if (!rows[0]) throw new Error("Failed to save the exam.");
   const exam = rowToExam(rows[0]);
   exam.courseIds = courseIds;
   exam.chapterId = chapterId;
+  exam.scope = scope;
   invalidateExamsCache();
   return exam;
 }
@@ -1470,7 +1553,7 @@ export async function duplicateExam(sourceId: string, adminUid: string): Promise
   } catch {
     // rules table may not exist yet
   }
-  // Copy course assignments
+  // Copy course assignments (same COURSE scope linkage as the source).
   try {
     const courses = await query<{ course_id: string }[]>(`SELECT course_id FROM exam_courses WHERE exam_id = ?`, [sourceId]);
     for (const c of courses) {
@@ -1478,6 +1561,15 @@ export async function duplicateExam(sourceId: string, adminUid: string): Promise
     }
   } catch {
     // best effort
+  }
+  // Mirror the unified scope (kind → type) for the duplicate.
+  try {
+    await exec(`UPDATE exams SET type = ? WHERE id = ?`, [
+      src.kind === "enrolled" ? "course" : "public",
+      newId,
+    ]);
+  } catch {
+    // Best effort — kind remains the source of truth.
   }
   await recomputeExamTotals(newId);
   invalidateExamsCache();
@@ -1812,6 +1904,8 @@ export async function fetchPublishedPublicExams(
   try {
     await ensureTables();
     const params: unknown[] = [];
+    // PUBLIC scope category listing — keep the legacy `kind = 'public'` filter
+    // so Public Exam Control category pages behave exactly as before.
     let where = `kind = 'public' AND status <> 'draft'`;
     if (categoryId && categoryId.trim()) {
       where += ` AND category_id = ?`;
@@ -1824,6 +1918,47 @@ export async function fetchPublishedPublicExams(
       params,
     );
     return await applyLiveTotals(rows.map(rowToExam));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Published COURSE-scope exams for ONE course (Course Content → enrolled
+ * students only). Same unified engine/rows as public exams — only the access
+ * scope differs. Links via exam_courses (direct) OR the chapter → subject →
+ * course chain (chapter-scoped course exams). Never leaks other courses'
+ * exams or PUBLIC exams.
+ */
+export async function fetchPublishedCourseExams(
+  courseId: string,
+): Promise<Exam[]> {
+  const course = courseId?.trim();
+  if (!course) return [];
+  try {
+    await ensureTables();
+    const rows = await query<ExamRow[]>(
+      `SELECT ${EXAM_COLUMNS} FROM exams ex
+        WHERE ex.kind = 'enrolled' AND ex.status <> 'draft'
+          AND (
+            EXISTS (SELECT 1 FROM exam_courses ec WHERE ec.exam_id = ex.id AND ec.course_id = ?)
+            OR EXISTS (
+              SELECT 1 FROM course_chapters ch
+                JOIN course_subject_assignments a ON a.subject_id = ch.subject_id
+               WHERE ch.id = ex.chapter_id AND a.course_slug = ?
+            )
+            OR EXISTS (
+              SELECT 1 FROM course_chapters ch2
+               WHERE ch2.id = ex.chapter_id AND ch2.course_slug = ?
+            )
+          )
+        ORDER BY ex.sort_order ASC, ex.created_at DESC`,
+      [course, course, course],
+    );
+    const exams = rows.map(rowToExam);
+    const assignments = await fetchCourseAssignments();
+    for (const exam of exams) exam.courseIds = assignments.get(exam.id) ?? [];
+    return await applyLiveTotals(exams);
   } catch {
     return [];
   }

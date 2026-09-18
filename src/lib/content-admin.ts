@@ -13,6 +13,12 @@ export type Notification = {
   targetEmail: string | null;
   isActive: boolean;
   createdAt: string;
+  /**
+   * Per-student read state (persisted in `notification_reads`, keyed by
+   * notification + student uid). True when this student has read it.
+   * Always false in the admin view (admins don't consume read state).
+   */
+  isRead: boolean;
 };
 
 export type JerseyItem = {
@@ -68,7 +74,9 @@ function normalizeAudience(value: string): Notification["audience"] {
   return value === "students" ? "students" : "all";
 }
 
-function mapNotificationRow(row: NotificationRow): Notification {
+function mapNotificationRow(
+  row: NotificationRow & { read_at?: Date | string | null },
+): Notification {
   return {
     id: row.id,
     title: row.title,
@@ -77,6 +85,9 @@ function mapNotificationRow(row: NotificationRow): Notification {
     targetEmail: row.target_email ?? null,
     isActive: Boolean(row.is_active),
     createdAt: toIso(row.created_at),
+    // Present (non-null) only when joined with notification_reads for a
+    // student that has read it; admin rows never join, so always false there.
+    isRead: row.read_at !== undefined && row.read_at !== null,
   };
 }
 
@@ -104,6 +115,15 @@ async function ensureNotificationsTable(): Promise<void> {
   } catch {
     // Already migrated — safe to ignore.
   }
+  // Per-student read state — persists across refreshes/devices. One row per
+  // (notification, student). Never deleted except with the notification itself.
+  await exec(`CREATE TABLE IF NOT EXISTS notification_reads (
+    notification_id VARCHAR(64) NOT NULL,
+    student_uid VARCHAR(191) NOT NULL,
+    read_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (notification_id, student_uid),
+    KEY idx_notification_reads_student (student_uid)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   ensureNotificationsTableReady = true;
 }
 
@@ -113,7 +133,7 @@ export async function fetchNotifications(all = false): Promise<Notification[]> {
     const rows = await query<NotificationRow[]>(
       `SELECT * FROM notifications ${all ? "" : "WHERE is_active = 1"} ORDER BY created_at DESC LIMIT 200`,
     );
-    return rows.map(mapNotificationRow);
+    return rows.map((row) => mapNotificationRow(row));
   } catch {
     return [];
   }
@@ -124,6 +144,9 @@ export async function fetchNotifications(all = false): Promise<Notification[]> {
  *  - audience "all" (+ legacy "students") → everyone
  *  - audience "enrolled" → only students with an ACTIVE enrollment
  *  - audience "student" → only the targeted student
+ *
+ * Each item carries its persisted per-student read state (`isRead`) from
+ * `notification_reads`, newest first. Targeting/delivery logic is unchanged.
  */
 export async function fetchStudentNotifications(
   studentUid?: string,
@@ -136,10 +159,12 @@ export async function fetchStudentNotifications(
          WHERE is_active = 1 AND audience IN ('all','students')
          ORDER BY created_at DESC LIMIT 200`,
       );
-      return rows.map(mapNotificationRow);
+      return rows.map((row) => mapNotificationRow(row));
     }
-    const rows = await query<NotificationRow[]>(
-      `SELECT n.* FROM notifications n
+    const rows = await query<(NotificationRow & { read_at: Date | string | null })[]>(
+      `SELECT n.*, r.read_at AS read_at FROM notifications n
+       LEFT JOIN notification_reads r
+         ON r.notification_id = n.id AND r.student_uid = ?
        WHERE n.is_active = 1 AND (
          n.audience IN ('all','students')
          OR (n.audience = 'enrolled' AND EXISTS (
@@ -148,11 +173,79 @@ export async function fetchStudentNotifications(
          OR (n.audience = 'student' AND n.target_uid = ?)
        )
        ORDER BY n.created_at DESC LIMIT 200`,
-      [studentUid, studentUid],
+      [studentUid, studentUid, studentUid],
     );
-    return rows.map(mapNotificationRow);
+    return rows.map((row) => mapNotificationRow(row));
   } catch {
     return [];
+  }
+}
+
+/** Persistently mark ONE notification as read for a student. */
+export async function markNotificationRead(
+  notificationId: string,
+  studentUid: string,
+): Promise<void> {
+  const id = notificationId?.trim();
+  const uid = studentUid?.trim();
+  if (!id || !uid) return;
+  await ensureNotificationsTable();
+  await exec(
+    `INSERT IGNORE INTO notification_reads (notification_id, student_uid)
+     VALUES (?, ?)`,
+    [id, uid],
+  );
+}
+
+/**
+ * Persistently mark EVERY notification currently visible to the student as
+ * read (same targeting rules as the list — no other student's state touched,
+ * no notification content changed).
+ */
+export async function markAllNotificationsRead(
+  studentUid: string,
+): Promise<void> {
+  const uid = studentUid?.trim();
+  if (!uid) return;
+  await ensureNotificationsTable();
+  await exec(
+    `INSERT IGNORE INTO notification_reads (notification_id, student_uid)
+     SELECT n.id, ? FROM notifications n
+      WHERE n.is_active = 1 AND (
+        n.audience IN ('all','students')
+        OR (n.audience = 'enrolled' AND EXISTS (
+              SELECT 1 FROM enrollments e
+              WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+        OR (n.audience = 'student' AND n.target_uid = ?)
+      )`,
+    [uid, uid, uid],
+  );
+}
+
+/** Count of visible-but-unread notifications for the header indicator. */
+export async function fetchUnreadNotificationCount(
+  studentUid: string,
+): Promise<number> {
+  const uid = studentUid?.trim();
+  if (!uid) return 0;
+  try {
+    await ensureNotificationsTable();
+    const rows = await query<{ n: number }[]>(
+      `SELECT COUNT(*) AS n FROM notifications n
+       LEFT JOIN notification_reads r
+         ON r.notification_id = n.id AND r.student_uid = ?
+       WHERE n.is_active = 1 AND r.notification_id IS NULL AND (
+         n.audience IN ('all','students')
+         OR (n.audience = 'enrolled' AND EXISTS (
+               SELECT 1 FROM enrollments e
+               WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+         OR (n.audience = 'student' AND n.target_uid = ?)
+       )`,
+      [uid, uid, uid],
+    );
+    return Number(rows[0]?.n ?? 0) || 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -208,6 +301,7 @@ export async function saveNotification(
 
 export async function deleteNotification(id: string): Promise<void> {
   await ensureNotificationsTable();
+  await exec(`DELETE FROM notification_reads WHERE notification_id = ?`, [id]);
   await exec(`DELETE FROM notifications WHERE id = ?`, [id]);
 }
 

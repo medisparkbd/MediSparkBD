@@ -49,6 +49,15 @@ export function flow5SubjectTitle(key: string): string {
   return FLOW5_SUBJECTS.find((s) => s.key === key)?.title ?? key;
 }
 
+/**
+ * Unified Exam System — course-exam list item.
+ * SAME complete fields as a Public Exam (one engine); only the access scope
+ * differs (COURSE → enrolled students of the linked course_id, shown inside
+ * Course Content). `phase` is the Upcoming → Live → Practice lifecycle
+ * derived server-side from Start/End time.
+ */
+export type Flow5ExamPhase = "upcoming" | "live" | "practice" | "no-window";
+
 export type Flow5ExamItem = {
   id: string;
   title: string;
@@ -57,4 +66,22 @@ export type Flow5ExamItem = {
   durationMinutes: number;
   totalMarks: number;
   scheduledAt: string | null;
+  /** Unified scope marker — always COURSE for these items. */
+  scope: "COURSE";
+  /** Same detail fields as Public Exam cards. */
+  subject: string;
+  courseType: "Academic" | "Admission";
+  bannerUrl: string | null;
+  description: string | null;
+  totalQuestions: number;
+  marksPerQuestion: number;
+  endsAt: string | null;
+  /** Live Exam vs Practice Exam (static mode, like Public Exams). */
+  examMode: "live" | "practice";
+  negativeEnabled: boolean;
+  negativePerWrong: number;
+  secondTimerEnabled: boolean;
+  secondTimerDeduction: number;
+  /** Upcoming → Live → Practice lifecycle (server time). */
+  phase: Flow5ExamPhase;
 };

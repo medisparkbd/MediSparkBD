@@ -298,6 +298,12 @@ export default function ExamManager({
     );
   }
 
+  // Unified Exam System — Course exams use the SAME complete form/engine as
+  // Public exams. Only the access scope differs: PUBLIC (fixedCategory) vs
+  // COURSE (fixedCourse / fixedChapter → enrolled students of that course).
+  const isCourseScope = !fixedCategory && (Boolean(fixedCourse) || Boolean(fixedChapter));
+  const useUnifiedForm = Boolean(fixedCategory) || isCourseScope;
+
   function startCreate() {
     if (fixedCategory) {
       const tpl = detectTemplateForCategory(fixedCategory);
@@ -311,12 +317,21 @@ export default function ExamManager({
         secondTimerEnabled: isSecond,
         secondTimerDeduction: isSecond ? "3" : "0",
       });
-    } else if (fixedCourse) {
-      // Flow 4 Exam Batch — always enrolled, auto-assigned to this course.
+    } else if (isCourseScope) {
+      // Course exam — same complete system as Public Exam Control, but COURSE
+      // scope: auto-assigned to this course (or chapter chain), enrolled-only.
       // Exam-flow pages additionally lock the Flow-5 category + subject.
+      const tpl = "academic";
       setForm({
         ...EMPTY,
+        id: generateExamId(),
         kind: "enrolled",
+        ruleTemplate: tpl,
+        questionCount: "30",
+        marksPerQuestion: "1",
+        secondTimerEnabled: false,
+        secondTimerDeduction: "0",
+        chapterId: fixedChapter ? fixedChapter.id : "",
         examFormat: fixedFormat ?? "",
         topicSubject: fixedTopicSubject ?? "",
       });
@@ -372,11 +387,12 @@ export default function ExamManager({
   }
 
   async function save() {
-    // Flow 4 Exam Batch — force enrolled + this course (admin never picks).
-    const effectiveKind = fixedCourse ? "enrolled" : form.kind;
+    // Unified scope — COURSE pages force enrolled + the linked course (admin
+    // never picks); PUBLIC pages force public + the fixed category.
+    const effectiveKind = fixedCategory ? "public" : isCourseScope ? "enrolled" : form.kind;
     const effectiveCourseIds = fixedCourse ? [fixedCourse.slug] : courseIds;
-    // Public Exam Control has its own validation — skip enrolled kind check when fixedCategory.
-    if (!fixedCategory && !fixedCourse && form.kind === "enrolled" && courseIds.length === 0) {
+    // Unified-form pages (Public + Course) share one validation path.
+    if (!useUnifiedForm && form.kind === "enrolled" && courseIds.length === 0 && !form.chapterId) {
       setNotice({ kind: "error", text: "Assign at least one course to an enrolled exam." });
       return;
     }
@@ -385,9 +401,11 @@ export default function ExamManager({
       setNotice({ kind: "error", text: "Exam Title is required." });
       return;
     }
-    // Flow 5: topic-wise enrolled exams must belong to exactly one subject
+    // Flow 5: topic-wise course exams must belong to exactly one subject
     // so the Topic-wise → Subject → Exams branch never mixes subjects.
-    if (!fixedCategory && form.kind === "enrolled" && (form as unknown as { examFormat?: string }).examFormat === "topic-wise" && !(form as unknown as { topicSubject?: string }).topicSubject?.trim()) {
+    const effectiveFormat = fixedFormat ?? (form as unknown as { examFormat?: string }).examFormat;
+    const effectiveTopicSubject = fixedTopicSubject ?? (form as unknown as { topicSubject?: string }).topicSubject;
+    if (!fixedCategory && effectiveKind === "enrolled" && effectiveFormat === "topic-wise" && !effectiveTopicSubject?.trim()) {
       setNotice({ kind: "error", text: "Select a subject for this Topic-wise exam." });
       return;
     }
@@ -400,12 +418,12 @@ export default function ExamManager({
       : form.kind === "public"
         ? formCategoryId || existing?.categoryId || ""
         : existing?.categoryId ?? "";
-    if (!fixedCategory && form.kind === "public" && !categoryId) {
+    if (!fixedCategory && !isCourseScope && form.kind === "public" && !categoryId) {
       setNotice({ kind: "error", text: "Select a category for this public exam." });
       return;
     }
-    // Public Exam Control validation for the new form fields.
-    if (fixedCategory) {
+    // Unified-form validation — same complete system for Public + Course.
+    if (useUnifiedForm) {
       if (!form.subject.trim()) {
         setNotice({ kind: "error", text: "Subject is required." });
         return;
@@ -422,9 +440,9 @@ export default function ExamManager({
       }
     }
     const chapterId = fixedChapter ? fixedChapter.id : form.chapterId;
-    // Auto-generate ID for Public Exam Control when missing.
+    // Auto-generate ID for unified-form pages when missing.
     let examId = form.id.trim().toLowerCase();
-    if (fixedCategory && !examId) {
+    if (useUnifiedForm && !examId) {
       examId = generateExamId(form.title);
     }
     if (!examId) {
@@ -434,17 +452,20 @@ export default function ExamManager({
     setBusy(true);
     setNotice(null);
     try {
-      // For Public Exam Control, derive marks from template + auto totals.
+      // Unified payload — same complete Public Exam system for both scopes.
+      // Only scope + linkage differ: PUBLIC → category lock, COURSE → course lock.
       let payload: Record<string, unknown>;
-      if (fixedCategory) {
+      if (useUnifiedForm) {
         const qc = Math.floor(Number((form as unknown as Record<string, unknown>).questionCount) || 0);
         const mpqNum = Number((form as unknown as Record<string, unknown>).marksPerQuestion) || 1;
         const total = qc * mpqNum;
         const tpl = (form as unknown as Record<string, unknown>).ruleTemplate as string;
+        const isPublicScope = Boolean(fixedCategory);
         payload = {
           id: examId,
           title: form.title.trim(),
-          kind: "public",
+          scope: isPublicScope ? "PUBLIC" : "COURSE",
+          kind: isPublicScope ? "public" : "enrolled",
           examMode: (form as unknown as { examMode?: string }).examMode || "live",
           batchId: form.batchId,
           subject: form.subject.trim(),
@@ -455,12 +476,22 @@ export default function ExamManager({
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
           bannerUrl: form.bannerUrl || null,
           chapterId,
-          categoryId,
-          courseIds: [],
-          ruleTemplate: tpl || detectTemplateForCategory(fixedCategory),
+          categoryId: isPublicScope ? categoryId : (existing?.categoryId ?? null),
+          courseIds: isPublicScope ? [] : fixedCourse ? [fixedCourse.slug] : (existing?.courseIds ?? courseIds),
+          ruleTemplate: tpl || (isPublicScope ? detectTemplateForCategory(fixedCategory!) : "academic"),
           questionCount: qc,
           marksPerQuestion: mpqNum,
           totalMarks: total,
+          // Course-exam Flow-5 locks ride along so branches never mix; new
+          // chapter/legacy course exams keep NULL (legacy flow) via existing.
+          ...(isPublicScope
+            ? {}
+            : {
+                examFormat: fixedFormat ?? existing?.examFormat ?? null,
+                topicSubject: (fixedFormat === "topic-wise" || (existing?.examFormat ?? null) === "topic-wise")
+                  ? (fixedTopicSubject ?? existing?.topicSubject ?? null)
+                  : null,
+              }),
           // Second Timer Penalty — editable, default 3 when enabled (student chooses First/Second on Rules page)
           secondTimerEnabled: form.secondTimerEnabled,
           secondTimerDeduction: Number(form.secondTimerDeduction) || 3,
@@ -913,14 +944,23 @@ export default function ExamManager({
                 void save();
               }}
             >
-              {fixedCategory ? (
+              {useUnifiedForm ? (
                 <>
-                  {/* Public Exam Control — 15-field form exactly as spec */}
+                  {/* Unified Exam form — SAME complete Public Exam system for both
+                      scopes. PUBLIC (fixedCategory) locks the category; COURSE
+                      (fixedCourse / fixedChapter) locks the course/chapter and
+                      stays enrolled-only. All other fields are identical. */}
                   <div className="sm:col-span-2">
                     <label className={labelClass} htmlFor="ex-title">Exam Title</label>
                     <input id="ex-title" className={inputClass} value={form.title} placeholder="e.g. Medical Admission Model Test 01"
                       onChange={(event) => setForm({ ...form, title: event.target.value })} />
-                    <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Category: <span className="font-bold">{examCategoryLabel(fixedCategory)}</span> (fixed — auto-assigned)</p>
+                    {fixedCategory ? (
+                      <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Category: <span className="font-bold">{examCategoryLabel(fixedCategory)}</span> (fixed — auto-assigned)</p>
+                    ) : fixedCourse ? (
+                      <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Course: <span className="font-bold">{fixedCourse.name}</span> (fixed — enrolled students only)</p>
+                    ) : fixedChapter ? (
+                      <p className="mt-1 text-[11px] text-slate-500 admin-dark:text-slate-400">Chapter: <span className="font-bold">{fixedChapter.name}</span> (fixed — enrolled students only)</p>
+                    ) : null}
                   </div>
                   <div>
                     <label className={labelClass} htmlFor="ex-id">Exam ID — auto-generated</label>

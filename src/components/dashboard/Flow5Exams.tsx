@@ -253,7 +253,33 @@ function Flow5TopicSubjectsContent({ slug }: { slug: string }) {
 }
 
 // ── Direct exam list (Paper Final / Subject Final / Final Model)
-//     + Topic-wise per-subject list. Existing exam-taking UI untouched. ──
+//     + Topic-wise per-subject list. Unified Exam System: SAME complete engine
+//     as Public Exams (/exam/[id]/rules → timer → result); only the access
+//     scope differs (COURSE → enrolled students, inside Course Content). ──
+
+const PHASE_META: Record<string, { label: string; className: string }> = {
+  upcoming: { label: "Upcoming", className: "bg-amber-500/15 text-amber-400" },
+  live: { label: "Live", className: "bg-emerald-500/15 text-emerald-400" },
+  practice: { label: "Practice", className: "bg-violet-500/15 text-violet-400" },
+  "no-window": { label: "Live", className: "bg-sky-500/15 text-sky-400" },
+};
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("en-US", {
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "—";
+  }
+}
 export function Flow5ExamListView({
   slug,
   format,
@@ -307,7 +333,9 @@ function Flow5ExamListContent({
         />
       ) : (
         <ul className="mt-6 space-y-3">
-          {exams.map((exam, index) => (
+          {exams.map((exam, index) => {
+            const phase = PHASE_META[exam.phase] ?? PHASE_META.live;
+            return (
             <li key={exam.id}>
               <Link
                 href={`/exam/${encodeURIComponent(exam.id)}/rules`}
@@ -318,19 +346,32 @@ function Flow5ExamListContent({
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-extrabold text-heading transition group-hover:text-primary-400">
-                    {exam.title}
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="block truncate text-base font-extrabold text-heading transition group-hover:text-primary-400">
+                      {exam.title}
+                    </span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${phase.className}`}>
+                      {phase.label}
+                    </span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${exam.examMode === "practice" ? "bg-violet-500/15 text-violet-400" : "bg-sky-500/15 text-sky-400"}`}>
+                      {exam.examMode === "practice" ? "Practice" : "Live"}
+                    </span>
                   </span>
-                  <span className="text-xs text-neutral-500">
-                    Exam{exam.durationMinutes > 0 ? ` · ${exam.durationMinutes} min` : ""}{exam.totalMarks > 0 ? ` · ${exam.totalMarks} marks` : ""}
+                  <span className="mt-1 block text-xs text-neutral-500">
+                    {exam.subject ? `${exam.subject} · ` : ""}{exam.totalQuestions > 0 ? `${exam.totalQuestions} Questions · ` : ""}{exam.totalMarks > 0 ? `${exam.totalMarks} Marks · ` : ""}{exam.durationMinutes > 0 ? `${exam.durationMinutes} min` : ""}
+                    {exam.negativeEnabled && exam.negativePerWrong > 0 ? ` · −${exam.negativePerWrong} per wrong` : ""}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-neutral-600">
+                    Start: {formatDateTime(exam.scheduledAt)} · End: {formatDateTime(exam.endsAt)}
                   </span>
                 </span>
                 <span className="shrink-0 rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white transition group-hover:bg-primary-700">
-                  Start
+                  {exam.phase === "upcoming" ? "View" : "Start"}
                 </span>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>

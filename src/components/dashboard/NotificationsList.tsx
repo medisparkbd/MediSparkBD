@@ -1,30 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 
 type Notification = {
   id: string;
   title: string;
   message: string;
-  audience: "all" | "students" | "admins";
+  audience: "all" | "students" | "admins" | "enrolled" | "student";
+  isRead: boolean;
   createdAt: string;
 };
 
-function formatDate(value: string): string {
+/** e.g. "18 September 2026 • 10:30 AM" */
+function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  const day = date.getDate();
+  const month = date.toLocaleString("en-US", { month: "long" });
+  const year = date.getFullYear();
+  const time = date
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .toUpperCase();
+  return `${day} ${month} ${year} • ${time}`;
+}
+
+/** Tell the header indicator the fresh unread count (same tab, instant). */
+function broadcastUnreadCount(unreadCount: number): void {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("medispark:notifications-read", {
+        detail: { unreadCount },
+      }),
+    );
+  } catch {
+    // Non-fatal — the header also polls + refetches on focus.
+  }
 }
 
 export default function NotificationsList() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[] | null>(null);
   const [error, setError] = useState(false);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -37,8 +60,18 @@ export default function NotificationsList() {
           cache: "no-store",
         });
         if (!response.ok) throw new Error("Failed to load notifications.");
-        const data = (await response.json()) as { notifications?: Notification[] };
-        if (!cancelled) setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+        const data = (await response.json()) as {
+          notifications?: Notification[];
+          unreadCount?: unknown;
+        };
+        if (cancelled) return;
+        const items = Array.isArray(data.notifications) ? data.notifications : [];
+        setNotifications(items);
+        broadcastUnreadCount(
+          typeof data.unreadCount === "number"
+            ? data.unreadCount
+            : items.filter((item) => !item.isRead).length,
+        );
       } catch {
         if (!cancelled) {
           setNotifications([]);
@@ -51,13 +84,74 @@ export default function NotificationsList() {
     };
   }, [user]);
 
-  return (
-    <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <h1 className="text-2xl font-extrabold text-heading">Notifications</h1>
-      <p className="mt-1 text-sm text-neutral-400">
-        Updates and announcements from MediSpark.
-      </p>
+  const markRead = useCallback(
+    async (id: string) => {
+      if (!user || markingId) return;
+      const current = notifications?.find((item) => item.id === id);
+      if (!current || current.isRead) return;
+      setMarkingId(id);
+      // Optimistic: flip immediately, reconcile with the server count after.
+      setNotifications((prev) =>
+        prev?.map((item) => (item.id === id ? { ...item, isRead: true } : item)) ?? prev,
+      );
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/notifications", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id }),
+        });
+        const data = (await response.json().catch(() => null)) as {
+          unreadCount?: unknown;
+        } | null;
+        if (!response.ok) throw new Error("Failed to mark as read.");
+        broadcastUnreadCount(Number(data?.unreadCount ?? 0) || 0);
+      } catch {
+        // Roll back the optimistic flip so the indicator never lies.
+        setNotifications((prev) =>
+          prev?.map((item) => (item.id === id ? { ...item, isRead: false } : item)) ?? prev,
+        );
+      } finally {
+        setMarkingId(null);
+      }
+    },
+    [user, markingId, notifications],
+  );
 
+  const markAllRead = useCallback(async () => {
+    if (!user || markingAll) return;
+    setMarkingAll(true);
+    const previous = notifications;
+    setNotifications((prev) => prev?.map((item) => ({ ...item, isRead: true })) ?? prev);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ all: true }),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        unreadCount?: unknown;
+      } | null;
+      if (!response.ok) throw new Error("Failed to mark all as read.");
+      broadcastUnreadCount(Number(data?.unreadCount ?? 0) || 0);
+    } catch {
+      if (previous) setNotifications(previous);
+    } finally {
+      setMarkingAll(false);
+    }
+  }, [user, markingAll, notifications]);
+
+  const unreadCount = notifications?.filter((item) => !item.isRead).length ?? 0;
+
+  return (
+    <section className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6">
       {notifications === null ? (
         <div className="mt-8 space-y-3" aria-label="Loading notifications">
           {[0, 1, 2].map((index) => (
@@ -83,36 +177,80 @@ export default function NotificationsList() {
             </svg>
           </span>
           <p className="mt-5 font-semibold text-heading">No notifications yet</p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-neutral-400">
-            {error
-              ? "We could not load your notifications right now. Please try again later."
-              : "Announcements from MediSpark will appear here."}
-          </p>
+          {error && (
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-neutral-400">
+              We could not load your notifications right now. Please try again later.
+            </p>
+          )}
         </div>
       ) : (
-        <ul className="mt-8 space-y-4">
-          {notifications.map((notification) => (
-            <li
-              key={notification.id}
-              className="rounded-2xl border border-ink/10 bg-dark-900 p-6 shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-7"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-primary-500/40 bg-primary-600/15 px-2.5 py-1 text-xs font-bold text-primary-400">
-                  Notice
-                </span>
-                <time className="text-xs font-semibold text-neutral-500" dateTime={notification.createdAt}>
-                  {formatDate(notification.createdAt)}
-                </time>
-              </div>
-              <h2 className="mt-3 text-lg font-bold text-heading">
-                {notification.title}
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">
-                {notification.message}
+        <>
+          {unreadCount > 0 && (
+            <div className="mt-8 flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+                {unreadCount} unread
               </p>
-            </li>
-          ))}
-        </ul>
+              <button
+                type="button"
+                onClick={() => void markAllRead()}
+                disabled={markingAll}
+                className="rounded-xl border border-ink/10 bg-ink/5 px-4 py-2 text-xs font-bold text-neutral-300 transition hover:border-primary-500/50 hover:bg-primary-500/10 hover:text-heading disabled:opacity-50"
+              >
+                {markingAll ? "Marking…" : "Mark all as read"}
+              </button>
+            </div>
+          )}
+          <ul className="mt-4 space-y-4">
+            {notifications.map((notification) => (
+              <li key={notification.id}>
+                <article
+                  onClick={() => void markRead(notification.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      void markRead(notification.id);
+                    }
+                  }}
+                  tabIndex={notification.isRead ? -1 : 0}
+                  role={notification.isRead ? undefined : "button"}
+                  aria-label={
+                    notification.isRead
+                      ? notification.title
+                      : `Mark as read: ${notification.title}`
+                  }
+                  className={`rounded-2xl border bg-dark-900 p-6 shadow-lg shadow-black/20 transition duration-300 hover:border-primary-600/60 hover:shadow-primary-900/30 sm:p-7 ${
+                    notification.isRead
+                      ? "border-ink/10"
+                      : "cursor-pointer border-primary-500/40 bg-primary-600/[0.04]"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {!notification.isRead && (
+                      <span
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-500"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg font-bold leading-snug text-heading">
+                        {notification.title}
+                      </h2>
+                      <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">
+                        {notification.message}
+                      </p>
+                      <time
+                        className="mt-3 block text-xs font-semibold text-neutral-500"
+                        dateTime={notification.createdAt}
+                      >
+                        {formatDateTime(notification.createdAt)}
+                      </time>
+                    </div>
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
