@@ -390,7 +390,7 @@ export default function ExamCard({
           ) : canStart && !detailsHref ? (
             <StartExamButton
               exam={exam}
-              disabled={false}
+              disabled={isInactive || isUnpublished}
               className={`${buttonClasses} flex items-center justify-center gap-2 bg-primary-600 text-white shadow-md shadow-primary-900/50 hover:bg-primary-500`}
             >
               {action.label}
