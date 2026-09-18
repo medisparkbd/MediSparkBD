@@ -175,11 +175,6 @@ function Flow5CourseContent({ slug }: { slug: string }) {
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mt-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary-500">Course Exams</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Select Exam Type</h1>
-        <p className="mt-1 text-sm text-neutral-400">Choose an exam category to continue.</p>
-      </header>
       <InfoBox title="Course Exams" className="mt-4">
         তোমার পরীক্ষার ধরন নির্বাচন করো।
       </InfoBox>
@@ -319,15 +314,9 @@ function Flow5ExamListContent({
   const meta = FLOW5_FORMATS.find((f) => f.key === format);
   const isTopic = format === "topic-wise";
   const heading = isTopic && subjectKey ? flow5SubjectTitle(subjectKey) : (meta?.title ?? "Exams");
-  const eyebrow = isTopic && subjectKey ? "Topic-wise Exam" : "Course Exams";
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mt-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary-500">{eyebrow}</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">{heading}</h1>
-        <p className="mt-1 text-sm text-neutral-400">Select an exam to start.</p>
-      </header>
       <InfoBox title={heading} className="mt-4">
         পরীক্ষা শুরু করতে Start Exam বাটনে ক্লিক করো।
       </InfoBox>
