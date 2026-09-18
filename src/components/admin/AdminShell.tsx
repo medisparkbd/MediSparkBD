@@ -305,7 +305,7 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           />
-          <aside className="absolute left-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-zinc-950 shadow-2xl shadow-black/60">
+          <aside className="absolute left-0 top-0 z-10 flex h-full w-72 max-w-[85vw] flex-col bg-zinc-950 shadow-2xl shadow-black/60">
             <button
               type="button"
               aria-label="Close menu"
