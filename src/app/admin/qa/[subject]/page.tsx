@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -223,12 +222,6 @@ export default function SubjectQuestionsPage({
           <p className="text-sm font-bold text-yellow-700 admin-dark:text-yellow-300">
             Invalid subject / Subject not found
           </p>
-          <Link
-            href="/admin/qa"
-            className="mt-3 inline-block rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:bg-primary-700"
-          >
-            Back
-          </Link>
         </div>
       )}
 

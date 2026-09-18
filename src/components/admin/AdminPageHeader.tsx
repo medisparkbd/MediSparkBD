@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { findActiveAdminNav } from "@/lib/admin-nav";
 
 export function AdminBreadcrumbs({ className = "" }: { className?: string }) {
@@ -26,40 +26,6 @@ export function AdminBreadcrumbs({ className = "" }: { className?: string }) {
         </li>
       </ol>
     </nav>
-  );
-}
-
-export function AdminBackButton({
-  label = "Back",
-  fallbackHref = "/admin",
-}: {
-  label?: string;
-  fallbackHref?: string;
-}) {
-  const router = useRouter();
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (window.history.length > 1) router.back();
-        else router.push(fallbackHref);
-      }}
-      className="inline-flex items-center gap-1.5 rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-xs font-bold text-[#1a3a78] shadow-sm transition hover:border-[#93c5fd] hover:bg-[#eff6ff] hover:text-[#123060] admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:text-[#93c5fd] admin-dark:hover:border-[#2f5aa0] admin-dark:hover:text-white"
-    >
-      <svg
-        className="h-3.5 w-3.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        viewBox="0 0 24 24"
-      >
-        <path d="m15 18-6-6 6-6" />
-      </svg>
-      {label}
-    </button>
   );
 }
 

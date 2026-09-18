@@ -212,15 +212,6 @@ export default function PublicExamCategoryManager({
           </div>
         )}
 
-        {tab === "practice" && useSubjectCards && subject && (
-          <button
-            type="button"
-            onClick={() => setSubject(null)}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2.5 text-xs font-bold text-slate-600 ring-1 ring-[#dbeafe] transition hover:text-[#0b1e3a] admin-dark:bg-[#112544] admin-dark:text-slate-300 admin-dark:ring-[#1e3a65] admin-dark:hover:text-white"
-          >
-            ← All Subjects
-          </button>
-        )}
       </div>
 
       {listVisible && (

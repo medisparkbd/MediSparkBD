@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import ExamCard from "@/components/ExamCard";
 import {
@@ -155,6 +154,7 @@ export default function PublicExamCategoryView({
   );
 
   const useSubjectCards = practiceUsesSubjectCards(categoryKey, practiceExams);
+  const isMedical = categoryKey === "medical-admission";
 
   const practiceSubjects = useMemo(() => {
     if (!useSubjectCards) return [];
@@ -220,12 +220,6 @@ export default function PublicExamCategoryView({
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <Link
-        href="/exam"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-heading"
-      >
-        ← All Public Exam Categories
-      </Link>
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
         {categoryLabel}
       </h1>
@@ -329,14 +323,11 @@ export default function PublicExamCategoryView({
         </div>
       ) : (
         <div>
-          {practiceExams.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
-              <p className="font-semibold text-heading">No practice exams yet</p>
-              <p className="mt-1 text-sm text-neutral-400">
-                New practice exams will appear here automatically.
-              </p>
-            </div>
-          ) : useSubjectCards && !subject ? (
+          {/* Medical Admission Practice: always show the fixed 8 subject
+              cards first (even with 0 exams) — no custom Back navigation;
+              subject selection only filters the existing Practice list.
+              Returning to cards: re-select the Practice Exam tab. */}
+          {useSubjectCards && !subject && (isMedical || practiceExams.length > 0) ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {practiceSubjects.map((item) => (
                 <button
@@ -367,17 +358,15 @@ export default function PublicExamCategoryView({
                 </button>
               ))}
             </div>
+          ) : practiceExams.length === 0 && !isMedical ? (
+            <div className="rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
+              <p className="font-semibold text-heading">No practice exams yet</p>
+              <p className="mt-1 text-sm text-neutral-400">
+                New practice exams will appear here automatically.
+              </p>
+            </div>
           ) : (
             <div>
-              {useSubjectCards && subject && (
-                <button
-                  type="button"
-                  onClick={() => setSubject(null)}
-                  className="mb-6 inline-flex items-center gap-1.5 rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-neutral-300 transition hover:border-primary-500/50 hover:text-heading"
-                >
-                  ← All Subjects
-                </button>
-              )}
               {visiblePractice.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-ink/15 bg-dark-900/60 p-10 text-center">
                   <p className="font-semibold text-heading">

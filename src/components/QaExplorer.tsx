@@ -12,7 +12,6 @@ import PermissionGuidanceCard, {
   type PermissionGuidance,
 } from "@/components/auth/PermissionGuidanceCard";
 import { useAuth } from "@/lib/auth-context";
-import { useNavHistory } from "@/components/navigation/NavHistoryContext";
 import { splitUrl } from "@/components/navigation/route-parents";
 import type { QaAskCardSettings } from "@/lib/qa-ask-card-settings";
 
@@ -45,7 +44,6 @@ export default function QaExplorer({
       ? initialSubjectId
       : null,
   );
-  const { goBack } = useNavHistory();
   const [askOpen, setAskOpen] = useState(false);
   const [askOptions, setAskOptions] = useState<QaAskOptions | null>(null);
   const [askOptionsError, setAskOptionsError] = useState<string | null>(null);
@@ -238,19 +236,12 @@ export default function QaExplorer({
 
   const handleBackToSubjects = useCallback(() => {
     if (!selectedSubjectId) return;
-    // FINAL RULE: child → Q&A Main only, resolved through the SINGLE
-    // navigation system (NavHistoryContext.goBack → explicit `/qa` parent
-    // via replace — never Home/Exam/Dashboard/Category, never
-    // router.back() / history.back() / navigate(-1)).
-    // replace() removes the child entry → Back on Main can never loop
-    // back to the child. Works identically for website Back, Browser
-    // Back and Android system Back:
-    //   Scenario 1: Home → Q&A → Biology → Back → Q&A Main
-    //   Scenario 2: Exam → Q&A → Chemistry → Back → Q&A Main
-    //   Scenario 3: Dashboard → Q&A → Physics → Back → Q&A Main
+    // Subject filter reset — direct replace to Q&A Main (no custom Back
+    // history logic; Browser / device Back handles previous navigation).
+    // replace() removes the child entry so Back on Main never loops back.
     setSelectedSubjectId(null);
     setAskOpen(false);
-    goBack("/qa");
+    router.replace("/qa", { scroll: false });
     const restoreScroll = savedMainScrollRef.current;
     requestAnimationFrame(() => {
       try {
@@ -259,7 +250,7 @@ export default function QaExplorer({
         // ignore
       }
     });
-  }, [goBack, selectedSubjectId]);
+  }, [router, selectedSubjectId]);
   const [askCardSettings, setAskCardSettings] = useState<QaAskCardSettings | null>(
     initialAskCardSettings ?? null
   );

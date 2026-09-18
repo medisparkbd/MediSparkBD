@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import CategoryCard from "@/components/CategoryCard";
 import BatchCourseList from "@/components/BatchCourseList";
@@ -85,29 +84,6 @@ function iconForSlug(slug: string): React.ReactNode {
   return CATEGORY_ICONS[key ?? "hsc"];
 }
 
-function BackToAllCourses() {
-  return (
-    <Link
-      href="/courses"
-      className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-400 transition hover:text-primary-400"
-    >
-      <svg
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        viewBox="0 0 24 24"
-      >
-        <path d="M19 12H5" />
-        <path d="m12 19-7-7 7-7" />
-      </svg>
-      All Courses
-    </Link>
-  );
-}
-
 function CoursesViewInner({
   courses,
   categories,
@@ -146,8 +122,6 @@ function CoursesViewInner({
     return (
       <main className="flex-1 bg-dark-950">
         <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-          <BackToAllCourses />
-
           <BatchCourseList options={batchOptions} courses={paidCourses} />
         </section>
       </main>
@@ -161,8 +135,6 @@ function CoursesViewInner({
     return (
       <main className="flex-1 bg-dark-950">
         <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-          <BackToAllCourses />
-
           <BatchCourseList
             options={category === "ssc" ? optionsFor("ssc") : optionsFor("hsc")}
             courses={typeCourses}
