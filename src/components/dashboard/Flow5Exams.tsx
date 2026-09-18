@@ -22,6 +22,7 @@ import {
 
 import ExamCard from "@/components/ExamCard";
 import type { PublicExam } from "@/lib/public-exams";
+import InfoBox from "@/components/dashboard/InfoBox";
 
 export function examFlowBase(slug: string) {
   return `/dashboard/enrolled-courses/${encodeURIComponent(slug)}/exam-flow`;
@@ -179,6 +180,9 @@ function Flow5CourseContent({ slug }: { slug: string }) {
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">Select Exam Type</h1>
         <p className="mt-1 text-sm text-neutral-400">Choose an exam category to continue.</p>
       </header>
+      <InfoBox title="Course Exams" className="mt-4">
+        তোমার পরীক্ষার ধরন নির্বাচন করো।
+      </InfoBox>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FLOW5_FORMATS.map((format) => (
           <Link
@@ -324,6 +328,9 @@ function Flow5ExamListContent({
         <h1 className="mt-2 text-2xl font-extrabold text-heading sm:text-3xl">{heading}</h1>
         <p className="mt-1 text-sm text-neutral-400">Select an exam to start.</p>
       </header>
+      <InfoBox title={heading} className="mt-4">
+        পরীক্ষা শুরু করতে Start Exam বাটনে ক্লিক করো।
+      </InfoBox>
       {exams.length === 0 ? (
         <EmptyExams
           title="No exams available yet."

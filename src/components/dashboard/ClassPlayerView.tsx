@@ -9,6 +9,7 @@ import PermissionGate, {
 } from "@/components/auth/PermissionGate";
 import PermissionGuidanceCard from "@/components/auth/PermissionGuidanceCard";
 import type { CourseLearningData } from "@/lib/my-learning";
+import InfoBox from "@/components/dashboard/InfoBox";
 
 type LoadState = "loading" | "error" | "forbidden" | "ready" | "missing";
 
@@ -357,6 +358,9 @@ function ClassPlayerBody({
             </div>
             <FavouriteButton itemType="class" itemId={cls.id} initial={cls.isFavourite} />
           </div>
+          <InfoBox title={cls.title} className="mt-4">
+            Watch the class to complete lessons and track your progress.
+          </InfoBox>
 
           {/* Playback speed — HTML5 video only */}
           {!embed && cls.videoUrl && (

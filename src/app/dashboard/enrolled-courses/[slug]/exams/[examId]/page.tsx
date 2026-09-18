@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import ExamParticipationArea from "@/components/auth/ExamParticipationArea";
 import HideDuringExam from "@/components/exam/HideDuringExam";
+import InfoBox from "@/components/dashboard/InfoBox";
 
 type ExamMeta = {
   id: string;
@@ -126,6 +127,14 @@ export default function CourseExamPage() {
                 </div>
               </div>
             </div>
+          )}
+          {exam && (
+            <InfoBox title={exam.title} className="mt-4">
+              <span>Total {exam.totalMarks} Marks • {exam.durationMinutes} min</span>
+              {exam.negativeMarks > 0 && (
+                <span className="text-primary-300"> • −{exam.negativeMarks} per wrong</span>
+              )}
+            </InfoBox>
           )}
         </HideDuringExam>
 

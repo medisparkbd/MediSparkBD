@@ -79,6 +79,9 @@ export default function QaExplorer({
   //   is untouched (other sections unaffected).
   const savedMainScrollRef = useRef(0);
   const insertedParentRef = useRef(false);
+  const initialSubjectIdRef = useRef(initialSubjectId);
+  const validSubjectIdsRef = useRef(validSubjectIds);
+  const routerRef = useRef(router);
 
   const readSubjectFromUrl = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -119,6 +122,9 @@ export default function QaExplorer({
   // Deep link (`/qa?subject=x` as the entry point — new tab, shared link):
   // explicitly preserve Q&A Main as the parent route so Browser / Android
   // Back goes to `/qa` natively.
+  // This runs only for the subject present on the first render. A subject
+  // selected after mounting is already inside Q&A and must not re-enter this
+  // insertion path.
   // Rewrites [.., /qa?subject=x] → [.., /qa, /qa?subject=x] using ONLY Next
   // router calls (never raw history.replaceState/pushState, so App Router
   // bookkeeping stays intact) — no reload, no flicker, and it never reads
@@ -131,7 +137,9 @@ export default function QaExplorer({
   //   dropped, is slow, or the user navigated away, nothing is pushed.
   // - The global NavHistory guard remains as backstop for every other case.
   useEffect(() => {
-    if (insertedParentRef.current) return;
+    const initialSubjectId = initialSubjectIdRef.current;
+    const validSubjectIds = validSubjectIdsRef.current;
+    const router = routerRef.current;
     if (!initialSubjectId || !validSubjectIds.has(initialSubjectId)) return;
     if (typeof window === "undefined") return;
     let childUrl = "";
@@ -192,7 +200,7 @@ export default function QaExplorer({
       if (attempts >= 5) clearInterval(timer);
     }, 100);
     return () => clearInterval(timer);
-  }, [initialSubjectId, validSubjectIds, router]);
+  }, []);
 
   // Clean an unknown `?subject=` value back to Q&A root (replace → no
   // duplicate history entry).
