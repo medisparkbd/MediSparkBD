@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { logAdminAction } from "@/lib/administration";
 import { getPaymentCard, savePaymentCard } from "@/lib/payment-card";
 import { PAYMENT_CARD_MAX } from "@/lib/payment-card-config";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /** GET — current payment card configuration. */
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
  * At least one payment method must remain enabled with a number.
  */
 export async function PUT(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

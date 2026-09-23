@@ -234,11 +234,13 @@ const DEFAULT_PERMISSIONS_BY_ROLE: Record<AdminRole, readonly AdminPermission[]>
  * Flexible: role_permissions can reconfigure any of these per role at runtime.
  */
 export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly AdminPermission[]> = {
+  // Control-center pages (sidebar cards)
   "/admin/website-information": ["manageContent"],
   "/admin/enrollment-control": ["manageStudents", "manageCourses"],
   "/admin/home-control": ["manageContent"],
   "/admin/course-control": ["manageCourses"],
   "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
+  "/admin/material-pdf": ["manageCourses", "manageCourseContent", "manageExams"],
   "/admin/public-exam-control": ["managePublicExam", "manageExams"],
   // Canonical Public Exam Control subtree (redirect target of the control):
   // hub (/admin/public-exam) and Category → Exam pages inherit the parent.
@@ -248,12 +250,29 @@ export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly AdminPermission[
   "/admin/exams": ["managePublicExam", "manageExams"],
   // Enrolled-exam lists are course-assigned; course managers keep access.
   "/admin/exams/enrolled": ["managePublicExam", "manageExams", "manageCourses"],
+  "/admin/course-exams": ["managePublicExam", "manageExams", "manageCourses"],
   "/admin/qa-control": ["manageQa", "manageContent"],
+  "/admin/qa": ["manageQa", "manageContent"],
   "/admin/dashboard-control": ["manageSystem", "manageContent"],
   "/admin/student-control": ["manageStudents"],
+  "/admin/students": ["manageStudents"],
   "/admin/result-control": ["manageResults", "manageExams"],
   "/admin/notification-control": ["manageContent", "manageSystem"],
   "/admin/admin-center": ["manageAdmins"],
+  "/admin/administration": ["manageAdmins"],
+  "/admin/system": ["manageSystem", "manageAdmins"],
+  // Legacy section pages — same permission as their backing APIs
+  "/admin/website": ["manageContent"],
+  "/admin/branding": ["manageContent"],
+  "/admin/settings": ["manageContent"],
+  "/admin/homepage-courses": ["manageCourses"],
+  "/admin/content": ["manageContent"],
+  "/admin/mentors": ["manageContent"],
+  "/admin/courses": ["manageCourses"],
+  "/admin/course": ["manageCourses"],
+  "/admin/course-content": ["manageCourseContent", "manageCourses"],
+  "/admin/enrolled-courses": ["manageCourseContent", "manageCourses"],
+  "/admin/marketing": ["manageCourses"],
 };
 
 export function hasControlAccess(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { isMysqlConfigured } from "@/lib/mysql";
 import { getAdminCourseLearningData } from "@/lib/my-learning";
 
@@ -15,7 +15,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ slug: string }> },
 ) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

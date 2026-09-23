@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission, requirePermission } from "@/lib/admin";
 import { query } from "@/lib/mysql";
 import { logAdminAction } from "@/lib/administration";
 import {
@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   // Admin catalog reads are permission-gated (includes unpublished courses).
-  const admin = await requirePermission(request, "manageCourses");
+  // Reads allow course-content managers too (course-content-control pages
+  // fetch course info); writes stay manageCourses-only below.
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

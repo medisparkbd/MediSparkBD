@@ -25,11 +25,11 @@ const ALLOWED_EXTENSIONS = [
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 
 /** Generic admin media upload: multipart { file, dir?, previousUrl? }.
- * Public Exam Control inheritance: exam managers (managePublicExam or the
- * legacy broad manageExams) may upload exam banners and question images from
- * Exam Management — same entry permission as the parent control. */
+ * Any content manager may upload: course managers (course covers, class
+ * materials), course-content managers (classes/materials), exam managers
+ * (banners, question images) and content managers (logos, banners, FAQ). */
 export async function POST(request: NextRequest) {
-  const admin = await requireAnyPermission(request, ["manageContent", "manageExams", "managePublicExam"]);
+  const admin = await requireAnyPermission(request, ["manageContent", "manageCourses", "manageCourseContent", "manageExams", "managePublicExam", "manageQa"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

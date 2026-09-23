@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { logAdminAction } from "@/lib/administration";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const REVALIDATED = "Next.js page & data cache";
 
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageAdmins");
+  const admin = await requireAnyPermission(request, ["manageSystem", "manageAdmins"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 /** Clear supported application caches. */
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageAdmins");
+  const admin = await requireAnyPermission(request, ["manageSystem", "manageAdmins"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

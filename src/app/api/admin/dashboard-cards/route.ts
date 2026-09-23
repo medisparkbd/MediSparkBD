@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { logAdminAction } from "@/lib/administration";
 import {
   deleteDashboardCard,
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 /** All dashboard cards, including hidden ones. */
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
+  const admin = await requireAnyPermission(request, ["manageContent", "manageSystem"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 /** Add a card to every student dashboard. */
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
+  const admin = await requireAnyPermission(request, ["manageContent", "manageSystem"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
 /** Edit card fields and/or show/hide it. */
 export async function PATCH(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
+  const admin = await requireAnyPermission(request, ["manageContent", "manageSystem"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -93,7 +93,7 @@ export async function PATCH(request: NextRequest) {
 
 /** Remove a card from every student dashboard (?key=...). */
 export async function DELETE(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
+  const admin = await requireAnyPermission(request, ["manageContent", "manageSystem"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

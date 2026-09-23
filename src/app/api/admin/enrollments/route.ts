@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import {
   fetchEnrollmentsAdmin,
   setEnrollmentStatus,
@@ -23,7 +23,7 @@ const STATUSES: EnrollmentStatus[] = [
 
 /** List enrollments (search + status filter). */
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
 /** Assign a course to a student. */
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -87,7 +87,7 @@ return NextResponse.json({ message: "Course assigned and activated." });
  *                               pending rows must go through accept/reject
  */
 export async function PUT(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -170,7 +170,7 @@ return NextResponse.json({ message: `Enrollment marked as ${body.status}.` });
 
 /** Permanently remove a course access record. */
 export async function DELETE(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import {
   addTypeChapter,
   deleteTypeChapter,
@@ -29,7 +29,7 @@ function scopeFrom(body: Record<string, unknown>): CtypeScope | null {
  * POST {action, …}                        → add-chapter / add-type / rename-type
  */
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
   if (!admin) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const url = new URL(request.url);
   const slug = url.searchParams.get("course") ?? "";
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageCourses", "manageCourseContent"]);
   if (!admin) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid body." }, { status: 400 });

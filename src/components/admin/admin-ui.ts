@@ -350,12 +350,29 @@ export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly string[]> = {
   // Enrolled-exam lists are course-assigned; course managers keep read
   // access here (backend writes still enforce their own permission pairs).
   "/admin/exams/enrolled": ["managePublicExam", "manageExams", "manageCourses"],
+  "/admin/course-exams": ["managePublicExam", "manageExams", "manageCourses"],
   "/admin/qa-control": ["manageQa", "manageContent"],
+  "/admin/qa": ["manageQa", "manageContent"],
   "/admin/dashboard-control": ["manageSystem", "manageContent"],
   "/admin/student-control": ["manageStudents"],
+  "/admin/students": ["manageStudents"],
   "/admin/result-control": ["manageResults", "manageExams"],
   "/admin/notification-control": ["manageContent", "manageSystem"],
   "/admin/admin-center": ["manageAdmins"],
+  "/admin/administration": ["manageAdmins"],
+  "/admin/system": ["manageSystem", "manageAdmins"],
+  // Legacy section pages — same permission as their backing APIs
+  "/admin/website": ["manageContent"],
+  "/admin/branding": ["manageContent"],
+  "/admin/settings": ["manageContent"],
+  "/admin/homepage-courses": ["manageCourses"],
+  "/admin/content": ["manageContent"],
+  "/admin/mentors": ["manageContent"],
+  "/admin/courses": ["manageCourses"],
+  "/admin/course": ["manageCourses"],
+  "/admin/course-content": ["manageCourseContent", "manageCourses"],
+  "/admin/enrolled-courses": ["manageCourseContent", "manageCourses"],
+  "/admin/marketing": ["manageCourses"],
 };
 
 /**

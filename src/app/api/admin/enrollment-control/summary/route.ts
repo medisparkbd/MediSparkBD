@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin";
+import { requireAnyPermission } from "@/lib/admin";
 import { isMysqlConfigured, query } from "@/lib/mysql";
 import { fetchEnrollmentControlCourses } from "@/lib/enrollments-admin";
 import { syncCatalogCategoryIds } from "@/lib/courses-admin";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** GET — published courses with per-course pending application counts.
  *  Optional ?categoryId= returns ONLY that Course Control category's courses. */
 export async function GET(request: NextRequest) {
-  const admin = await requirePermission(request, "manageCourses");
+  const admin = await requireAnyPermission(request, ["manageStudents", "manageCourses"]);
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }

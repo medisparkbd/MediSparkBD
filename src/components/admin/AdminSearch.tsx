@@ -7,6 +7,7 @@ import {
   adminProfileCategory,
   type AdminCategory,
 } from "@/lib/admin-nav";
+import { hasControlAccess, useAdminGate } from "@/components/admin/admin-ui";
 import { SearchIcon } from "@/components/admin/icons";
 
 type SearchEntry = {
@@ -35,6 +36,7 @@ export default function AdminSearch({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
+  const gate = useAdminGate();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,12 +44,20 @@ export default function AdminSearch({
   const results = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) return [];
-    return SEARCH_INDEX.filter(
+    // RBAC: only suggest sections the current role can actually open.
+    // Before the gate resolves, show everything (no flash of empty).
+    const entries =
+      gate.ready
+        ? SEARCH_INDEX.filter((entry) =>
+            hasControlAccess(gate.role, gate.permissions, entry.href),
+          )
+        : SEARCH_INDEX;
+    return entries.filter(
       (entry) =>
         entry.label.toLowerCase().includes(trimmed) ||
         entry.section.toLowerCase().includes(trimmed)
     ).slice(0, 8);
-  }, [query]);
+  }, [query, gate.ready, gate.role, gate.permissions]);
 
   useEffect(() => {
     if (!open) return;
