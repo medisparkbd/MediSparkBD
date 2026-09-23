@@ -67,32 +67,57 @@ async function ensureUploadsTable(): Promise<void> {
   );
 }
 
-const COMPRESSIBLE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
+const COMPRESSIBLE_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
 
-async function compressImageIfNeeded(
+function minifySvg(buffer: Buffer): Buffer {
+  try {
+    let text = buffer.toString("utf8");
+    const originalLen = Buffer.byteLength(text);
+    // Remove XML/HTML comments, keep conditional comments out
+    text = text.replace(/<!--[\s\S]*?-->/g, "");
+    // Collapse whitespace between tags, trim
+    text = text.replace(/>\s+</g, "><").replace(/\s{2,}/g, " ").trim();
+    // Remove empty attributes like fill="none" keeping? keep lossless so only whitespace
+    const out = Buffer.from(text, "utf8");
+    return out.length < originalLen ? out : buffer;
+  } catch {
+    return buffer;
+  }
+}
+
+async function compressFileIfNeeded(
   buffer: Buffer,
   fileName: string,
 ): Promise<Buffer> {
   const dot = fileName.lastIndexOf(".");
   const ext = dot === -1 ? "" : fileName.slice(dot).toLowerCase();
-  if (!COMPRESSIBLE_EXTS.has(ext)) return buffer;
-  // Skip tiny files (<8KB) — overhead not worth it
+  // SVG: lossless minify (no visual change)
+  if (ext === ".svg") {
+    if (buffer.length < 1 * 1024) return buffer;
+    const min = minifySvg(buffer);
+    return min.length < buffer.length ? min : buffer;
+  }
+  // PDF/Audio (mp3/m4a/aac/ogg/opus/wav/pdf): already compressed containers.
+  // Lossless re-encode would need ffmpeg/ghostscript which aren't on Vercel/VM and risks quality loss,
+  // so keep original bytes (PDF is already DEFLATE-compressed, MP3/AAC/OPUS are perceptual codecs).
+  // Only WAV (uncompressed PCM) could be losslessly converted to FLAC, but we keep it to preserve exact upload.
+  if ([".pdf", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".mp4", ".webm", ".gif", ".ico"].includes(ext)) {
+    return buffer;
+  }
+  if (!COMPRESSIBLE_IMAGE_EXTS.has(ext)) return buffer;
   if (buffer.length < 8 * 1024) return buffer;
   try {
     const image = sharp(buffer, { failOn: "none" });
     const meta = await image.metadata();
-    // Cap width at 2048px to avoid 4K uploads bloating storage — visually lossless on web
     let pipeline: sharp.Sharp = image;
     if (meta.width && meta.width > 2048) {
       pipeline = pipeline.resize({ width: 2048, withoutEnlargement: true });
     }
     if (ext === ".jpg" || ext === ".jpeg") {
-      // mozjpeg + 82% = visually lossless, ~40-60% smaller than phone originals
       const out = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
       return out.length < buffer.length ? out : buffer;
     }
     if (ext === ".png") {
-      // Lossless PNG: max compression + adaptive filtering, keep alpha. If result larger, keep original.
       const out = await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true, palette: false }).toBuffer();
       return out.length < buffer.length ? out : buffer;
     }
@@ -106,7 +131,6 @@ async function compressImageIfNeeded(
     }
     return buffer;
   } catch {
-    // Corrupt / unsupported image — fall back to original bytes
     return buffer;
   }
 }
@@ -118,7 +142,7 @@ export async function saveFile(
 ): Promise<string> {
   const rawBytes =
     data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)) : data;
-  const bytes = await compressImageIfNeeded(rawBytes, fileName);
+  const bytes = await compressFileIfNeeded(rawBytes, fileName);
 
   const endpoint = new URL(MEDIA_UPLOAD_URL);
   endpoint.searchParams.set("dir", directory);
