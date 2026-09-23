@@ -388,7 +388,7 @@ export async function resolveAdminPermissions(
   };
   try {
     await ensureRolesTable();
-    let assignedRole: AdminRole = "admin";
+    let assignedRole: AdminRole | null = null;
     if (email) {
       const rows = await query<{ role: string }[]>(
         `SELECT role FROM admin_roles WHERE email = ? LIMIT 1`,
@@ -400,7 +400,23 @@ export async function resolveAdminPermissions(
       } else if (rawRole === "super-admin") {
         assignedRole = "admin";
       }
+      // Fallback to admins.role when no admin_roles entry (e.g., legacy moderator)
+      if (!assignedRole) {
+        try {
+          const adminRows = await query<{ role: string | null }[]>(
+            `SELECT role FROM admins WHERE LOWER(email) = LOWER(?) LIMIT 1`,
+            [email.trim().toLowerCase()],
+          );
+          const adminRole = String(adminRows[0]?.role ?? "").trim().toLowerCase();
+          if ((AVAILABLE_ROLES as readonly string[]).includes(adminRole)) {
+            assignedRole = adminRole as AdminRole;
+          }
+        } catch {
+          // ignore, use default below
+        }
+      }
     }
+    if (!assignedRole) assignedRole = "admin";
     // Admin always has all permissions.
     if (assignedRole === "admin") {
       return { role: "admin", permissions: [...ALL_PERMISSIONS] };
