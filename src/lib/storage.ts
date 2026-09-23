@@ -109,7 +109,7 @@ async function compressFileIfNeeded(
   try {
     const image = sharp(buffer, { failOn: "none" });
     const meta = await image.metadata();
-    let pipeline: sharp.Sharp = image;
+    let pipeline = image;
     if (meta.width && meta.width > 2048) {
       pipeline = pipeline.resize({ width: 2048, withoutEnlargement: true });
     }
