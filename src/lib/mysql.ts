@@ -37,7 +37,8 @@ export function getMysqlPool(): mysql.Pool | null {
       enableKeepAlive: true,
       keepAliveInitialDelay: 5_000,
       queueLimit: 100,
-      // Azure MySQL enforces TLS
+      // Azure MySQL enforces TLS; VM MariaDB (20.219.193.182 / medispark.duckdns.org) is non-TLS.
+      // Set MYSQL_SSL=false for VM/local, MYSQL_SSL=true to force TLS.
       ssl:
         process.env.MYSQL_SSL === "false"
           ? undefined
