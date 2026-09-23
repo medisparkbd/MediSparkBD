@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { exec, query } from "@/lib/mysql";
+import sharp from "sharp";
 
 // Media files live on the Azure VM's disk under /var/www/medispark-uploads
 // and are served over HTTPS by nginx at MEDIA_FILES_BASE_URL. saveFile()
@@ -66,13 +67,58 @@ async function ensureUploadsTable(): Promise<void> {
   );
 }
 
+const COMPRESSIBLE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
+
+async function compressImageIfNeeded(
+  buffer: Buffer,
+  fileName: string,
+): Promise<Buffer> {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+  if (!COMPRESSIBLE_EXTS.has(ext)) return buffer;
+  // Skip tiny files (<8KB) — overhead not worth it
+  if (buffer.length < 8 * 1024) return buffer;
+  try {
+    const image = sharp(buffer, { failOn: "none" });
+    const meta = await image.metadata();
+    // Cap width at 2048px to avoid 4K uploads bloating storage — visually lossless on web
+    let pipeline: sharp.Sharp = image;
+    if (meta.width && meta.width > 2048) {
+      pipeline = pipeline.resize({ width: 2048, withoutEnlargement: true });
+    }
+    if (ext === ".jpg" || ext === ".jpeg") {
+      // mozjpeg + 82% = visually lossless, ~40-60% smaller than phone originals
+      const out = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+      return out.length < buffer.length ? out : buffer;
+    }
+    if (ext === ".png") {
+      // Lossless PNG: max compression + adaptive filtering, keep alpha. If result larger, keep original.
+      const out = await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true, palette: false }).toBuffer();
+      return out.length < buffer.length ? out : buffer;
+    }
+    if (ext === ".webp") {
+      const out = await pipeline.webp({ quality: 82, effort: 6 }).toBuffer();
+      return out.length < buffer.length ? out : buffer;
+    }
+    if (ext === ".avif") {
+      const out = await pipeline.avif({ quality: 50, effort: 4 }).toBuffer();
+      return out.length < buffer.length ? out : buffer;
+    }
+    return buffer;
+  } catch {
+    // Corrupt / unsupported image — fall back to original bytes
+    return buffer;
+  }
+}
+
 export async function saveFile(
   directory: string,
   fileName: string,
   data: ArrayBuffer | Buffer,
 ): Promise<string> {
-  const bytes =
+  const rawBytes =
     data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)) : data;
+  const bytes = await compressImageIfNeeded(rawBytes, fileName);
 
   const endpoint = new URL(MEDIA_UPLOAD_URL);
   endpoint.searchParams.set("dir", directory);
