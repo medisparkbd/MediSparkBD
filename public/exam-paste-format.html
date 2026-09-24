@@ -7,20 +7,26 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif; background: #f1f5f9; color: #0b1e3a; margin: 0; padding: 16px; line-height: 1.8; }
-  .wrap { max-width: 860px; margin: 0 auto; }
+  .wrap { max-width: 880px; margin: 0 auto; }
   .card { background: #fff; border: 1px solid #dbeafe; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(11,30,58,.06); }
   h1 { font-size: 22px; margin: 0 0 4px; }
   h2 { font-size: 17px; margin: 0 0 8px; color: #1a3a78; }
   .sub { color: #64748b; font-size: 13px; margin-bottom: 12px; }
   pre { background: #0b1e3a; color: #e8eefc; border-radius: 12px; padding: 14px; overflow-x: auto; font-size: 13.5px; line-height: 1.9; white-space: pre-wrap; }
-  code.inline { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 6px; padding: 0 6px; font-size: 13px; color: #1a3a78; }
+  code.inline { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 6px; padding: 0 6px; font-size: 13px; color: #1a3a78; white-space: nowrap; }
   .ok { border-left: 5px solid #16a34a; }
   .bad { border-left: 5px solid #dc2626; }
   .info { border-left: 5px solid #234e9f; }
+  .phy { border-left: 5px solid #7c3aed; }
+  .che { border-left: 5px solid #0891b2; }
+  .eng { border-left: 5px solid #ea580c; }
   .tag { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 10px; margin-bottom: 8px; }
   .tag.ok { background: #dcfce7; color: #166534; }
   .tag.bad { background: #fee2e2; color: #991b1b; }
   .tag.info { background: #dbeafe; color: #1a3a78; }
+  .tag.phy { background: #ede9fe; color: #5b21b6; }
+  .tag.che { background: #cffafe; color: #0e7490; }
+  .tag.eng { background: #ffedd5; color: #9a3412; }
   ul { margin: 6px 0; padding-left: 20px; font-size: 14px; }
   li { margin-bottom: 4px; }
   button.copy { background: #1a3a78; color: #fff; border: 0; border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 10px; }
@@ -28,6 +34,10 @@
   .steps { display: grid; gap: 8px; font-size: 14px; }
   .step { background: #f8fbff; border: 1px solid #dbeafe; border-radius: 10px; padding: 8px 12px; }
   .step b { color: #1a3a78; }
+  .palette { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .palette button { font-size: 16px; background: #f8fbff; border: 1px solid #dbeafe; border-radius: 8px; padding: 4px 10px; cursor: pointer; color: #0b1e3a; }
+  .palette button:active { background: #dbeafe; }
+  .pal-label { font-size: 12px; font-weight: 800; color: #64748b; margin: 10px 0 2px; }
   @media (max-width: 560px) { body { padding: 10px; } .card { padding: 14px; } h1 { font-size: 19px; } }
 </style>
 </head>
@@ -36,17 +46,33 @@
 
   <div class="card">
     <h1>📝 Exam Paste Format Guide</h1>
-    <div class="sub">Admin Panel → Add Exam → Paste Questions → <b>Detect Questions</b> — ১০ / ২০ / ৫০ / ১০০+ প্রশ্ন একসাথে সাপোর্ট করে। নিচের ফরম্যাটে paste করলে সব প্রশ্ন + উত্তর সঠিকভাবে detect হবে (৫৫/৫৫ verified)।</div>
+    <div class="sub">Admin Panel → Add Exam → Paste Questions → <b>Detect Questions</b> — Biology, Physics, Chemistry, English সব সাবজেক্ট। ১০ / ২০ / ৫০ / ১০০+ প্রশ্ন একসাথে। Reaction, subscript, superscript, equation, symbol — সব Unicode-এ লিখলে detect হবে (verified)।</div>
     <div class="steps">
-      <div class="step"><b>ধাপ ১:</b> নিচের <b>সঠিক ফরম্যাটে</b> প্রশ্ন paste করুন।</div>
-      <div class="step"><b>ধাপ ২:</b> <b>Detect Questions</b> চাপুন → সব প্রশ্ন preview-তে আসবে।</div>
+      <div class="step"><b>ধাপ ১:</b> নিচের ফরম্যাটে প্রশ্ন paste করুন (উত্তর = শুধু লেবেল)।</div>
+      <div class="step"><b>ধাপ ২:</b> <b>Detect Questions</b> চাপুন → সব preview-তে আসবে।</div>
       <div class="step"><b>ধাপ ৩:</b> Review করে <b>Save Questions</b> চাপুন।</div>
     </div>
   </div>
 
+  <div class="card info">
+    <span class="tag info">ⓘ Symbol Palette — ক্লিক করলেই কপি হবে</span>
+    <h2>Subscript / Superscript / Reaction / Equation চিহ্ন</h2>
+    <div class="sub">Word থেকে কপি করলে formatting নষ্ট হয় — নিচের Unicode চিহ্ন ব্যবহার করুন। এগুলো plain-text, তাই detect-এ কোনো সমস্যা হয় না।</div>
+    <div class="pal-label">Subscript (নিচে): H₂O এর মতো</div>
+    <div class="palette" id="palSub"></div>
+    <div class="pal-label">Superscript (উপরে): x², Ca²⁺ এর মতো</div>
+    <div class="palette" id="palSup"></div>
+    <div class="pal-label">Arrow / Reaction</div>
+    <div class="palette" id="palArrow"></div>
+    <div class="pal-label">Greek (Physics: λ θ Ω Δ α β γ μ π)</div>
+    <div class="palette" id="palGreek"></div>
+    <div class="pal-label">Math</div>
+    <div class="palette" id="palMath"></div>
+  </div>
+
   <div class="card ok">
-    <span class="tag ok">✓ সঠিক ফরম্যাট (এইভাবে paste করুন)</span>
-    <h2>বাংলা MCQ — উত্তর শুধু লেবেল (ক / খ / গ / ঘ) লিখুন</h2>
+    <span class="tag ok">✓ Biology ফরম্যাট (verified 55/55)</span>
+    <h2>উত্তর শুধু লেবেল (ক / খ / গ / ঘ) লিখুন</h2>
 <pre id="goodFormat">১। কোনটির পুচ্ছ পাখনা হেটারোসার্কাল ধরনের? [ঢা. বো. ১৯]
 (ক) রুই
 (খ) লাংফিশ
@@ -54,38 +80,122 @@
 (ঘ) হাঙ্গর
 সঠিক উত্তর: ঘ
 
-২। সম্পূর্ণ চার প্রকোষ্ঠবিশিষ্ট হৃৎপিণ্ড কোন প্রাণীতে দেখা যায়? [ঢা. বো. ১৯]
+২। সম্পূর্ণ চার প্রকোষ্ঠবিশিষ্ট হৃৎপিণ্ড কোন প্রাণীতে দেখা যায়?
 (ক) টিকটিকি
 (খ) কুমির
 (গ) কচ্ছপ
 (ঘ) সাপ
-সঠিক উত্তর: খ
-
-৩। ত্রিপদ নামকরণের প্রবক্তা কোন বিজ্ঞানী? [চ. বো. ১৯]
-(ক) লিনিয়াস
-(খ) স্লেজেল
-(গ) ল্যামার্ক
-(ঘ) হ্যাক্সেলে
 সঠিক উত্তর: খ</pre>
-    <button class="copy" onclick="copyGood()">📋 ফরম্যাট কপি করুন</button>
+    <button class="copy" onclick="copyText('goodFormat')">📋 ফরম্যাট কপি করুন</button>
     <ul>
       <li>প্রশ্ন নম্বর: <code class="inline">১।</code> <code class="inline">২।</code> … অথবা <code class="inline">1.</code> <code class="inline">2)</code> <code class="inline">Q1.</code></li>
-      <li>অপশন: <code class="inline">(ক) (খ) (গ) (ঘ)</code> অথবা <code class="inline">ক. খ. গ. ঘ.</code> অথবা <code class="inline">A. B. C. D.</code></li>
-      <li>উত্তর: <b>শুধু লেবেল</b> — <code class="inline">সঠিক উত্তর: ঘ</code> / <code class="inline">উত্তর: খ</code> / <code class="inline">Answer: D</code></li>
-      <li>বোর্ড ট্যাগ প্রশ্নের লাইনেই রাখুন: <code class="inline">[ঢা. বো. ১৯]</code> — সমস্যা নেই।</li>
-      <li>প্রশ্নগুলোর মাঝে <b>এক লাইন ফাঁকা</b> রাখুন।</li>
+      <li>অপশন: <code class="inline">(ক) (খ) (গ) (ঘ)</code> / <code class="inline">ক. খ. গ. ঘ.</code> / <code class="inline">A. B. C. D.</code></li>
+      <li>উত্তর: <code class="inline">সঠিক উত্তর: ঘ</code> / <code class="inline">উত্তর: খ</code> / <code class="inline">Answer: D</code></li>
+      <li>বোর্ড ট্যাগ প্রশ্নের লাইনেই রাখুন: <code class="inline">[ঢা. বো. ১৯]</code>। প্রশ্নের মাঝে ফাঁকা লাইন রাখুন।</li>
+    </ul>
+  </div>
+
+  <div class="card phy">
+    <span class="tag phy">✓ Physics ফরম্যাট (verified)</span>
+    <h2>সূত্র, একক, চিহ্ন — এক লাইনে, Unicode-এ</h2>
+<pre id="phyFormat">১। কোনো বস্তুর বেগ v = 10 m/s এবং ভর m = 2 kg হলে গতিশক্তি (Eₖ = ½mv²) কত? [ঢা. বো. ১৯]
+(ক) 10 J
+(খ) 20 J
+(গ) 100 J
+(ঘ) 200 J
+সঠিক উত্তর: গ
+
+2. If θ = 30°, find sinθ + cosθ where Δ = √3/2 and π ≈ 3.14:
+A. 1 + √3/2
+B. (1 + √3)/2
+C. √3
+D. 1/2
+Answer: B</pre>
+    <button class="copy" onclick="copyText('phyFormat')">📋 ফরম্যাট কপি করুন</button>
+    <ul>
+      <li>সূত্র প্রশ্নের লাইনেই লিখুন: <code class="inline">Eₖ = ½mv²</code>, <code class="inline">sinθ</code>, <code class="inline">√3/2</code>।</li>
+      <li>একক অপশনে: <code class="inline">10 J</code>, <code class="inline">5 Ω</code>, <code class="inline">20 m/s</code>।</li>
+      <li>ভগ্নাংশ inline লিখুন: <code class="inline">1/2</code>, <code class="inline">(1 + √3)/2</code>।</li>
+    </ul>
+  </div>
+
+  <div class="card che">
+    <span class="tag che">✓ Chemistry ফরম্যাট (verified)</span>
+    <h2>Reaction এক লাইনে — subscript/superscript Unicode-এ</h2>
+<pre id="cheFormat">১। 2H₂ + O₂ → 2H₂O বিক্রিয়ায় অক্সিজেনের মোল সংখ্যা কত? [ঢা. বো. ১৯]
+(ক) 1
+(খ) 2
+(গ) 3
+(ঘ) 4
+সঠিক উত্তর: ক
+
+২। Ca²⁺ আয়নে ইলেকট্রন সংখ্যা কত? (Ca = 20)
+(ক) 18
+(খ) 20
+(গ) 22
+(ঘ) 16
+সঠিক উত্তর: ক
+
+৩। A + B ⇌ C + D সাম্যাবস্থায় K꜀ = 4 হলে ΔG° কত?
+(ক) -3.44 kJ/mol
+(খ) +3.44 kJ/mol
+(গ) -34.4 kJ/mol
+(ঘ) 0 kJ/mol
+সঠিক উত্তর: ক</pre>
+    <button class="copy" onclick="copyText('cheFormat')">📋 ফরম্যাট কপি করুন</button>
+    <ul>
+      <li>Reaction: <code class="inline">2H₂ + O₂ → 2H₂O</code>, উভমুখী: <code class="inline">A + B ⇌ C + D</code>।</li>
+      <li>যৌগ: <code class="inline">H₂SO₄</code>, <code class="inline">NaCl</code>। আয়ন: <code class="inline">Ca²⁺</code>, <code class="inline">SO₄²⁻</code>।</li>
+      <li>H₂-এর <code class="inline">₂</code> সাধারণ 2 দিয়ে লিখবেন না — palette থেকে subscript কপি করুন।</li>
+    </ul>
+  </div>
+
+  <div class="card eng">
+    <span class="tag eng">✓ English ফরম্যাট (verified)</span>
+<pre id="engFormat">1. Choose the correct sentence.
+A. He go to school.
+B. He goes to school.
+C. He going to school.
+D. He gone to school.
+Answer: B
+
+2. The synonym of "rapid" is ——.
+A. slow
+B. fast
+C. lazy
+D. dull
+Answer: B</pre>
+    <button class="copy" onclick="copyText('engFormat')">📋 ফরম্যাট কপি করুন</button>
+  </div>
+
+  <div class="card info">
+    <span class="tag info">ⓘ Stem / উদ্দীপক / বহু-লাইন প্রশ্নের নিয়ম</span>
+    <h2>Equation বা বাড়তি লাইন যেভাবে লিখবেন</h2>
+<pre id="stemFormat">১। উদ্দীপকটি পড়ো এবং উত্তর দাওঃ
+- পানির সংকেত H₂O
+- লবণের সংকেত NaCl
+উপরের কোনটি সঠিক?
+(ক) i ও ii
+(খ) শুধু i
+(গ) শুধু ii
+(ঘ) কোনটিই নয়
+সঠিক উত্তর: ক</pre>
+    <button class="copy" onclick="copyText('stemFormat')">📋 ফরম্যাট কপি করুন</button>
+    <ul>
+      <li>বাড়তি লাইন <b>সাধারণ লাইন বা <code class="inline">- </code> দিয়ে</b> লিখুন — প্রশ্নের সাথেই থাকবে (verified)।</li>
+      <li>Stem-এর ভেতরে <code class="inline">i.</code> <code class="inline">ii.</code> <code class="inline">1.</code> <code class="inline">2.</code> দিয়ে লাইন শুরু করবেন <b>না</b> — এগুলো আলাদা প্রশ্ন ধরা হয়।</li>
+      <li>সমীকরণ সবসময় <b>এক লাইনে</b> রাখুন।</li>
     </ul>
   </div>
 
   <div class="card bad">
-    <span class="tag bad">✗ ভুল ফরম্যাট (এইভাবে paste করবেন না)</span>
-    <h2>উত্তরের সাথে ব্র্যাকেটে অপশন-টেক্সট লিখবেন না</h2>
-<pre>সঠিক উত্তর: (ঘ) হাঙ্গর     ← ভুল
+    <span class="tag bad">✗ ভুল ফরম্যাট (এড়িয়ে চলুন)</span>
+<pre>সঠিক উত্তর: (ঘ) হাঙ্গর     ← ভুল (উত্তর detect হয় না, বড় সেটে প্রশ্নও ভাঙে)
 সঠিক উত্তর: ঘ              ← সঠিক</pre>
     <ul>
-      <li><code class="inline">সঠিক উত্তর: (ঘ) হাঙ্গর</code> — এই ফরম্যাটে উত্তর detect হয় না, আর বড় সেটে (১১টার পর) প্রশ্নও ভাগ হয়ে যায়।</li>
-      <li>উত্তরের লাইনে শুধু <b>এক অক্ষরের লেবেল</b> রাখুন — অপশনের টেক্সট আবার লিখবেন না।</li>
-      <li>প্রশ্নের মাঝখানে <code class="inline">Answer Key:</code> / <code class="inline">উত্তরমালা</code> হেডিং দেবেন না (থাকলে শেষের অংশ আলাদা answer-key ধরা হয়)।</li>
+      <li>উত্তরের লাইনে শুধু <b>এক অক্ষরের লেবেল</b> — অপশনের টেক্সট আবার লিখবেন না।</li>
+      <li>প্রশ্নের মাঝখানে <code class="inline">Answer Key:</code> / <code class="inline">উত্তরমালা</code> হেডিং দেবেন না।</li>
+      <li>অপশনের আগে stem-এ <code class="inline">A.</code> / <code class="inline">ক)</code> দিয়ে লাইন শুরু করবেন না — অপশন ধরা হয়।</li>
     </ul>
   </div>
 
@@ -93,11 +203,10 @@
     <span class="tag info">ⓘ আলাদা Answer Key (নতুন সুবিধা)</span>
     <h2>প্রশ্নে উত্তর না থাকলে — Answer source: “Separate”</h2>
     <ul>
-      <li>প্রশ্ন paste করে Detect করুন (উত্তর খালি থাকবে)।</li>
-      <li>Answer Key ঘরে key paste করুন — ফরম্যাট: <code class="inline">1-A</code> <code class="inline">2-B</code> … অথবা <code class="inline">1. A</code> <code class="inline">2. B</code> … অথবা <code class="inline">1 A</code> <code class="inline">2 B</code> … অথবা <code class="inline">1A 2B 3C</code></li>
-      <li><b>Detect Answer Key</b> → preview-তে মিলিয়ে দেখুন (✓ Matched / ⚠ Missing / Extra) → <b>Apply Answer Key</b> → Save।</li>
-      <li>মিল হয় <b>প্রশ্ন নম্বর</b> দিয়ে (২৫→B মানে ২৫ নম্বর প্রশ্নের উত্তর B) — ৫০/১০০+ key-ও একসাথে সাপোর্ট করে।</li>
-      <li>Answer-key ছবি থাকলে <b>Upload Answer Key Image</b> দিয়েও detect করা যায়।</li>
+      <li>প্রশ্ন paste → Detect (উত্তর খালি থাকবে)।</li>
+      <li>Key paste: <code class="inline">1-A</code> <code class="inline">2-B</code> … / <code class="inline">1. A</code> … / <code class="inline">1 A</code> … / <code class="inline">1A 2B 3C</code></li>
+      <li><b>Detect Answer Key</b> → preview (✓ / ⚠ Missing / Extra) → <b>Apply Answer Key</b> → Save।</li>
+      <li>মিল হয় <b>প্রশ্ন নম্বর</b> দিয়ে — ৫০/১০০+ key একসাথে চলে। ছবি থাকলে <b>Upload Answer Key Image</b>।</li>
     </ul>
 <pre>1-A
 2-B
@@ -109,17 +218,39 @@
   <div class="card">
     <h2>✅ চেকলিস্ট (Save-এর আগে)</h2>
     <ul>
-      <li>Detected সংখ্যা আপনার প্রশ্নসংখ্যার সমান কি না দেখুন (যেমন ৫৫ paste → Detected 55)।</li>
-      <li>কোনো উত্তরে “Needs review” থাকলে ঠিক করে নিন।</li>
-      <li>Separate key ব্যবহার করলে Missing/Extra warning না থাকা নিশ্চিত করুন।</li>
-      <li>তারপর <b>Save Questions</b> চাপুন।</li>
+      <li>Detected সংখ্যা = paste করা সংখ্যা (যেমন ৫৫ → Detected 55)।</li>
+      <li>“Needs review” থাকলে ঠিক করে নিন।</li>
+      <li>Separate key-তে Missing/Extra warning নেই নিশ্চিত করুন।</li>
+      <li>তারপর <b>Save Questions</b>।</li>
     </ul>
   </div>
 
 </div>
 <script>
-function copyGood() {
-  var t = document.getElementById("goodFormat").innerText;
+var pals = {
+  palSub: "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₔₕₖₗₘₙₚₛₜ".split(""),
+  palSup: "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ".split(""),
+  palArrow: ["→","⇌","⇒","⇔","←","↑","↓","↔"],
+  palGreek: ["λ","θ","Ω","Δ","α","β","γ","μ","π","σ","φ","ω","°"],
+  palMath: ["×","÷","±","√","½","¼","¾","∞","≈","≠","≤","≥","·","˚","꜀","ₖ"]
+};
+Object.keys(pals).forEach(function(id) {
+  var box = document.getElementById(id);
+  pals[id].forEach(function(ch) {
+    var b = document.createElement("button");
+    b.textContent = ch;
+    b.title = "কপি: " + ch;
+    b.onclick = function() {
+      if (navigator.clipboard) { navigator.clipboard.writeText(ch); }
+      else { var ta = document.createElement("textarea"); ta.value = ch; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
+      b.style.background = "#dcfce7";
+      setTimeout(function(){ b.style.background = ""; }, 400);
+    };
+    box.appendChild(b);
+  });
+});
+function copyText(id) {
+  var t = document.getElementById(id).innerText;
   if (navigator.clipboard) { navigator.clipboard.writeText(t).then(function(){ alert("ফরম্যাট কপি হয়েছে ✓"); }); }
   else { var ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); alert("ফরম্যাট কপি হয়েছে ✓"); }
 }
