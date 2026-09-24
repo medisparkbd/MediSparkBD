@@ -216,30 +216,41 @@ export default function ExamPaperEditor({
     return questions.filter(isCompleted).length;
   }, [questions]);
 
-  const displaySlots = useMemo(() => {
-    if (!questions) return [];
-    const list: Array<{ index: number; q: ExamQuestion | null }> = [];
-    for (let i = 0; i < totalSlots; i += 1) {
-      const q = i < questions.length ? questions[i] : null;
-      list.push({ index: i, q });
-    }
-    if (totalSlots === 0) {
-      return questions.map((q, i) => ({ index: i, q }));
-    }
-    return list;
-  }, [questions, totalSlots]);
-
-  const progressText =
-    totalSlots > 0
-      ? `${completedCount}/${totalSlots} Questions Completed`
-      : `${completedCount} questions`;
-
   // Local drafts for inline editing — UNSAVED until "Save Questions" is clicked.
   // Typing, detecting, answering and image uploads only touch these drafts.
   const [drafts, setDrafts] = useState<Record<number, SlotDraft>>({});
 
+  // Effective total: never truncate pasted detection. If admin pastes 20/50/100,
+  // preview shows all, even if exam was configured for 10. Extra slots are
+  // kept as unsaved drafts and auto-created on Save via resolveOrCreateSlot.
+  const effectiveTotalSlots = useMemo(() => {
+    const draftMax = Object.keys(drafts).length ? Math.max(...Object.keys(drafts).map(Number)) + 1 : 0;
+    const qLen = questions?.length ?? 0;
+    return Math.max(totalSlots, draftMax, qLen);
+  }, [totalSlots, drafts, questions]);
+
+  const displaySlots = useMemo(() => {
+    if (!questions) return [];
+    const effective = effectiveTotalSlots;
+    const list: Array<{ index: number; q: ExamQuestion | null }> = [];
+    for (let i = 0; i < effective; i += 1) {
+      const q = i < questions.length ? questions[i] : null;
+      list.push({ index: i, q });
+    }
+    if (effective === 0) {
+      return questions.map((q, i) => ({ index: i, q }));
+    }
+    return list;
+  }, [questions, effectiveTotalSlots]);
+
+  const progressText =
+    effectiveTotalSlots > 0
+      ? `${completedCount}/${effectiveTotalSlots} Questions Completed`
+      : `${completedCount} questions`;
+
   useEffect(() => {
     // Seed drafts from saved questions when they load (never overwrite edits in progress)
+    // Keep detected drafts beyond totalSlots (effective) — don't prune, so 20/50/100 all show.
     if (!questions) return;
     setDrafts((prev) => {
       const merged: Record<number, SlotDraft> = { ...prev };
@@ -249,10 +260,6 @@ export default function ExamPaperEditor({
           merged[i] = draftFromQuestion(q);
         }
       }
-      // Remove extra indices beyond totalSlots
-      Object.keys(merged).forEach((k) => {
-        if (Number(k) >= totalSlots) delete merged[Number(k)];
-      });
       return merged;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,12 +271,11 @@ export default function ExamPaperEditor({
     let n = 0;
     for (const k of Object.keys(drafts)) {
       const i = Number(k);
-      if (i >= totalSlots) continue;
       const q = i < questions.length ? questions[i] : null;
       if (isDraftDirty(drafts[i], q)) n += 1;
     }
     return n;
-  }, [drafts, questions, totalSlots]);
+  }, [drafts, questions]);
 
   // NOTE: there is intentionally NO blur auto-save. All edits stay in `drafts`
   // until the admin explicitly clicks "Save Questions".
@@ -302,13 +308,12 @@ export default function ExamPaperEditor({
     }
     setDetectBusy(true);
     try {
-      const count = Math.min(useParsed.length, totalSlots);
-      const extra = useParsed.length - totalSlots;
+      const count = useParsed.length;
 
       // Track which slots already had content (questions added before detection)
       const existingMap: Record<number, boolean> = {};
       for (let i = 0; i < count; i++) {
-        const slot = displaySlots[i];
+        const slot = i < displaySlots.length ? displaySlots[i] : null;
         const hadContent = slot?.q?.id !== null && slot?.q?.id !== undefined &&
           (slot?.q?.question?.trim().length ?? 0) >= 3;
         if (hadContent) existingMap[i] = true;
@@ -326,24 +331,26 @@ export default function ExamPaperEditor({
 
       // Detected questions stay UNSAVED drafts until "Save Questions" is clicked.
       // Fully replace drafts — clear ALL old drafts first, then set only the newly detected ones.
-      // Saved images on overwritten slots are preserved in the drafts.
+      // Saved images on overwritten slots are preserved in the drafts. All detected are kept,
+      // even beyond configured totalSlots — Save will auto-create slots via resolveOrCreateSlot.
       const newDrafts: Record<number, SlotDraft> = {};
       for (let i = 0; i < count; i++) {
         const p = useParsed[i];
         const ci = p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4 ? p.correctIndex : -1;
+        const existingSlot = i < displaySlots.length ? displaySlots[i] : null;
         newDrafts[i] = {
           question: p.question,
           options: p.options.slice(0, 4) as string[],
           correctIndex: ci >= 0 ? ci : -1,
           explanation: p.explanation ?? "",
-          questionImage: displaySlots[i]?.q?.questionImage ?? null,
+          questionImage: existingSlot?.q?.questionImage ?? null,
         };
       }
       setDrafts(newDrafts);
 
       // No database writes here — the admin reviews and clicks Save Questions.
       let msg = `Detected ${useParsed.length} question${useParsed.length === 1 ? "" : "s"} — filled Q01–Q${pad(count)} in ${detectVersion} Set ${detectSet} (unsaved — review, then click Save Questions).`;
-      if (extra > 0) msg += ` Warning: ${extra} extra question${extra === 1 ? "" : "s"} detected beyond ${totalSlots} slots (not included).`;
+      if (count > totalSlots) msg += ` Note: ${count} detected exceeds configured ${totalSlots} slots — extra ${count - totalSlots} will auto-create new slots on Save.`;
       const noAnswerCount = useParsed.slice(0, count).filter((p) => p.correctIndex === null).length;
       if (noAnswerCount > 0) msg += ` ${noAnswerCount} question${noAnswerCount === 1 ? "" : "s"} have no confident answer — please verify before saving.`;
       const reviewCount = Object.keys(warnings).length;
