@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isActiveEnrollment } from "@/lib/enrollments";
 import { useAuth } from "@/lib/auth-context";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import PermissionGuidanceCard, {
   type PermissionGuidance,
 } from "./PermissionGuidanceCard";
@@ -11,10 +12,7 @@ import PermissionGuidanceCard, {
 export function AccessLoading({ label }: { label: string }) {
   return (
     <main className="flex flex-1 items-center justify-center bg-dark-950">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-        <p className="text-sm text-neutral-400">{label}</p>
-      </div>
+      <AdminCenterLoader label={label} />
     </main>
   );
 }

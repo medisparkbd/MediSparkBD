@@ -16,6 +16,7 @@ import {
   noticeClass,
   type Notice,
 } from "@/components/admin/admin-ui";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import ExamPaperEditor from "@/components/admin/ExamPaperEditor";
 import ExamRulesEditor from "@/components/admin/ExamRulesEditor";
 import { MediaUploadField } from "@/components/admin/MediaUploadField";
@@ -320,15 +321,23 @@ function RulesTab({ exam, headers }: { exam: Exam; headers: Record<string, strin
 
 function ParticipantsTab({ examId, headers }: { examId: string; headers: Record<string, string> }) {
   const [rows, setRows] = useState<Enrollment[] | null>(null);
+  const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     setBusy(true);
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No participants yet" while the new request is still pending.
+    setError(false);
+    setRows(null);
     try {
       const res = await fetch(`/api/admin/exams/enrolled?examId=${encodeURIComponent(examId)}`, { cache: "no-store", headers });
+      if (!res.ok) throw new Error("failed");
       const data = (await res.json()) as { enrollments?: Enrollment[] };
       setRows(data.enrollments ?? []);
     } catch {
-      setRows([]);
+      // ERROR keeps rows as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
+      setError(true);
     } finally {
       setBusy(false);
     }
@@ -343,13 +352,18 @@ function ParticipantsTab({ examId, headers }: { examId: string; headers: Record<
         </div>
         <button type="button" onClick={() => void load()} disabled={busy} className={buttonSecondaryClass}>{busy ? "…" : "↻ Refresh"}</button>
       </div>
-      {rows === null ? (
+      {rows === null && !error ? (
         <p className="mt-4 text-center text-sm text-slate-500">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : error ? (
+        <div className="mt-4 text-center">
+          <p className="text-sm font-semibold text-slate-700 admin-dark:text-zinc-200">Could not load participants.</p>
+          <button type="button" onClick={() => void load()} disabled={busy} className={`${buttonSecondaryClass} mt-3`}>Try Again</button>
+        </div>
+      ) : (rows ?? []).length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-slate-500 admin-dark:border-zinc-700">No participants yet.</p>
       ) : (
         <ul className="mt-4 space-y-2">
-          {rows.map((r) => (
+          {(rows ?? []).map((r) => (
             <li key={r.id} className="flex items-center gap-3 rounded-xl border border-[#eef4ff] bg-[#f8fbff] px-4 py-3 text-sm admin-dark:border-[#1e3a65]/60 admin-dark:bg-[#0f2547]">
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-bold text-[#0b1e3a] admin-dark:text-zinc-100">{r.studentName || r.studentUid}</span>
@@ -366,13 +380,21 @@ function ParticipantsTab({ examId, headers }: { examId: string; headers: Record<
 
 function ResultsTab({ examId, examTitle, headers }: { examId: string; examTitle: string; headers: Record<string, string> }) {
   const [rows, setRows] = useState<Result[] | null>(null);
+  const [error, setError] = useState(false);
   const load = useCallback(async () => {
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No results yet" while the new request is still pending.
+    setError(false);
+    setRows(null);
     try {
       const res = await fetch(`/api/admin/exams/results?examId=${encodeURIComponent(examId)}`, { cache: "no-store", headers });
+      if (!res.ok) throw new Error("failed");
       const data = (await res.json()) as { results?: Result[] };
       setRows(data.results ?? []);
     } catch {
-      setRows([]);
+      // ERROR keeps rows as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
+      setError(true);
     }
   }, [examId, headers]);
   useEffect(() => { void load(); }, [load]);
@@ -385,13 +407,18 @@ function ResultsTab({ examId, examTitle, headers }: { examId: string; examTitle:
         </div>
         <button type="button" onClick={() => void load()} className={buttonSecondaryClass}>↻ Refresh</button>
       </div>
-      {rows === null ? (
+      {rows === null && !error ? (
         <p className="mt-4 text-center text-sm text-slate-500">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : error ? (
+        <div className="mt-4 text-center">
+          <p className="text-sm font-semibold text-slate-700 admin-dark:text-zinc-200">Could not load results.</p>
+          <button type="button" onClick={() => void load()} className={`${buttonSecondaryClass} mt-3`}>Try Again</button>
+        </div>
+      ) : (rows ?? []).length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-slate-500 admin-dark:border-zinc-700">No results yet.</p>
       ) : (
         <ul className="mt-4 space-y-2">
-          {rows.map((r) => (
+          {(rows ?? []).map((r) => (
             <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[#eef4ff] bg-[#f8fbff] px-4 py-3 admin-dark:border-[#1e3a65]/60 admin-dark:bg-[#0f2547]">
               {r.meritPosition != null && (
                 <span
@@ -491,7 +518,11 @@ export default function ExamManageClient({ examId }: { examId: string }) {
   }
 
   if (loading) {
-    return <p className={`${cardClass} mx-auto max-w-5xl p-8 text-center text-sm text-slate-500`}>Loading exam…</p>;
+    return (
+      <div className="mx-auto max-w-5xl">
+        <AdminCenterLoader label="Loading exam…" />
+      </div>
+    );
   }
 
   if (loadError || !exam) {

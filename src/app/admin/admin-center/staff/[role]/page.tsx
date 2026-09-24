@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
@@ -32,12 +32,19 @@ export default function StaffByRolePage({
   const { user, authLoading } = useAuth();
   const [staff, setStaff] = useState<AdminAccount[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (retry).
+  const requestRef = useRef(0);
   const [role, setRole] = useState<RoleParam>("admin");
   const [selectedRoleLabel, setSelectedRoleLabel] = useState("Admin");
 
   const load = useCallback(async () => {
     if (!user) return;
+    const requestId = ++requestRef.current;
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false empty state while the new request is still pending.
     setLoadError(false);
+    setStaff(null);
     try {
       const res = await fetch("/api/admin/accounts", {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` },
@@ -49,9 +56,12 @@ export default function StaffByRolePage({
       const filtered = allAdmins.filter(
         (admin) => (admin.role ?? "admin").toLowerCase() === role,
       );
+      if (requestRef.current !== requestId) return;
       setStaff(filtered);
     } catch {
-      setStaff([]);
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps staff as null (never `[]`) so the UI shows Retry —
+      // never a false empty state.
       setLoadError(true);
     }
   }, [user, role]);

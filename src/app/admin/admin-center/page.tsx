@@ -52,19 +52,27 @@ const ROLES = [
 export default function AdminCenterPage() {
   const { user, authLoading } = useAuth();
   const [admins, setAdmins] = useState<AdminAccount[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
+    // Enter LOADING: clear errors and reset to null so the cards never render
+    // a stale `[]` as false "0 users" counts while the request is pending.
+    // Only a successful response may populate counts.
+    setLoadError(false);
+    setAdmins(null);
     try {
       const res = await fetch("/api/admin/accounts", {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` },
         cache: "no-store",
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const data = (await res.json()) as { admins?: AdminAccount[] };
       setAdmins(Array.isArray(data.admins) ? data.admins : []);
     } catch {
-      setAdmins([]);
+      // ERROR keeps admins as null (never `[]`) so counts show "…" + Retry —
+      // never false zeros.
+      setLoadError(true);
     }
   }, [user]);
 
@@ -86,9 +94,12 @@ export default function AdminCenterPage() {
       {/* 3 Role Cards */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {ROLES.map((role) => {
-          const count = (admins ?? []).filter(
-            (a) => (a.role ?? "admin").toLowerCase() === role.value,
-          ).length;
+          const loaded = admins !== null;
+          const count = loaded
+            ? (admins ?? []).filter(
+                (a) => (a.role ?? "admin").toLowerCase() === role.value,
+              ).length
+            : null;
 
           return (
             <div
@@ -107,7 +118,13 @@ export default function AdminCenterPage() {
                 {role.label}
               </h2>
               <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">
-                {count} {count === 1 ? "user" : "users"}
+                {count === null ? (
+                  "…"
+                ) : (
+                  <>
+                    {count} {count === 1 ? "user" : "users"}
+                  </>
+                )}
               </p>
 
               {/* 2 Buttons */}
@@ -129,6 +146,21 @@ export default function AdminCenterPage() {
           );
         })}
       </div>
+
+      {loadError && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+          <p className="text-xs font-semibold text-red-600 admin-dark:text-red-400">
+            Could not load staff counts. The role cards above are still usable.
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className={`${buttonSecondaryClass} text-xs`}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Quick info */}
       <div className={`${cardClass} mt-6 p-5`}>

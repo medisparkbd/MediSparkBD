@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import {
   useAdminGate,
   noticeClass,
@@ -138,6 +139,9 @@ export default function CourseManager({
   const searchParams = useSearchParams();
   const [courses, setCourses] = useState<CatalogCourse[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (filter change / retry / save).
+  const requestRef = useRef(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -158,7 +162,11 @@ export default function CourseManager({
   const requestedCategory = searchParams.get("category");
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No courses yet" while the new request is still in flight.
     setLoadError(false);
+    setCourses(null);
     try {
       const response = await fetch(
         categoryFilter
@@ -170,6 +178,8 @@ export default function CourseManager({
       const data = (await response.json()) as { courses?: CatalogCourse[] };
       // Backend already returns only this category's courses (?category=).
       const list = data.courses ?? [];
+      // A superseded (slow earlier) response must never overwrite newer state.
+      if (requestRef.current !== requestId) return;
       setCourses(list);
 
       // Handle the deep-linked action once the list is available.
@@ -198,8 +208,10 @@ export default function CourseManager({
         setNotice(null);
       }
     } catch {
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps courses as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
       setLoadError(true);
-      setCourses([]);
     }
   }, [categoryFilter, gate.headers, requestedEditSlug, autoAdd, requestedCategory]);
 
@@ -500,7 +512,7 @@ export default function CourseManager({
           </button>
         </div>
       ) : courses === null ? (
-        <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
+        <AdminCenterLoader label="Loading courses…" />
       ) : filtered.length === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
           No courses yet. Create the first one.

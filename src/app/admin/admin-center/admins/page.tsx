@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
@@ -32,10 +32,17 @@ export default function ViewAdminsPage() {
   const [addName, setAddName] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addMsg, setAddMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (retry).
+  const requestRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!user) return;
+    const requestId = ++requestRef.current;
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No admin users found" while the new request is still pending.
     setLoadError(false);
+    setStaff(null);
     try {
       const res = await fetch("/api/admin/accounts", {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` },
@@ -44,9 +51,12 @@ export default function ViewAdminsPage() {
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const data = (await res.json()) as { admins?: AdminAccount[] };
       const allAdmins = Array.isArray(data.admins) ? data.admins : [];
+      if (requestRef.current !== requestId) return;
       setStaff(allAdmins.filter((a) => (a.role ?? "admin").toLowerCase() === "admin"));
     } catch {
-      setStaff([]);
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps staff as null (never `[]`) so the UI shows Retry —
+      // never a false empty state.
       setLoadError(true);
     }
   }, [user]);

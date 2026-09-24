@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import {
   useAdminGate,
   noticeClass,
@@ -16,20 +17,28 @@ import type { Exam } from "@/components/admin/ExamManager";
 export default function AnswerKeysPage() {
   const gate = useAdminGate();
   const [exams, setExams] = useState<Exam[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [keyText, setKeyText] = useState("{}");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const load = useCallback(async () => {
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No exams yet" while the new request is still in flight.
+    setLoadError(false);
+    setExams(null);
     try {
       const response = await fetch("/api/admin/exams", { cache: "no-store", headers: gate.headers });
+      if (!response.ok) throw new Error("failed");
       const data = (await response.json()) as { exams?: Exam[] };
       setExams(data.exams ?? []);
     } catch {
-      setExams([]);
+      // ERROR keeps exams as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
+      setLoadError(true);
     }
-  }, []);
+  }, [gate.headers]);
 
   useEffect(() => {
     if (gate.ready) void Promise.resolve().then(load);
@@ -91,7 +100,22 @@ export default function AnswerKeysPage() {
       </header>
 
       <div className={`${cardClass} mt-5 p-4 sm:p-5`}>
-        {(exams ?? []).length === 0 ? (
+        {loadError ? (
+          <div className="p-4 text-center">
+            <p className="text-sm font-semibold text-slate-700 admin-dark:text-zinc-200">
+              Could not load exams.
+            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className={`${buttonPrimaryClass} mt-4`}
+            >
+              Try Again
+            </button>
+          </div>
+        ) : exams === null ? (
+          <AdminCenterLoader label="Loading exams…" />
+        ) : exams.length === 0 ? (
           <p className="text-sm text-slate-500">No exams yet.</p>
         ) : (
           <>

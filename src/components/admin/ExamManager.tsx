@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import {
   useAdminGate,
   hasPublicExamAccess,
@@ -236,8 +237,18 @@ export default function ExamManager({
   );
   const [phaseFilter, setPhaseFilter] = useState<"all" | "upcoming" | "live" | "closed" | "archived" | "practice">("all");
 
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (filter change / retry / save).
+  const requestRef = useRef(0);
+
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    // Enter LOADING: clear any previous error and reset data to null so a
+    // retry never renders a stale `[]` as a false "No exams yet" while the
+    // new request is still in flight. Only a 200-confirmed `[]` may render
+    // the genuine empty state below.
     setLoadError(false);
+    setExams(null);
     try {
       const params = new URLSearchParams();
       if (fixedCategory) {
@@ -267,10 +278,14 @@ export default function ExamManager({
       });
       if (!response.ok) throw new Error("failed");
       const data = (await response.json()) as { exams?: Exam[] };
+      // A superseded (slow earlier) response must never overwrite newer state.
+      if (requestRef.current !== requestId) return;
       setExams(data.exams ?? []);
     } catch {
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps exams as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
       setLoadError(true);
-      setExams([]);
     }
   }, [kindFilter, fixedCategory, fixedChapter, fixedCourse, gate.headers]);
 
@@ -881,7 +896,7 @@ export default function ExamManager({
           </button>
         </div>
       ) : exams === null ? (
-        <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>Loading…</p>
+        <AdminCenterLoader label="Loading exams…" />
       ) : (filteredByMode?.length ?? 0) === 0 ? (
         <p className={`${cardClass} mt-5 p-8 text-center text-sm text-slate-500`}>
           {exams.length === 0 ? "No exams yet." : (fixedFormat || fixedTopicSubject) ? "No exams in this category yet — create the first one with + New Exam." : hasEnrolledExams ? `No ${phaseFilter === "upcoming" ? "Upcoming" : phaseFilter === "live" ? "Live" : phaseFilter === "closed" ? "Closed" : phaseFilter === "archived" ? "Archived" : "exams"} found.` : `No ${effectiveMode === "live" ? "Live Exams" : effectiveMode === "practice" ? "Practice Exams" : "exams"} found.`}

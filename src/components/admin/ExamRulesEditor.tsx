@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { inputClass, labelClass } from "@/components/admin/admin-ui";
 
 type Rule = { id: number | null; title: string; text: string };
@@ -25,19 +25,29 @@ export default function ExamRulesEditor({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftText, setDraftText] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (retry).
+  const requestRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No Rules Added" while the new request is still in flight.
     setLoadError(false);
+    setRules(null);
     try {
       const response = await fetch(
         `/api/admin/exam-rules?examId=${encodeURIComponent(examId)}`,
         { cache: "no-store", headers: authHeaders },
       );
       const data = (await response.json()) as { rules?: Rule[] };
+      if (requestRef.current !== requestId) return;
       setRules(data.rules ?? []);
     } catch {
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps rules as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
       setLoadError(true);
-      setRules([]);
     }
   }, [examId, authHeaders]);
 

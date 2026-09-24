@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import AdminCenterLoader from "@/components/admin/AdminCenterLoader";
 import {
   useAdminGate,
   noticeClass,
@@ -71,6 +72,9 @@ export default function CategoryCourseManager({
   const gate = useAdminGate();
   const [courses, setCourses] = useState<CategoryCourse[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Monotonic request id — a slow earlier response can never overwrite the
+  // result of a newer load (retry / save).
+  const requestRef = useRef(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [mentorIds, setMentorIds] = useState<string[]>([]);
   const [mentorOptions, setMentorOptions] = useState<MentorOption[]>([]);
@@ -90,7 +94,11 @@ export default function CategoryCourseManager({
   const autoAdd = searchParams.get("add") === "1";
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    // Enter LOADING: reset to null so a retry never renders a stale `[]` as
+    // a false "No courses available" while the new request is still pending.
     setLoadError(false);
+    setCourses(null);
     try {
       const response = await fetch(
         `/api/admin/courses?categoryId=${encodeURIComponent(category.id)}`,
@@ -99,6 +107,8 @@ export default function CategoryCourseManager({
       if (!response.ok) throw new Error("failed");
       const data = (await response.json()) as { courses?: CategoryCourse[] };
       const list = data.courses ?? [];
+      // A superseded (slow earlier) response must never overwrite newer state.
+      if (requestRef.current !== requestId) return;
       setCourses(list);
 
       if (requestedEditSlug) {
@@ -113,8 +123,10 @@ export default function CategoryCourseManager({
         startCreate();
       }
     } catch {
+      if (requestRef.current !== requestId) return;
+      // ERROR keeps courses as null (never `[]`) so the UI shows Try Again —
+      // never a false empty state.
       setLoadError(true);
-      setCourses([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openEdit/startCreate are stable setters
   }, [category.id, gate.headers, requestedEditSlug, autoAdd]);
@@ -424,9 +436,7 @@ export default function CategoryCourseManager({
           </button>
         </div>
       ) : courses === null ? (
-        <p className={`${cardClass} mt-5 p-6 text-center text-sm text-slate-500`}>
-          Loading courses...
-        </p>
+        <AdminCenterLoader label="Loading courses…" />
       ) : filtered.length === 0 ? (
         <div className="mt-5">
           <p className={`${cardClass} p-8 text-center text-sm text-slate-500`}>
