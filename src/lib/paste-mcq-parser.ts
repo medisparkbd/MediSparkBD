@@ -419,21 +419,22 @@ function answerKeyHeadingRemainder(line: string): string | null {
 // which must NOT be treated as an answer-key heading.
 function isSingleAnswerLabel(s: string): boolean {
   const c = s.trim().replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
-  if (/^[A-Da-d]$/.test(c)) return true;
-  if (/^[কখগঘ]$/.test(c)) return true;
-  if (/^[1-4]$/.test(c) || /^[১-৪]$/.test(c)) return true;
-  if (/^(i{1,3}|iv|I{1,3}|IV)$/.test(c)) return true;
+  if (/^[A-Ea-e]$/.test(c)) return true;
+  if (/^[কখগঘঙ]$/.test(c)) return true;
+  if (/^[1-5]$/.test(c) || /^[১-৫]$/.test(c)) return true;
+  if (/^(i{1,3}|iv|v|I{1,3}|IV|V)$/.test(c)) return true;
   // "Option B" style single answer
   if (/^(?:option|অপশন)\s*[A-Da-d]$/.test(c.trim())) return true;
   return false;
 }
 
-function answerKeyLabelToIndex(label: string): number | null {
+export function answerKeyLabelToIndex(label: string): number | null {
   const c = label.trim().replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]]$/g, "").trim();
-  if (/^[A-Da-d]$/.test(c)) return c.toUpperCase().charCodeAt(0) - 65;
-  if (/^[কখগঘ]$/.test(c)) return BN_OPT_MAP[c];
-  if (/^[1-4]$/.test(c)) return parseInt(c, 10) - 1;
-  if (/^[১-৪]$/.test(c)) return parseInt(bnDigitsToAscii(c), 10) - 1;
+  if (/^[A-Ea-e]$/.test(c)) return c.toUpperCase().charCodeAt(0) - 65;
+  if (/^[কখগঘঙ]$/.test(c)) return BN_OPT_MAP[c] ?? ({ "ঙ": 4 } as Record<string, number>)[c] ?? null;
+  if (/^[1-5]$/.test(c)) return parseInt(c, 10) - 1;
+  if (/^[১-৫]$/.test(c)) return parseInt(bnDigitsToAscii(c), 10) - 1;
+  if (/^[vV]$/.test(c)) return 4;
   const r = romanToIndex(c);
   if (r !== null) return r;
   return null;
@@ -441,11 +442,13 @@ function answerKeyLabelToIndex(label: string): number | null {
 
 // Parse "1. B", "2-C", "3: A", "4) D", "Q5: b", "১. খ" etc. from key block text.
 // Multiple entries per line ("1. B 2. C", "1-B, 2-C") are all captured.
+// Supports A–E (5-option questions); E maps to index 4 and is validated
+// against the question's actual option count at apply time.
 function parseAnswerKeyEntries(keyText: string): Map<number, string> {
   const out = new Map<number, string>();
   if (!keyText.trim()) return out;
   const re =
-    /(?:^|[\s,;|।]+)(?:Q(?:uestion)?\s*|প্রশ্ন\s*(?:নং\.?|No\.?)?\s*)?(\d+|[০-৯]+)\s*[\.\)\]:\-–—=ঃ]+\s*\(?\s*([A-Da-d]|[কখগঘ]|[1-4]|[১-৪]|iv|IV|i{1,3}|I{1,3})\s*\)?(?![A-Za-z\u0980-\u09FF0-9])/g;
+    /(?:^|[\s,;|।]+)(?:Q(?:uestion)?\s*|প্রশ্ন\s*(?:নং\.?|No\.?)?\s*)?(\d+|[০-৯]+)\s*[\.\)\]:\-–—=ঃ]+\s*\(?\s*([A-Ea-e]|[কখগঘঙ]|[1-5]|[১-৫]|iv|IV|v|V|i{1,3}|I{1,3})\s*\)?(?![A-Za-z\u0980-\u09FF0-9])/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(keyText)) !== null) {
     const numAscii = bnDigitsToAscii(m[1]);
@@ -457,6 +460,120 @@ function parseAnswerKeyEntries(keyText: string): Map<number, string> {
     out.set(qNum, label);
   }
   return out;
+}
+
+// ── standalone answer-key detection (separate Answer Key workflow) ──────────
+// Parses a dedicated answer-key input (NOT trailing section of questions).
+// Supports compact + continuous formats with NO truncation limit:
+//   "1. A", "2-B", "3: C", "4) D", "5 A", "1A 2B 3C",
+//   "1-A, 2-B, 3-C", "Q1: b", "১. খ", "উত্তরমালা / Answer Key:" headings.
+// Matching downstream is by QUESTION NUMBER (never array position).
+export type StandaloneAnswerKeyResult = {
+  /** question number → raw answer label (first entry wins on duplicates) */
+  entries: Map<number, string>;
+  /** question numbers in first-seen order */
+  order: number[];
+  /** question numbers seen more than once (duplicates, second+ ignored) */
+  duplicates: number[];
+  /** total raw matches found (including duplicates) */
+  totalFound: number;
+};
+
+function stripStandaloneKeyHeadings(text: string): string {
+  const lines = text.split("\n");
+  const kept: string[] = [];
+  for (const line of lines) {
+    const rem = answerKeyHeadingRemainder(line);
+    if (rem === null) {
+      kept.push(line);
+      continue;
+    }
+    if (rem === "") continue; // pure heading line ("Answer Key:") — drop
+    if (isSingleAnswerLabel(rem)) {
+      kept.push(line); // e.g. "Answer: B" alone — keep, may hold an entry
+      continue;
+    }
+    // Heading with inline entries ("Answer Key: 1-A 2-B") — keep remainder + rest
+    kept.push(rem);
+  }
+  return kept.join("\n");
+}
+
+function collectKeyMatches(
+  keyText: string,
+  re: RegExp,
+  out: Map<number, string>,
+  duplicates: number[],
+  seenCount: Map<number, number>,
+): number {
+  let found = 0;
+  // Fresh regex instance per call (global flag) to avoid lastIndex carryover
+  const rx = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(keyText)) !== null) {
+    const numAscii = bnDigitsToAscii(m[1]);
+    const qNum = parseInt(numAscii, 10);
+    if (!Number.isFinite(qNum) || qNum <= 0 || qNum > 1000) continue;
+    const label = (m[2] ?? "").trim();
+    if (answerKeyLabelToIndex(label) === null) continue;
+    found += 1;
+    seenCount.set(qNum, (seenCount.get(qNum) ?? 0) + 1);
+    if (out.has(qNum)) {
+      if (!duplicates.includes(qNum)) duplicates.push(qNum);
+      continue; // first entry wins, never guess on duplicates
+    }
+    out.set(qNum, label);
+  }
+  return found;
+}
+
+export function parseStandaloneAnswerKey(rawText: string): StandaloneAnswerKeyResult {
+  const out = new Map<number, string>();
+  const duplicates: number[] = [];
+  const seenCount = new Map<number, number>();
+  const order: number[] = [];
+  if (!rawText || !rawText.trim()) return { entries: out, order, duplicates, totalFound: 0 };
+  const keyText = stripStandaloneKeyHeadings(rawText.replace(/\r\n/g, "\n"));
+  if (!keyText.trim()) return { entries: out, order, duplicates, totalFound: 0 };
+
+  // 1) Explicit separator: "1. A", "2-B", "3: C", "4) D", "Q5: b", "১. খ"
+  const sepRe =
+    /(?:^|[\s,;|।]+)(?:Q(?:uestion)?\s*|প্রশ্ন\s*(?:নং\.?|No\.?)?\s*)?(\d+|[০-৯]+)\s*[\.\)\]:\-–—=ঃ]+\s*\(?\s*([A-Ea-e]|[কখগঘঙ]|[1-5]|[১-৫]|iv|IV|v|V|i{1,3}|I{1,3})\s*\)?(?![A-Za-z\u0980-\u09FF0-9])/g;
+  // 2) Space-separated: "1 A", "2 b", "10 E" (letters only — numeric ambiguous)
+  const spaceRe =
+    /(?:^|[\s,;|।]+)(?:Q(?:uestion)?\s*)?(\d+|[০-৯]+)\s+([A-Ea-e]|[কখগঘঙ])(?![A-Za-z\u0980-\u09FF0-9])/g;
+  // 3) Concatenated: "1A 2B 3C" (digits immediately followed by letter)
+  const concatRe =
+    /(?:^|[\s,;|।\(\[]+)(?:Q\s*)?(\d{1,4}|[০-৯]{1,4})([A-Ea-e]|[কখগঘঙ])(?![A-Za-z\u0980-\u09FF0-9])/g;
+
+  let totalFound = 0;
+  totalFound += collectKeyMatches(keyText, sepRe, out, duplicates, seenCount);
+  totalFound += collectKeyMatches(keyText, spaceRe, out, duplicates, seenCount);
+  totalFound += collectKeyMatches(keyText, concatRe, out, duplicates, seenCount);
+
+  out.forEach((_v, k) => order.push(k));
+  order.sort((a, b) => a - b);
+  duplicates.sort((a, b) => a - b);
+  return { entries: out, order, duplicates, totalFound };
+}
+
+/** Original question number → parsed-question index (first unused wins). */
+export function buildQuestionNumberMap(
+  originalNumbers: Array<string | null | undefined>,
+): Map<number, number> {
+  const numToIdx = new Map<number, number>();
+  originalNumbers.forEach((header, i) => {
+    const n = originalHeaderToNumber(header) ?? i + 1;
+    if (!numToIdx.has(n)) numToIdx.set(n, i);
+  });
+  return numToIdx;
+}
+
+export function questionNumberForIndex(
+  originalNumber: string | null | undefined,
+  fallbackIndex: number,
+): number {
+  return originalHeaderToNumber(originalNumber) ?? fallbackIndex + 1;
 }
 
 function splitAnswerKeySection(text: string): {
@@ -518,7 +635,7 @@ function applyAnswerKey(
     const targetIdx = numToIdx.get(qNum);
     if (targetIdx === undefined) return; // no matching question — ignore, never guess
     const optIdx = answerKeyLabelToIndex(label);
-    if (optIdx === null || optIdx < 0 || optIdx > 3) return;
+    if (optIdx === null || optIdx < 0 || optIdx > 4) return;
     parsed[targetIdx].correctIndex = optIdx;
     assigned.add(targetIdx);
   });

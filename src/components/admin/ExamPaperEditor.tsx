@@ -6,7 +6,12 @@ import {
   buttonSecondaryClass,
   cardClass,
 } from "./admin-ui";
-import { parsePastedMcqs } from "@/lib/paste-mcq-parser";
+import {
+  answerKeyLabelToIndex,
+  parsePastedMcqs,
+  parseStandaloneAnswerKey,
+  questionNumberForIndex,
+} from "@/lib/paste-mcq-parser";
 
 type ExamBrief = {
   id: string;
@@ -53,10 +58,13 @@ type SlotDraft = {
   correctIndex: number;
   explanation: string;
   questionImage: string | null;
+  /** Original pasted question number (e.g. 25 for "25. ...") — used to match
+   *  a separately detected Answer Key by QUESTION NUMBER, never array position. */
+  sourceNumber: number | null;
 };
 
 function emptyDraft(): SlotDraft {
-  return { question: "", options: [...EMPTY_OPTIONS], correctIndex: 0, explanation: "", questionImage: null };
+  return { question: "", options: [...EMPTY_OPTIONS], correctIndex: 0, explanation: "", questionImage: null, sourceNumber: null };
 }
 
 function draftFromQuestion(q: ExamQuestion | null | undefined): SlotDraft {
@@ -70,6 +78,7 @@ function draftFromQuestion(q: ExamQuestion | null | undefined): SlotDraft {
     correctIndex: q?.correctIndex ?? 0,
     explanation: q?.explanation ?? "",
     questionImage: q?.questionImage ?? null,
+    sourceNumber: null,
   };
 }
 
@@ -135,6 +144,31 @@ export default function ExamPaperEditor({
   const [imageUploadingSlot, setImageUploadingSlot] = useState<number | null>(null);
   const [detectWarnings, setDetectWarnings] = useState<Record<number, string[]>>({});
   const [detectExistingMap, setDetectExistingMap] = useState<Record<number, boolean>>({});
+  // ── Separate Answer Key workflow (per version/set workspace, like bulkTexts) ──
+  // "included" = existing combined Question+Answer detection (default, unchanged).
+  // "separate" = detect questions only, then detect/paste a standalone key and Apply by question number.
+  const [answerSources, setAnswerSources] = useState<Record<string, "included" | "separate">>({});
+  const answerSource = answerSources[activeTab] ?? "included";
+  const setAnswerSource = useCallback((value: "included" | "separate") => {
+    setAnswerSources((prev) => ({ ...prev, [activeTab]: value }));
+  }, [activeTab]);
+  const [answerKeyTexts, setAnswerKeyTexts] = useState<Record<string, string>>({});
+  const answerKeyText = answerKeyTexts[activeTab] ?? "";
+  const setAnswerKeyText = useCallback((value: string) => {
+    setAnswerKeyTexts((prev) => ({ ...prev, [activeTab]: value }));
+  }, [activeTab]);
+  /** Detected key: question number → raw answer label (editable via dropdowns). */
+  const [answerKeyMaps, setAnswerKeyMaps] = useState<Record<string, Record<number, string>>>({});
+  const answerKeyMap = answerKeyMaps[activeTab] ?? {};
+  const [answerKeyDupes, setAnswerKeyDupes] = useState<Record<string, number[]>>({});
+  const answerKeyDupesForTab = answerKeyDupes[activeTab] ?? [];
+  const [answerKeyBusy, setAnswerKeyBusy] = useState(false);
+  const [answerKeyOcrBusy, setAnswerKeyOcrBusy] = useState<string | null>(null);
+  const [answerKeyMsg, setAnswerKeyMsg] = useState<string | null>(null);
+  const [answerKeyError, setAnswerKeyError] = useState<string | null>(null);
+  const [addKeyNum, setAddKeyNum] = useState("");
+  const [addKeyLabel, setAddKeyLabel] = useState("A");
+  const answerKeyFileRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bearer = useMemo(() => authHeaders["Authorization"] || authHeaders["authorization"] || "", [authHeaders]);
@@ -201,6 +235,11 @@ export default function ExamPaperEditor({
     setSavingSlot(null);
     setError(null);
     setNotice(null);
+    setAnswerKeyMsg(null);
+    setAnswerKeyError(null);
+    setAnswerKeyOcrBusy(null);
+    setAddKeyNum("");
+    // NOTE: bulkTexts / answerKeyTexts / answerKeyMaps persist per workspace tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -257,7 +296,9 @@ export default function ExamPaperEditor({
       for (let i = 0; i < totalSlots; i++) {
         if (!merged[i]) {
           const q = i < questions.length ? questions[i] : null;
-          merged[i] = draftFromQuestion(q);
+          merged[i] = { ...draftFromQuestion(q), sourceNumber: i + 1 };
+        } else if (merged[i].sourceNumber == null) {
+          merged[i] = { ...merged[i], sourceNumber: i + 1 };
         }
       }
       return merged;
@@ -344,6 +385,7 @@ export default function ExamPaperEditor({
           correctIndex: ci >= 0 ? ci : -1,
           explanation: p.explanation ?? "",
           questionImage: existingSlot?.q?.questionImage ?? null,
+          sourceNumber: questionNumberForIndex(p.originalNumber, i),
         };
       }
       setDrafts(newDrafts);
@@ -367,6 +409,250 @@ export default function ExamPaperEditor({
       setDetectBusy(false);
     }
   }
+
+  // ── Separate Answer Key workflow ──────────────────────────────────────────
+  // Detect / OCR / edit a standalone key, then Apply by QUESTION NUMBER
+  // (never array position) onto the detected drafts.
+
+  /** Original question number → draft slot index (first wins). */
+  function draftNumberMap(): Map<number, number> {
+    const map = new Map<number, number>();
+    const indices = Object.keys(drafts).map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    for (const i of indices) {
+      const n = drafts[i]?.sourceNumber ?? i + 1;
+      if (!map.has(n)) map.set(n, i);
+    }
+    return map;
+  }
+
+  function normalizeKeyLabel(raw: string): string {
+    const t = raw.trim();
+    if (/^[A-Ea-e]$/.test(t)) return t.toUpperCase();
+    return t;
+  }
+
+  function handleDetectAnswerKey(raw?: string) {
+    setAnswerKeyError(null);
+    setAnswerKeyMsg(null);
+    const text = (raw ?? answerKeyText).trim();
+    if (!text) {
+      setAnswerKeyError("Paste your answer key first (e.g. 1-A, 2-B …).");
+      return;
+    }
+    const r = parseStandaloneAnswerKey(text);
+    if (r.entries.size === 0) {
+      setAnswerKeyError("No answers detected. Use formats like 1-A, 1. A, 1 A, or 1A 2B 3C.");
+      return;
+    }
+    if (raw !== undefined) setAnswerKeyText(raw);
+    const map: Record<number, string> = {};
+    r.entries.forEach((label, qNum) => {
+      // Normalize every label (A–E, ক–ঙ, 1–5, i–v) to an A–E letter so the
+      // preview dropdowns can display and edit every entry uniformly.
+      const idx = answerKeyLabelToIndex(label);
+      map[qNum] = idx !== null && idx >= 0 && idx <= 4 ? String.fromCharCode(65 + idx) : normalizeKeyLabel(label);
+    });
+    setAnswerKeyMaps((prev) => ({ ...prev, [activeTab]: map }));
+    setAnswerKeyDupes((prev) => ({ ...prev, [activeTab]: r.duplicates }));
+    const dup = r.duplicates.length > 0 ? ` Duplicates ignored (first kept): ${r.duplicates.map((n) => `Q${n}`).join(", ")}.` : "";
+    setAnswerKeyMsg(`Answers Detected: ${r.entries.size} — review below, then click Apply Answer Key.${dup}`);
+  }
+
+  /** Upload answer-key image(s) → vision OCR → raw text → same standalone parser.
+   *  Processes pages sequentially so progress (Page x/y) stays visible. */
+  async function handleAnswerKeyOcr(files: File[]) {
+    setAnswerKeyError(null);
+    setAnswerKeyMsg(null);
+    const valid = files.filter((f) => f.type.startsWith("image/"));
+    if (valid.length === 0) {
+      setAnswerKeyError("Please select image file(s).");
+      return;
+    }
+    if (valid.length > 10) {
+      setAnswerKeyError("Too many images (max 10 per batch).");
+      return;
+    }
+    setAnswerKeyBusy(true);
+    const collected: string[] = [];
+    try {
+      for (let i = 0; i < valid.length; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        setAnswerKeyOcrBusy(`Processing questions… Page ${i + 1}/${valid.length}`);
+        const fd = new FormData();
+        fd.append("images", valid[i]);
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch("/api/admin/exams/answer-key-ocr", {
+          method: "POST",
+          headers: { ...authHeaders },
+          body: fd,
+        });
+        const data = (await res.json().catch(() => null)) as { texts?: string[]; error?: string } | null;
+        if (!res.ok) throw new Error(data?.error ?? "OCR failed.");
+        const pageText = (data?.texts ?? []).join("\n").trim();
+        if (pageText) collected.push(pageText);
+        setAnswerKeyOcrBusy(`Processing questions… Page ${i + 1}/${valid.length} — Detected ${parseStandaloneAnswerKey(collected.join("\n")).entries.size} answers so far`);
+      }
+      if (collected.length === 0) {
+        setAnswerKeyError("OCR returned no text — please paste the key manually.");
+        return;
+      }
+      const combined = (answerKeyText.trim() ? answerKeyText.trim() + "\n" : "") + collected.join("\n");
+      setAnswerKeyText(combined);
+      handleDetectAnswerKey(combined);
+    } catch (e) {
+      setAnswerKeyError(e instanceof Error ? e.message : "Answer-key OCR failed.");
+    } finally {
+      setAnswerKeyBusy(false);
+      setAnswerKeyOcrBusy(null);
+      if (answerKeyFileRef.current) answerKeyFileRef.current.value = "";
+    }
+  }
+
+  function handleAnswerKeyChange(qNum: number, label: string) {
+    if (!label) {
+      // Clear answer
+      setAnswerKeyMaps((prev) => {
+        const next = { ...(prev[activeTab] ?? {}) };
+        delete next[qNum];
+        return { ...prev, [activeTab]: next };
+      });
+      return;
+    }
+    setAnswerKeyMaps((prev) => ({ ...prev, [activeTab]: { ...(prev[activeTab] ?? {}), [qNum]: label } }));
+  }
+
+  function handleAnswerKeyAdd() {
+    setAnswerKeyError(null);
+    const n = parseInt(addKeyNum.trim(), 10);
+    if (!Number.isFinite(n) || n <= 0 || n > 1000) {
+      setAnswerKeyError("Enter a valid question number to add.");
+      return;
+    }
+    if (answerKeyLabelToIndex(addKeyLabel) === null) {
+      setAnswerKeyError("Select a valid answer label.");
+      return;
+    }
+    setAnswerKeyMaps((prev) => ({ ...prev, [activeTab]: { ...(prev[activeTab] ?? {}), [n]: addKeyLabel } }));
+    setAddKeyNum("");
+  }
+
+  function handleClearAnswerKey() {
+    setAnswerKeyMaps((prev) => ({ ...prev, [activeTab]: {} }));
+    setAnswerKeyDupes((prev) => ({ ...prev, [activeTab]: [] }));
+    setAnswerKeyMsg(null);
+    setAnswerKeyError(null);
+  }
+
+  /** Apply the detected key onto drafts by QUESTION NUMBER with full validation. */
+  function handleApplyAnswerKey() {
+    setAnswerKeyError(null);
+    setAnswerKeyMsg(null);
+    const entries = Object.entries(answerKeyMap);
+    if (entries.length === 0) {
+      setAnswerKeyError("Detect an answer key first.");
+      return;
+    }
+    const draftIndices = Object.keys(drafts).map(Number).filter((n) => Number.isFinite(n));
+    if (draftIndices.length === 0) {
+      setAnswerKeyError("Detect questions first, then apply the answer key.");
+      return;
+    }
+    const numToDraft = draftNumberMap();
+    const draftNums = new Set<number>(draftIndices.map((i) => drafts[i]?.sourceNumber ?? i + 1));
+    let applied = 0;
+    const missing: number[] = [];
+    const extra: number[] = [];
+    const invalid: string[] = [];
+    const updates: Record<number, number> = {};
+    for (const [qNumStr, label] of entries) {
+      const qNum = Number(qNumStr);
+      const slotIdx = numToDraft.get(qNum);
+      if (slotIdx === undefined) {
+        extra.push(qNum);
+        continue;
+      }
+      const optIdx = answerKeyLabelToIndex(label);
+      const opts = drafts[slotIdx]?.options ?? [];
+      const available = opts.filter((o) => o.trim()).length;
+      if (optIdx === null || optIdx < 0 || optIdx >= opts.length || !opts[optIdx]?.trim()) {
+        const have = available > 0 ? `has only ${available} option${available === 1 ? "" : "s"} (A${available > 1 ? `–${String.fromCharCode(64 + available)}` : ""})` : "has no options";
+        invalid.push(`Q${qNum} → ${label} invalid (question ${have})`);
+        continue;
+      }
+      updates[slotIdx] = optIdx;
+      applied += 1;
+    }
+    draftNums.forEach((n) => {
+      if (!(n in answerKeyMap)) missing.push(n);
+    });
+    missing.sort((a, b) => a - b);
+    extra.sort((a, b) => a - b);
+
+    if (applied > 0) {
+      setDrafts((prev) => {
+        const next = { ...prev };
+        for (const [slotStr, optIdx] of Object.entries(updates)) {
+          const slot = Number(slotStr);
+          if (next[slot]) next[slot] = { ...next[slot], correctIndex: optIdx };
+        }
+        return next;
+      });
+      // Clear stale "no answer" warnings on slots that now have answers.
+      setDetectWarnings((prev) => {
+        const next = { ...prev };
+        for (const slotStr of Object.keys(updates)) {
+          const slot = Number(slotStr);
+          const list = next[slot];
+          if (!list) continue;
+          const filtered = list.filter(
+            (w) => w !== "Answer could not be confidently detected — please verify." && w !== "No answer-key entry found for this question — please verify.",
+          );
+          if (filtered.length === 0) delete next[slot];
+          else next[slot] = filtered;
+        }
+        return next;
+      });
+    }
+
+    const totalQ = draftIndices.length;
+    let msg = `Applied ${applied}/${entries.length} answers to ${totalQ} questions.`;
+    if (missing.length > 0) msg += ` Missing answers: ${missing.map((n) => `Q${n}`).join(", ")}.`;
+    if (extra.length > 0) msg += ` Extra (no such question): ${extra.map((n) => `Q${n}`).join(", ")}.`;
+    if (invalid.length > 0) msg += ` Invalid: ${invalid.join("; ")}.`;
+    if (answerKeyDupesForTab.length > 0) msg += ` Duplicates ignored: ${answerKeyDupesForTab.map((n) => `Q${n}`).join(", ")}.`;
+    if (missing.length > 0 || extra.length > 0 || invalid.length > 0) msg += " ⚠ Review required before saving.";
+    else msg += " All matched ✓ — review the final preview, then Save Questions.";
+    setAnswerKeyMsg(msg);
+  }
+
+  // Answer-key preview status (recomputed per render — maps are small).
+  const answerKeyStatus = useMemo(() => {
+    const numToDraft = new Map<number, number>();
+    const indices = Object.keys(drafts).map(Number).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    for (const i of indices) {
+      const n = drafts[i]?.sourceNumber ?? i + 1;
+      if (!numToDraft.has(n)) numToDraft.set(n, i);
+    }
+    const rows = Object.entries(answerKeyMap)
+      .map(([qNumStr, label]) => {
+        const qNum = Number(qNumStr);
+        const slotIdx = numToDraft.get(qNum);
+        if (slotIdx === undefined) return { qNum, label, state: "extra" as const };
+        const optIdx = answerKeyLabelToIndex(label);
+        const opts = drafts[slotIdx]?.options ?? [];
+        if (optIdx === null || optIdx < 0 || optIdx >= opts.length || !opts[optIdx]?.trim()) {
+          return { qNum, label, state: "invalid" as const };
+        }
+        return { qNum, label, state: "matched" as const };
+      })
+      .sort((a, b) => a.qNum - b.qNum);
+    const keyed = new Set(rows.map((r) => r.qNum));
+    const draftNums = indices.map((i) => drafts[i]?.sourceNumber ?? i + 1).sort((a, b) => a - b);
+    const missing = draftNums.filter((n) => !keyed.has(n));
+    const extra = rows.filter((r) => r.state === "extra").map((r) => r.qNum);
+    const invalid = rows.filter((r) => r.state === "invalid");
+    return { rows, missing, extra, invalid, totalQuestions: indices.length, detected: rows.length };
+  }, [answerKeyMap, drafts]);
 
   /**
    * Explicit "Save Questions" — the ONLY writer to the database on this page.
@@ -520,6 +806,10 @@ export default function ExamPaperEditor({
     setDetectExistingMap({});
     setDrafts({});
     setBulkTexts((prev) => ({ ...prev, [activeTab]: "" }));
+    setAnswerKeyMaps((prev) => ({ ...prev, [activeTab]: {} }));
+    setAnswerKeyDupes((prev) => ({ ...prev, [activeTab]: [] }));
+    setAnswerKeyMsg(null);
+    setAnswerKeyError(null);
     // Empty detection state: clear displayed slots + question count (0).
     // Saved rows in the database are untouched — top Refresh reloads them.
     setQuestions([]);
@@ -765,6 +1055,170 @@ export default function ExamPaperEditor({
           <p className="text-[11px] leading-relaxed text-slate-400">
             Detected questions stay unsaved until <span className="font-bold">Save Questions</span> is clicked. Leaving this page without saving discards them.
           </p>
+        </div>
+
+        {/* ── ANSWER KEY — Included with questions (default) or Separate ── */}
+        <div className="space-y-2 rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3 admin-dark:border-[#1e3a65] admin-dark:bg-[#0b1e3a]/40">
+          <p className="text-sm font-extrabold text-[#0b1e3a] admin-dark:text-white">
+            Answer Key — <span className="capitalize">{langVersion} Version · Set {setLabel}</span>
+          </p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Answer source">
+            {(["included", "separate"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={answerSource === mode}
+                onClick={() => setAnswerSource(mode)}
+                className={`rounded-xl border px-3 py-2 text-xs font-extrabold transition ${answerSource === mode ? "border-[#1a3a78] bg-[#1a3a78] text-white shadow-md" : "border-[#dbeafe] bg-white text-[#0b1e3a] hover:border-[#93c5fd] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100"}`}
+              >
+                {mode === "included" ? "Detect Questions + Answers Together" : "Questions Only + Separate Answer Key"}
+              </button>
+            ))}
+          </div>
+
+          {answerSource === "separate" && (
+            <div className="space-y-2 pt-1">
+              <textarea
+                value={answerKeyText}
+                onChange={(e) => setAnswerKeyText(e.target.value)}
+                placeholder={`Paste answer key — one per line or compact:\n1-A\n2-B\n3-C\n…or: 1. A  2. B  3. C\n…or: 1-A, 2-B, 3-C\n…or: 1A 2B 3C`}
+                rows={4}
+                className="max-h-[30vh] min-h-[80px] w-full resize-y rounded-xl border border-[#dbeafe] bg-white p-3 text-sm leading-relaxed text-[#0b1e3a] placeholder:text-slate-400 focus:border-[#93c5fd] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-zinc-100 admin-dark:placeholder:text-slate-500"
+              />
+              <input
+                ref={answerKeyFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length > 0) void handleAnswerKeyOcr(files);
+                }}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={answerKeyBusy || detectBusy || saveAllBusy}
+                  onClick={() => handleDetectAnswerKey()}
+                  className={`${buttonPrimaryClass} w-full sm:w-auto`}
+                >
+                  {answerKeyBusy ? "Detecting…" : "Detect Answer Key"}
+                </button>
+                <button
+                  type="button"
+                  disabled={answerKeyBusy || detectBusy || saveAllBusy}
+                  onClick={() => answerKeyFileRef.current?.click()}
+                  className={`${buttonSecondaryClass} w-full sm:w-auto`}
+                  title="Upload answer-key image(s) — transcribed via vision, then parsed"
+                >
+                  {answerKeyOcrBusy ? answerKeyOcrBusy : "Upload Answer Key Image"}
+                </button>
+                {Object.keys(answerKeyMap).length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={answerKeyBusy || detectBusy || saveAllBusy}
+                      onClick={handleApplyAnswerKey}
+                      className="w-full rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-extrabold text-white shadow hover:bg-emerald-700 disabled:opacity-40 sm:w-auto"
+                      title="Match answers to questions by question number"
+                    >
+                      Apply Answer Key
+                    </button>
+                    <button
+                      type="button"
+                      disabled={answerKeyBusy || detectBusy || saveAllBusy}
+                      onClick={handleClearAnswerKey}
+                      className="w-full rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40 sm:w-auto admin-dark:border-red-900/40 admin-dark:bg-transparent admin-dark:text-red-300"
+                    >
+                      Clear Key
+                    </button>
+                  </>
+                )}
+              </div>
+              {answerKeyError && (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 admin-dark:border-red-900/40 admin-dark:bg-red-500/10 admin-dark:text-red-300">{answerKeyError}</p>
+              )}
+              {answerKeyMsg && (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 admin-dark:border-emerald-900/30 admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">{answerKeyMsg}</p>
+              )}
+
+              {answerKeyStatus.rows.length > 0 && (
+                <div className="rounded-xl border border-[#dbeafe] bg-white p-3 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547]">
+                  <p className="text-xs font-extrabold text-[#0b1e3a] admin-dark:text-white">
+                    Answer Key Preview — Total Questions: {answerKeyStatus.totalQuestions} · Answers Detected: {answerKeyStatus.detected}
+                    {answerKeyStatus.missing.length > 0 && <span className="text-amber-600"> · Missing: {answerKeyStatus.missing.map((n) => `Q${n}`).join(", ")}</span>}
+                  </p>
+                  {(answerKeyStatus.extra.length > 0 || answerKeyStatus.invalid.length > 0 || answerKeyDupesForTab.length > 0) && (
+                    <p className="mt-1 text-[11px] font-bold leading-relaxed text-amber-700 admin-dark:text-amber-300">
+                      {answerKeyStatus.extra.length > 0 && <span>⚠ Extra (no such question): {answerKeyStatus.extra.map((n) => `Q${n}`).join(", ")}. </span>}
+                      {answerKeyStatus.invalid.length > 0 && <span>⚠ Invalid: {answerKeyStatus.invalid.map((r) => `Q${r.qNum}→${r.label}`).join(", ")}. </span>}
+                      {answerKeyDupesForTab.length > 0 && <span>⚠ Duplicates ignored: {answerKeyDupesForTab.map((n) => `Q${n}`).join(", ")}.</span>}
+                    </p>
+                  )}
+                  <ul className="mt-2 grid max-h-56 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">
+                    {answerKeyStatus.rows.map((row) => (
+                      <li
+                        key={row.qNum}
+                        className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${row.state === "matched" ? "border-emerald-200 bg-emerald-50/60 admin-dark:border-emerald-900/40 admin-dark:bg-emerald-500/5" : row.state === "invalid" ? "border-red-200 bg-red-50/60 admin-dark:border-red-900/40 admin-dark:bg-red-500/5" : "border-amber-200 bg-amber-50/60 admin-dark:border-amber-900/40 admin-dark:bg-amber-500/5"}`}
+                      >
+                        <span className="shrink-0 text-[11px] font-extrabold text-[#0b1e3a] admin-dark:text-zinc-100">Q{row.qNum}</span>
+                        <select
+                          value={row.label}
+                          onChange={(e) => handleAnswerKeyChange(row.qNum, e.target.value)}
+                          aria-label={`Answer for question ${row.qNum}`}
+                          className="min-w-0 flex-1 rounded-md border border-[#dbeafe] bg-white px-1 py-0.5 text-[11px] font-extrabold text-[#0b1e3a] focus:border-[#93c5fd] focus:outline-none admin-dark:border-[#1e3a65] admin-dark:bg-[#0b1e3a] admin-dark:text-zinc-100"
+                        >
+                          {["A", "B", "C", "D", "E"].map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleAnswerKeyChange(row.qNum, "")}
+                          aria-label={`Clear answer for question ${row.qNum}`}
+                          title="Clear answer"
+                          className="shrink-0 rounded px-1 text-[11px] font-bold text-slate-400 hover:text-red-600"
+                        >
+                          ×
+                        </button>
+                        <span className="shrink-0 text-[11px]" title={row.state === "matched" ? "Matched" : row.state === "invalid" ? "Invalid — check options" : "No such question"}>
+                          {row.state === "matched" ? "✓" : "⚠"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      value={addKeyNum}
+                      onChange={(e) => setAddKeyNum(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="Q#"
+                      aria-label="Question number to add"
+                      className="w-16 rounded-lg border border-[#dbeafe] bg-white px-2 py-1.5 text-xs font-bold text-[#0b1e3a] focus:border-[#93c5fd] focus:outline-none admin-dark:border-[#1e3a65] admin-dark:bg-[#0b1e3a] admin-dark:text-zinc-100"
+                    />
+                    <select
+                      value={addKeyLabel}
+                      onChange={(e) => setAddKeyLabel(e.target.value)}
+                      aria-label="Answer label to add"
+                      className="rounded-lg border border-[#dbeafe] bg-white px-2 py-1.5 text-xs font-extrabold text-[#0b1e3a] focus:border-[#93c5fd] focus:outline-none admin-dark:border-[#1e3a65] admin-dark:bg-[#0b1e3a] admin-dark:text-zinc-100"
+                    >
+                      {["A", "B", "C", "D", "E"].map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={handleAnswerKeyAdd} className={buttonSecondaryClass}>
+                      Add missing answer
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                Matching is by question number (Q1→B), not list position. Apply updates the drafts below — review the final preview, then Save Questions.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-[#eef4ff] pt-3 admin-dark:border-[#1e3a65]/60">
