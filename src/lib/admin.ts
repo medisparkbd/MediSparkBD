@@ -109,6 +109,11 @@ export async function requireAdmin(
  * Role-based gate: like requireAdmin, but additionally enforces that the
  * admin's role grants the requested permission. Returns null when the
  * caller is not an admin or lacks the permission.
+ *
+ * Centralized: every admin mutation flows through here → `resolveAdminPermissions`
+ * → `role_permissions` matrix. UI (hasControlAccess) and API (this gate) share
+ * the same canonical permission set (`src/lib/admin-access.ts`). If a permission
+ * is ON in Admin Center, this gate allows it; if OFF, it denies it.
  */
 export async function requirePermission(
   request: NextRequest,
@@ -117,14 +122,22 @@ export async function requirePermission(
   const user = await getFirebaseUser(request);
   if (!user) return null;
   const email = user.email_verified === true ? (user.email ?? null) : null;
-  const [authorized, { role, permissions }] = await Promise.all([
+  // Resolve via UID + verified email fallback so UID-based admins with unverified
+  // token emails still get their correct role (mirrors /api/admin logic).
+  // Pass both token email and UID; resolve prioritizes token email then UID lookup.
+  const [authorized, resolved] = await Promise.all([
     isAdminUid(user.uid, email),
-    resolveAdminPermissions(user.email),
+    (async () => {
+      // Prefer account email when available (survives Firebase project changes)
+      const account = await fetchAdminAccount(user.uid);
+      const effectiveEmail = account?.email ?? user.email ?? null;
+      return resolveAdminPermissions(effectiveEmail, user.uid);
+    })(),
   ]);
   if (!authorized) return null;
   // Admin always passes; other roles must have the specific permission.
-  if (role === "admin") return user;
-  if (permissions.includes(permission)) return user;
+  if (resolved.role === "admin") return user;
+  if (resolved.permissions.includes(permission)) return user;
   return null;
 }
 
@@ -142,7 +155,11 @@ export async function requireAnyPermission(
   const email = user.email_verified === true ? (user.email ?? null) : null;
   const [authorized, resolved] = await Promise.all([
     isAdminUid(user.uid, email),
-    resolveAdminPermissions(user.email),
+    (async () => {
+      const account = await fetchAdminAccount(user.uid);
+      const effectiveEmail = account?.email ?? user.email ?? null;
+      return resolveAdminPermissions(effectiveEmail, user.uid);
+    })(),
   ]);
   if (!authorized) return null;
   // Admin always passes.

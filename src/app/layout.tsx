@@ -18,7 +18,9 @@ import {
   fetchThemeSettings,
   buildThemeOverrideCss,
 } from "@/lib/theme-settings";
+import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
+import { GlobalLoadingProvider, FirstLoadOverlay } from "@/components/GlobalLoading";
 import "./globals.css";
 
 // Branding/settings change rarely — cache layout data for 60s so every page
@@ -120,32 +122,41 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {initialSettings.faviconUrl && (
           <link rel="icon" href={initialSettings.faviconUrl} />
         )}
+        {/* First-load performance: resource hints */}
+        <link rel="preconnect" href="https://medispark.duckdns.org" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+        <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
       </head>
       <body className="flex min-h-full flex-col bg-dark-950 text-neutral-300">
-        <ThemeProvider>
-          <WebsiteSettingsProvider initialSettings={initialSettings}>
-            <LogoProvider
-              initialLogo={initialLogo}
-              initialThemeLogos={initialThemeLogos}
-            >
-              <AuthProvider>
-                <ExamLockProvider>
-                  <NavHistoryProvider>
-                  <HideOnAdmin>
-                    <AnnouncementBar />
-                    <Navbar config={navbarConfig} />
-                  </HideOnAdmin>
-                  {children}
-                  <HideOnAdmin>
-                    <Footer />
-                    <BottomNav />
-                  </HideOnAdmin>
-                  </NavHistoryProvider>
-                </ExamLockProvider>
-              </AuthProvider>
-            </LogoProvider>
-          </WebsiteSettingsProvider>
-        </ThemeProvider>
+        <FirstLoadOverlay />
+        <Suspense fallback={null}>
+          <GlobalLoadingProvider>
+            <ThemeProvider>
+              <WebsiteSettingsProvider initialSettings={initialSettings}>
+                <LogoProvider
+                  initialLogo={initialLogo}
+                  initialThemeLogos={initialThemeLogos}
+                >
+                  <AuthProvider>
+                    <ExamLockProvider>
+                      <NavHistoryProvider>
+                        <HideOnAdmin>
+                          <AnnouncementBar />
+                          <Navbar config={navbarConfig} />
+                        </HideOnAdmin>
+                        {children}
+                        <HideOnAdmin>
+                          <Footer />
+                          <BottomNav />
+                        </HideOnAdmin>
+                      </NavHistoryProvider>
+                    </ExamLockProvider>
+                  </AuthProvider>
+                </LogoProvider>
+              </WebsiteSettingsProvider>
+            </ThemeProvider>
+          </GlobalLoadingProvider>
+        </Suspense>
       </body>
     </html>
   );

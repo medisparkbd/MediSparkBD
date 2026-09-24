@@ -188,124 +188,40 @@ export async function recordAdminLogin(
 }
 
 // ── Roles & permissions ──────────────────────────────────────────────────
+// Canonical Role → Permission → Control definitions live in
+// `src/lib/admin-access.ts` (dependency-free, shared with client code).
+// This module re-exports them and adds the server-side (MySQL-backed)
+// role resolution. Do NOT redefine the matrix or control map here.
+export {
+  AVAILABLE_ROLES,
+  ROLE_LABELS,
+  ALL_PERMISSIONS,
+  DEFAULT_PERMISSIONS_BY_ROLE,
+  ADMIN_CONTROL_PERMISSIONS,
+  ADMIN_ONLY_PERMISSIONS,
+  PUBLIC_EXAM_PERMISSIONS,
+  normalizeControlPath,
+  resolveControlPermissions,
+  hasControlAccess,
+  hasAnyPermission,
+  hasAdminPermission,
+  hasPublicExamAccess,
+  sanitizePermissions,
+} from "@/lib/admin-access";
+export type { AdminPermission, AdminRole } from "@/lib/admin-access";
+import {
+  ALL_PERMISSIONS,
+  AVAILABLE_ROLES,
+  DEFAULT_PERMISSIONS_BY_ROLE,
+  ADMIN_ONLY_PERMISSIONS,
+  sanitizePermissions,
+  type AdminPermission,
+  type AdminRole,
+} from "@/lib/admin-access";
 
-export const AVAILABLE_ROLES = [
-  "admin",
-  "moderator",
-  "teacher",
-] as const;
-
-export type AdminRole = (typeof AVAILABLE_ROLES)[number];
-
-export const ROLE_LABELS: Record<AdminRole, string> = {
-  admin: "Admin",
-  moderator: "Moderator",
-  teacher: "Teacher",
-};
-
-/** Permission categories enforced on every admin API write. Flexible matrix: role_permissions overrides defaults. */
-export const ALL_PERMISSIONS = [
-  "manageContent",
-  "manageCourses",
-  "manageExams",
-  "manageStudents",
-  "manageAdmins",
-  "manageSystem",
-  // Teacher-scoped granular permissions (flexible, can be reconfigured per role)
-  "manageCourseContent",
-  "managePublicExam",
-  "manageQa",
-  "manageResults",
-] as const;
-
-export type AdminPermission = (typeof ALL_PERMISSIONS)[number];
-
-const DEFAULT_PERMISSIONS_BY_ROLE: Record<AdminRole, readonly AdminPermission[]> = {
-  admin: [...ALL_PERMISSIONS],
-  moderator: ["manageContent", "manageCourses", "manageExams"],
-  teacher: ["manageCourseContent", "managePublicExam", "manageQa", "manageResults"],
-};
-
-/**
- * Admin Panel control → required permissions.
- * Each control lists the granular permission(s) that grant access; broader
- * legacy permissions are accepted as fallback so Admin/Moderator keep their
- * existing access while Teacher is scoped to exactly 4 controls.
- * Flexible: role_permissions can reconfigure any of these per role at runtime.
- */
-export const ADMIN_CONTROL_PERMISSIONS: Record<string, readonly AdminPermission[]> = {
-  // Control-center pages (sidebar cards)
-  "/admin/website-information": ["manageContent"],
-  "/admin/enrollment-control": ["manageStudents", "manageCourses"],
-  "/admin/home-control": ["manageContent"],
-  "/admin/course-control": ["manageCourses"],
-  "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
-  "/admin/material-pdf": ["manageCourses", "manageCourseContent", "manageExams"],
-  "/admin/public-exam-control": ["managePublicExam", "manageExams"],
-  // Canonical Public Exam Control subtree (redirect target of the control):
-  // hub (/admin/public-exam) and Category → Exam pages inherit the parent.
-  "/admin/public-exam": ["managePublicExam", "manageExams"],
-  // Exam Management page (/admin/exams/[id]/manage) belongs to the Public
-  // Exam Control flow — Category → Exam → Manage inherits the parent grant.
-  "/admin/exams": ["managePublicExam", "manageExams"],
-  // Enrolled-exam lists are course-assigned; course managers keep access.
-  "/admin/exams/enrolled": ["managePublicExam", "manageExams", "manageCourses"],
-  "/admin/course-exams": ["managePublicExam", "manageExams", "manageCourses"],
-  "/admin/qa-control": ["manageQa", "manageContent"],
-  "/admin/qa": ["manageQa", "manageContent"],
-  "/admin/dashboard-control": ["manageSystem", "manageContent"],
-  "/admin/student-control": ["manageStudents"],
-  "/admin/students": ["manageStudents"],
-  "/admin/result-control": ["manageResults", "manageExams"],
-  "/admin/notification-control": ["manageContent", "manageSystem"],
-  "/admin/admin-center": ["manageAdmins"],
-  "/admin/administration": ["manageAdmins"],
-  "/admin/system": ["manageSystem", "manageAdmins"],
-  // Legacy section pages — same permission as their backing APIs
-  "/admin/website": ["manageContent"],
-  "/admin/branding": ["manageContent"],
-  "/admin/settings": ["manageContent"],
-  "/admin/homepage-courses": ["manageCourses"],
-  "/admin/content": ["manageContent"],
-  "/admin/mentors": ["manageContent"],
-  "/admin/courses": ["manageCourses"],
-  "/admin/course": ["manageCourses"],
-  "/admin/course-content": ["manageCourseContent", "manageCourses"],
-  "/admin/enrolled-courses": ["manageCourseContent", "manageCourses"],
-  "/admin/marketing": ["manageCourses"],
-};
-
-export function hasControlAccess(
-  role: string | null | undefined,
-  permissions: string[],
-  href: string,
-): boolean {
-  // Admin always has full access.
-  if (role === "admin") return true;
-  if (href === "/admin") return true;
-  // Longest-prefix match so Category → Exam → Exam Management sub-routes
-  // inherit their parent control's grant.
-  let matched: string | null = null;
-  for (const control of Object.keys(ADMIN_CONTROL_PERMISSIONS)) {
-    if (href === control || href.startsWith(control + "/")) {
-      if (!matched || control.length > matched.length) matched = control;
-    }
-  }
-  if (!matched) return true; // unknown route → allow for non-restricted pages
-  const required = ADMIN_CONTROL_PERMISSIONS[matched];
-  return required.some((perm) => permissions.includes(perm));
-}
-
-/** Check if a permission set grants any of the required permissions. */
-export function hasAnyPermission(
-  role: string | null | undefined,
-  permissions: string[],
-  required: readonly string[],
-): boolean {
-  // Admin always has full access.
-  if (role === "admin") return true;
-  return required.some((perm) => permissions.includes(perm));
-}
+// `ADMIN_CONTROL_PERMISSIONS`, `hasControlAccess` and `hasAnyPermission` are
+// re-exported from the canonical `src/lib/admin-access.ts` above (fail-closed,
+// segment-aware longest-prefix match). See that module for the full map.
 
 async function ensureRolesTable(): Promise<void> {
   if (ensureRolesTableReady) return;
@@ -347,21 +263,19 @@ export async function fetchRolePermissions(): Promise<Record<string, string[]>> 
       if (rows[0]?.permissions) {
         const parsed = JSON.parse(rows[0].permissions) as unknown;
         if (Array.isArray(parsed)) {
-          result[role] = parsed
-            .map(String)
-            .filter((p): p is AdminPermission =>
-              (ALL_PERMISSIONS as readonly string[]).includes(p as AdminPermission),
-            );
+          result[role] = sanitizePermissions(parsed).filter(
+            // `manageAdmins` is Admin-only and can never be persisted for
+            // other roles (also enforced on save) — belt and suspenders.
+            (p) => !ADMIN_ONLY_PERMISSIONS.includes(p),
+          );
           continue;
         }
       }
     } catch {
       // Fall through to defaults.
     }
-    // Default permissions when no DB row exists.
-    result[role] = role === "teacher"
-      ? ["manageCourseContent", "managePublicExam", "manageQa", "manageResults"]
-      : ["manageContent", "manageCourses", "manageExams"];
+    // Default permissions when no DB row exists (canonical matrix).
+    result[role] = [...DEFAULT_PERMISSIONS_BY_ROLE[role as AdminRole]];
   }
   return result;
 }
@@ -376,12 +290,16 @@ export async function saveRolePermissions(
     if (!(AVAILABLE_ROLES as readonly string[]).includes(role)) {
       throw new Error(`Unknown role: ${role}`);
     }
+    // The Admin permission set is fixed (all permissions) — ignore any
+    // stored override so Admin can never be downgraded via the matrix.
+    if (role === "admin") continue;
     if (!Array.isArray(rawPermissions)) continue;
-    const permissions = rawPermissions
-      .map(String)
-      .filter((permission): permission is AdminPermission =>
-        (ALL_PERMISSIONS as readonly string[]).includes(permission),
-      );
+    // `manageAdmins` is Admin-only: strip it so Moderator/Teacher can never
+    // gain Admin Center access through the matrix (the role UIs also forbid
+    // toggling it — this is the server-side enforcement).
+    const permissions = sanitizePermissions(rawPermissions).filter(
+      (permission) => !ADMIN_ONLY_PERMISSIONS.includes(permission),
+    );
     await exec(
       `INSERT INTO role_permissions (role, permissions, updated_by)
        VALUES (?, ?, ?)
@@ -395,23 +313,43 @@ export async function saveRolePermissions(
 /**
  * Resolve an admin's role and effective permissions.
  * Role assignment lives in `admin_roles` (email-keyed, defaults to
- * "admin"); the permission matrix comes from `role_permissions`.
- * Admin always holds every permission.
+ * "admin" for legacy accounts); the permission matrix comes from `role_permissions`.
+ * Admin always holds every permission. This is the SINGLE source of truth for
+ * server-side authorization — every `requirePermission` call flows through here.
+ *
+ * Fail-closed: unknown email, DB error, or missing role → deny (empty permissions).
+ * Legacy admins without an explicit `admin_roles` entry default to Admin ONLY if
+ * their email is known in the `admins` table; otherwise they are denied.
  */
 export async function resolveAdminPermissions(
   email: string | null | undefined,
+  uid: string | null | undefined = null,
 ): Promise<{ role: AdminRole; permissions: AdminPermission[] }> {
-  const fallback: { role: AdminRole; permissions: AdminPermission[] } = {
-    role: "admin",
-    permissions: [...DEFAULT_PERMISSIONS_BY_ROLE.admin],
+  const failClosed: { role: AdminRole; permissions: AdminPermission[] } = {
+    role: "teacher",
+    permissions: [],
   };
   try {
     await ensureRolesTable();
     let assignedRole: AdminRole | null = null;
-    if (email) {
+    let resolvedEmail = typeof email === "string" ? email.trim().toLowerCase() : null;
+    // If email is missing but uid is provided, resolve email from `admins` table
+    // so UID-based admins with unverified token emails still get their correct role.
+    if (!resolvedEmail && typeof uid === "string" && uid.length > 0) {
+      try {
+        const uidRows = await query<{ email: string | null }[]>(
+          `SELECT email FROM admins WHERE uid = ? LIMIT 1`,
+          [uid],
+        );
+        if (uidRows[0]?.email) resolvedEmail = uidRows[0].email.trim().toLowerCase();
+      } catch {
+        // ignore, fall through to fail-closed
+      }
+    }
+    if (resolvedEmail) {
       const rows = await query<{ role: string }[]>(
         `SELECT role FROM admin_roles WHERE email = ? LIMIT 1`,
-        [email.trim().toLowerCase()],
+        [resolvedEmail],
       );
       const rawRole = String(rows[0]?.role ?? "").trim().toLowerCase();
       if ((AVAILABLE_ROLES as readonly string[]).includes(rawRole)) {
@@ -424,7 +362,7 @@ export async function resolveAdminPermissions(
         try {
           const adminRows = await query<{ role: string | null }[]>(
             `SELECT role FROM admins WHERE LOWER(email) = LOWER(?) LIMIT 1`,
-            [email.trim().toLowerCase()],
+            [resolvedEmail],
           );
           const adminRole = String(adminRows[0]?.role ?? "").trim().toLowerCase();
           if ((AVAILABLE_ROLES as readonly string[]).includes(adminRole)) {
@@ -435,7 +373,43 @@ export async function resolveAdminPermissions(
         }
       }
     }
-    if (!assignedRole) assignedRole = "admin";
+    // No explicit role found — legacy fallback ONLY if this email/uid is a known admin.
+    // Unknown emails (not in `admins` table) are denied (fail-closed) instead of
+    // being auto-promoted to Admin.
+    if (!assignedRole) {
+      if (resolvedEmail) {
+        try {
+          const exists = await query<{ uid: string }[]>(
+            `SELECT uid FROM admins WHERE LOWER(email) = LOWER(?) LIMIT 1`,
+            [resolvedEmail],
+          );
+          if (exists.length > 0) {
+            assignedRole = "admin";
+          } else {
+            return failClosed;
+          }
+        } catch {
+          return failClosed;
+        }
+      } else if (typeof uid === "string" && uid.length > 0) {
+        // UID provided but no email resolved — check if UID is a known admin
+        try {
+          const exists = await query<{ uid: string }[]>(
+            `SELECT uid FROM admins WHERE uid = ? LIMIT 1`,
+            [uid],
+          );
+          if (exists.length > 0) {
+            assignedRole = "admin";
+          } else {
+            return failClosed;
+          }
+        } catch {
+          return failClosed;
+        }
+      } else {
+        return failClosed;
+      }
+    }
     // Admin always has all permissions.
     if (assignedRole === "admin") {
       return { role: "admin", permissions: [...ALL_PERMISSIONS] };
@@ -445,7 +419,7 @@ export async function resolveAdminPermissions(
     const perms = (matrix[assignedRole] ?? []) as AdminPermission[];
     return { role: assignedRole, permissions: perms };
   } catch {
-    return fallback;
+    return failClosed;
   }
 }
 

@@ -6,6 +6,7 @@ import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
   useAdminGate,
   hasAdminPermission,
+  DEFAULT_PERMISSIONS_BY_ROLE,
   noticeClass,
   cardClass,
   buttonPrimaryClass,
@@ -25,7 +26,8 @@ const PERMISSIONS = [
   { value: "manageAdmins", label: "Admin Center", desc: "Admin/Moderator/Teacher management" },
 ] as const;
 
-const MODERATOR_DEFAULT = ["manageContent", "manageCourses", "manageExams"];
+// Canonical default (single source of truth in `src/lib/admin-access.ts`).
+const MODERATOR_DEFAULT: string[] = [...DEFAULT_PERMISSIONS_BY_ROLE.moderator];
 
 export default function ModeratorRolesPage() {
   const gate = useAdminGate();

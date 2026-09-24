@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
   }
   // Account + role lookups are independent — run concurrently. The login
   // audit write is fire-and-forget so it never delays the gate response.
+  // Pass UID for fail-closed resolution and UID→email fallback (verified email mismatch).
   const [account, resolved] = await Promise.all([
     fetchAdminAccount(user.uid),
-    resolveAdminPermissions(user.email),
+    resolveAdminPermissions(user.email, user.uid),
   ]);
   const email = account?.email ?? user.email ?? null;
   // If the stored account email differs from the token email (e.g. Firebase
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   // lookup so explicit role assignments keep applying.
   const { role, permissions } =
     account?.email && account.email.toLowerCase() !== (user.email ?? "").toLowerCase()
-      ? await resolveAdminPermissions(account.email)
+      ? await resolveAdminPermissions(account.email, user.uid)
       : resolved;
   void recordAdminLogin({ uid: user.uid, email }).catch(() => undefined);
   return NextResponse.json({

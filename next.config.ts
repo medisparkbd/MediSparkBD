@@ -18,15 +18,24 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 31536000,
   },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
+  },
   experimental: {
     optimizePackageImports: [
-      "react",
-      "react-dom",
       "firebase",
       "firebase-admin",
+      "firebase/auth",
+      "firebase/app",
+      "firebase/messaging",
       "jspdf",
       "html2canvas",
     ],
+    // Stale-while-revalidate for client router cache — avoids refetching on back/forward
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
   },
   headers: async () => [
     {

@@ -86,11 +86,13 @@ function WebsiteAdminShellInner({
   );
 
   const isActive = (href: string) =>
-    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+    href === "/admin"
+      ? pathname === "/admin"
+      : pathname === href || pathname.startsWith(href + "/");
 
   // Route-level RBAC with parent → subtree inheritance (shared helper —
   // same check as AdminShell and the exam API pairs). Only enforced once
-  // the gate resolves; unknown routes stay accessible.
+  // the gate resolves; unknown routes fail closed (denied).
   const isDeniedByRole =
     gate.ready && !hasControlAccess(gate.role, gate.permissions, pathname);
 

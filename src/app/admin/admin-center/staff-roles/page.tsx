@@ -5,6 +5,7 @@ import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
 import {
   useAdminGate,
   hasAdminPermission,
+  DEFAULT_PERMISSIONS_BY_ROLE,
   noticeClass,
   cardClass,
   inputClass,
@@ -17,8 +18,8 @@ type Assignment = { email: string; role: string; permissions: string[] };
 
 const ROLES = [
   { value: "admin", label: "Admin", description: "Full access to every Admin Panel control and system settings. Cannot be restricted (previous Super Admin)." },
-  { value: "moderator", label: "Moderator", description: "Moderation access — permissions to be defined separately (flexible matrix)." },
-  { value: "teacher", label: "Teacher", description: "Limited to 4 teaching controls only. No other panel access unless explicitly granted." },
+  { value: "moderator", label: "Moderator", description: "Full access to every Admin Panel control except Admin Center (manageAdmins is Admin-only)." },
+  { value: "teacher", label: "Teacher", description: "Teaching/content scope: Website & Home, Course Content, Public Exam, Q&A, Result, Notification & Dashboard. No access to Enrollment, Course, Student, or Admin Center controls." },
 ] as const;
 
 const PERMISSIONS = [
@@ -34,8 +35,10 @@ const PERMISSIONS = [
   { value: "manageResults", label: "Result Sheet / Result Control" },
 ] as const;
 
-// Teacher defaults for display when matrix empty
-const TEACHER_DEFAULT = ["manageCourseContent", "managePublicExam", "manageQa", "manageResults"];
+// Canonical role defaults for display when the matrix is empty
+// (single source of truth in `src/lib/admin-access.ts`).
+const TEACHER_DEFAULT: string[] = [...DEFAULT_PERMISSIONS_BY_ROLE.teacher];
+const MODERATOR_DEFAULT: string[] = [...DEFAULT_PERMISSIONS_BY_ROLE.moderator];
 
 export default function StaffRolesPage() {
   const gate = useAdminGate();
@@ -91,7 +94,8 @@ export default function StaffRolesPage() {
   function togglePermission(role: string, permission: string) {
     if (role === "admin") return;
     setMatrix((prev) => {
-      const current = prev?.[role] ?? (role === "teacher" ? [...TEACHER_DEFAULT] : []);
+      if (permission === "manageAdmins" && role !== "admin") return prev ?? {};
+      const current = prev?.[role] ?? (role === "teacher" ? [...TEACHER_DEFAULT] : role === "moderator" ? [...MODERATOR_DEFAULT] : []);
       const next = current.includes(permission) ? current.filter((p) => p !== permission) : [...current, permission];
       return { ...(prev ?? {}), [role]: next };
     });
@@ -190,7 +194,8 @@ export default function StaffRolesPage() {
                         <input
                           type="checkbox"
                           aria-label={`${role.label}: ${perm.label}`}
-                          disabled={role.value === "admin"}
+                          disabled={role.value === "admin" || perm.value === "manageAdmins"}
+                          title={perm.value === "manageAdmins" && role.value !== "admin" ? "Admin-only permission" : perm.label}
                           checked={checked}
                           onChange={() => togglePermission(role.value, perm.value)}
                         />
@@ -202,7 +207,7 @@ export default function StaffRolesPage() {
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-slate-500 admin-dark:text-slate-400">Admin always has every permission. Teacher defaults to Course Content, Public Exam, Q&A, Result — keep flexible so permissions can be changed later.</p>
+        <p className="mt-2 text-xs text-slate-500 admin-dark:text-slate-400">Admin always has every permission. Teacher defaults to Content, Exams, Course Content, Public Exam, Q&A, Result. Moderator defaults to everything except Administration. Admin Center (manageAdmins) is Admin-only and cannot be granted to other roles.</p>
       </div>
 
       {/* Email → role assignments */}

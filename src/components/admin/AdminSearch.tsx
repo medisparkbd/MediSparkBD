@@ -45,13 +45,12 @@ export default function AdminSearch({
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) return [];
     // RBAC: only suggest sections the current role can actually open.
-    // Before the gate resolves, show everything (no flash of empty).
-    const entries =
-      gate.ready
-        ? SEARCH_INDEX.filter((entry) =>
-            hasControlAccess(gate.role, gate.permissions, entry.href),
-          )
-        : SEARCH_INDEX;
+    // While gate is resolving, show nothing (fail-closed) so search never
+    // suggests a section that the route guard would later block.
+    if (!gate.ready) return [];
+    const entries = SEARCH_INDEX.filter((entry) =>
+      hasControlAccess(gate.role, gate.permissions, entry.href),
+    );
     return entries.filter(
       (entry) =>
         entry.label.toLowerCase().includes(trimmed) ||

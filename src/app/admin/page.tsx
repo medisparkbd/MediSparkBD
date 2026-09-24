@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAdminGate } from "@/components/admin/admin-ui";
+import { hasControlAccess, useAdminGate } from "@/components/admin/admin-ui";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 import {
   PendingIndicator,
@@ -11,7 +11,8 @@ import {
 /**
  * Admin Panel Home — exactly 12 control cards (2 columns × 6 rows on every
  * device), each with an icon on the left and the control name on the right.
- * RBAC: Teacher sees only 4 teaching controls; other roles see their permitted set.
+ * RBAC: cards are filtered by the canonical Role → Permission → Control map;
+ * each role sees exactly its permitted set.
  */
 
 const CARDS: Array<{ href: string; icon: string; title: string }> = [
@@ -30,37 +31,45 @@ const CARDS: Array<{ href: string; icon: string; title: string }> = [
   { href: "/admin/admin-center", icon: "🛡️", title: "Admin Center" },
 ];
 
-// Client-safe RBAC mapping (mirrors src/lib/administration.ts)
-const CARD_PERMISSIONS: Record<string, readonly string[]> = {
-  "/admin/website-information": ["manageContent"],
-  "/admin/enrollment-control": ["manageStudents", "manageCourses"],
-  "/admin/home-control": ["manageContent"],
-  "/admin/course-control": ["manageCourses"],
-  "/admin/course-content-control": ["manageCourseContent", "manageCourses"],
-  "/admin/material-pdf": ["manageCourses", "manageCourseContent", "manageExams"],
-  "/admin/public-exam-control": ["managePublicExam", "manageExams"],
-  "/admin/qa-control": ["manageQa", "manageContent"],
-  "/admin/dashboard-control": ["manageSystem", "manageContent"],
-  "/admin/student-control": ["manageStudents"],
-  "/admin/result-control": ["manageResults", "manageExams"],
-  "/admin/notification-control": ["manageContent", "manageSystem"],
-  "/admin/admin-center": ["manageAdmins"],
-};
-
-function hasAccess(role: string | null, permissions: string[], href: string): boolean {
-  if (role === "admin") return true;
-  const required = CARD_PERMISSIONS[href];
-  if (!required) return true;
-  return required.some((perm) => permissions.includes(perm));
+// Card visibility uses the canonical control map (single source of truth in
+// `src/lib/admin-access.ts`) — identical to the sidebar/route guards.
+function hasAccess(
+  role: string | null,
+  permissions: string[],
+  href: string,
+): boolean {
+  return hasControlAccess(role, permissions, href);
 }
 
 export default function AdminHomePage() {
   const gate = useAdminGate();
   const ready = gate.ready;
   const { totalPending } = useEnrollmentPendingTotals();
+  // While gate is resolving, show nothing (fail-closed) — never flash all 12 cards
+  // to a Moderator/Teacher, otherwise UI shows a section as accessible while the
+  // route guard (AdminShell isDeniedByRole) would block it.
   const visibleCards = ready
     ? CARDS.filter((card) => hasAccess(gate.role, gate.permissions, card.href))
-    : CARDS;
+    : [];
+  if (!ready) {
+    return (
+      <section className="mx-auto max-w-6xl px-3 py-10 sm:px-6">
+        <header>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#234e9f] admin-dark:text-[#93c5fd]">
+            Admin Panel
+          </p>
+          <h1 className="mt-2 text-2xl font-extrabold text-[#0b1e3a] sm:text-3xl admin-dark:text-white">
+            MediSpark Management
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500 admin-dark:text-[#8da0c0]">
+            The Main Website with full control. Pick a section — every change is
+            saved to MySQL and appears on the Main Website immediately.
+          </p>
+        </header>
+        <AccessLoading label="Loading Admin Panel…" />
+      </section>
+    );
+  }
   return (
     <section className="mx-auto max-w-6xl px-3 py-10 sm:px-6">
       <header>
@@ -76,21 +85,20 @@ export default function AdminHomePage() {
         </p>
       </header>
 
-      {!ready && <AccessLoading label="Loading Admin Panel…" />}
-      {ready && visibleCards.length === 0 && (
+      {visibleCards.length === 0 && (
         <div className="mt-8 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-6 text-center">
           <p className="text-sm font-bold text-yellow-600 admin-dark:text-yellow-300">No accessible controls for your role.</p>
           <p className="mt-1 text-xs text-yellow-800/70 admin-dark:text-yellow-200/70">Contact an Admin to grant permissions.</p>
         </div>
       )}
-      {ready && gate.role === "teacher" && (
+      {gate.role === "teacher" && (
         <p className="mt-4 rounded-xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-xs font-semibold text-[#1a3a78] admin-dark:border-[#1e3a65] admin-dark:bg-[#132a4f] admin-dark:text-[#93c5fd]">
-          Teacher access: Course Content Control · Public Exam Control · Q&A Answer · Result Control
+          Teacher access: Website & Home · Course Content · Public Exam · Q&A · Result · Notification & Dashboard
         </p>
       )}
       {/* Exactly 2 columns × 6 rows on every device — Unified Smart Card */}
       <nav className="mt-8 grid grid-cols-2 gap-3 sm:gap-4">
-        {(ready ? visibleCards : CARDS).map((card) => (
+        {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}

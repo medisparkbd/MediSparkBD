@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { updateStudentProfile } from "@/lib/student-id";
+import MediSparkLoader from "@/components/MediSparkLoader";
 
 const inputClass =
   "w-full rounded-xl border border-ink/15 bg-dark-950 px-4 py-3 text-sm text-heading placeholder-neutral-500 outline-none transition focus:border-primary-500/70 focus:ring-2 focus:ring-primary-500/20";
@@ -76,10 +77,7 @@ export default function StudentProfileView() {
   if (authLoading || profileLoading || !user || !profile) {
     return (
       <main className="flex flex-1 items-center justify-center bg-dark-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-          <p className="text-sm text-neutral-400">Loading your profile...</p>
-        </div>
+        <MediSparkLoader size="medium" label="Loading your profile..." />
       </main>
     );
   }

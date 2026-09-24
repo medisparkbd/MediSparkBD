@@ -71,7 +71,8 @@ export default function BannerSlider({ initialSlides = [] }: { initialSlides?: S
         className="flex touch-pan-y transition-transform duration-700 ease-out"
         style={{ transform: `translateX(-${activeIndex * 100}%)` }}
       >
-        {slides.map((slide) => {
+        {slides.map((slide, index) => {
+          const isFirst = index === 0;
           const banner = (
             <Image
               src={slide.image}
@@ -80,7 +81,9 @@ export default function BannerSlider({ initialSlides = [] }: { initialSlides?: S
               sizes="100vw"
               draggable={false}
               className="object-cover"
-              priority
+              priority={isFirst}
+              loading={isFirst ? "eager" : "lazy"}
+              fetchPriority={isFirst ? "high" : "low"}
             />
           );
           const hashTarget = slide.href?.startsWith("#")

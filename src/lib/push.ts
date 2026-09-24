@@ -1,6 +1,10 @@
 "use client";
 
-import { isSupported, getMessaging, getToken } from "firebase/messaging";
+// Dynamic import for firebase/messaging to keep it out of initial bundle (slow network optimization)
+// Main bundle stays lightweight; messaging code only loads when user enables push.
+async function getMessagingModule() {
+  return import("firebase/messaging");
+}
 
 // Browser-side push subscription. The VAPID key must match the "Web Push
 // certificates" configured in Firebase Console → Cloud Messaging.
@@ -50,7 +54,8 @@ export async function enablePushNotifications(
     if (permission !== "granted") {
       return { ok: false, error: "Notification permission was not granted." };
     }
-    if (!(await isSupported())) {
+    const { isSupported: isSupportedMsg, getMessaging, getToken } = await getMessagingModule();
+    if (!(await isSupportedMsg())) {
       return { ok: false, error: "Push messaging is not supported in this browser." };
     }
     const registration = await registerServiceWorker();
@@ -98,7 +103,8 @@ export async function disablePushNotifications(
   try {
     const registration = await navigator.serviceWorker.getRegistration();
     let token: string | null = null;
-    if (registration && VAPID_KEY && await isSupported()) {
+    const { isSupported: isSupportedMsg, getMessaging, getToken } = await getMessagingModule();
+    if (registration && VAPID_KEY && await isSupportedMsg()) {
       token = await getToken(getMessaging(), {
         vapidKey: VAPID_KEY,
         serviceWorkerRegistration: registration,

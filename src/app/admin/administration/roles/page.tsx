@@ -86,6 +86,7 @@ export default function RolesPage() {
 
   function togglePermission(role: string, permission: string) {
     if (role === "admin") return; // Admin always has everything.
+    if (permission === "manageAdmins") return; // Admin Center is Admin-only (also enforced server-side).
     setMatrix((prev) => {
       const current = prev?.[role] ?? [];
       const next = current.includes(permission)
@@ -162,7 +163,7 @@ export default function RolesPage() {
                         <input
                           type="checkbox"
                           aria-label={`${role.label}: ${permission.label}`}
-                          disabled={role.value === "admin"}
+                          disabled={role.value === "admin" || permission.value === "manageAdmins"}
                           checked={checked}
                           onChange={() => togglePermission(role.value, permission.value)}
                         />

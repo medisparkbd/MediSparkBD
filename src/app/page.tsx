@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import BannerSlider from "@/components/home/BannerSlider";
 import Hero from "@/components/home/Hero";
 import FeaturedCourses from "@/components/home/FeaturedCourses";
@@ -10,6 +11,7 @@ import StudentReviews from "@/components/home/StudentReviews";
 import FaqSection from "@/components/home/FaqSection";
 import JoinWithUs from "@/components/home/JoinWithUs";
 import PromotionsSection from "@/components/home/PromotionsSection";
+import { BannerSkeleton, HeroSkeleton, SectionSkeleton } from "@/components/home/HomeSkeletons";
 import { fetchHomepageSections } from "@/lib/homepage-sections";
 import { fetchHeroSettings } from "@/lib/hero-settings";
 import { fetchPublishedReviewRecords } from "@/lib/reviews-store";
@@ -87,34 +89,46 @@ export default async function HomePage() {
 
   function renderHomeSection(section: HomepageSection): ReactNode {
     if (section.key === "banner") {
-      return <BannerSlider key={section.key} initialSlides={bannerSlides} />;
+      return (
+        <Suspense key={section.key} fallback={<BannerSkeleton />}>
+          <BannerSlider initialSlides={bannerSlides} />
+        </Suspense>
+      );
     }
     if (section.key === "hero") {
-      // Hero visibility is controlled from Admin → Website → Hero Section.
       if (!heroSettings.isActive) return null;
-      return <Hero key={section.key} hero={heroSettings} />;
+      return (
+        <Suspense key={section.key} fallback={<HeroSkeleton />}>
+          <Hero hero={heroSettings} />
+        </Suspense>
+      );
     }
     if (section.key === "reviews") {
       return (
-        <StudentReviews
-          key={section.key}
-          reviews={publishedReviews}
-          title={section.title ?? undefined}
-          description={section.description ?? undefined}
-        />
+        <Suspense key={section.key} fallback={<SectionSkeleton />}>
+          <StudentReviews
+            reviews={publishedReviews}
+            title={section.title ?? undefined}
+            description={section.description ?? undefined}
+          />
+        </Suspense>
       );
     }
     if (section.key === "faq") {
       return (
-        <FaqSection
-          key={section.key}
-          faqs={publishedFaqs}
-          title={section.title ?? undefined}
-          description={section.description ?? undefined}
-        />
+        <Suspense key={section.key} fallback={<SectionSkeleton />}>
+          <FaqSection
+            faqs={publishedFaqs}
+            title={section.title ?? undefined}
+            description={section.description ?? undefined}
+          />
+        </Suspense>
       );
     }
-    return renderSection(section);
+    // Below-fold sections: wrap in Suspense so they stream without blocking first paint
+    const node = renderSection(section);
+    if (!node) return null;
+    return <Suspense key={section.key} fallback={<SectionSkeleton />}>{node}</Suspense>;
   }
 
   const jerseyNode: ReactNode = (

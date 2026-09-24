@@ -173,9 +173,9 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
 
   // Route-level RBAC with parent → subtree inheritance (Public Exam Control
   // → Category → Exam → Exam Management resolve to the parent control via
-  // longest-prefix match). Only enforced once the gate resolves; while
-  // loading, pages render normally and show their own loaders. Unknown
-  // routes stay accessible; Admin bypasses every check.
+  // segment-aware longest-prefix match). Only enforced once the gate resolves;
+  // while loading, pages render normally and show their own loaders. Unknown
+  // routes fail closed (denied); Admin bypasses every check.
   const isDeniedByRole =
     gate.ready && !hasControlAccess(gate.role, gate.permissions, pathname);
 

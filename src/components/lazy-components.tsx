@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import MediSparkLoader from "@/components/MediSparkLoader";
 
 // Heavy PDF libraries - only load when user clicks Generate/Download
 export const PdfGenerator = dynamic(
@@ -10,36 +11,47 @@ export const PdfGenerator = dynamic(
       (mod) => mod.default
     ),
   {
-    loading: () => (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent" />
-      </div>
-    ),
+    loading: () => <MediSparkLoader size="medium" label="Loading PDF generator…" />,
     ssr: false,
   }
 );
 
-// Admin-heavy components - defer until admin panel
+// Admin-heavy components - defer until admin panel (use MediSparkLoader, not raw pulse)
 export const AdminExamManager = dynamic(
   () => import("@/components/admin/ExamManager").then((mod) => mod.default),
-  { loading: () => <div className="h-32 animate-pulse bg-slate-100" />, ssr: false }
+  {
+    loading: () => <MediSparkLoader size="small" label="Loading exam manager…" />,
+    ssr: false,
+  }
 );
 
 export const AdminCourseManager = dynamic(
   () => import("@/components/admin/CourseManager").then((mod) => mod.default),
-  { loading: () => <div className="h-32 animate-pulse bg-slate-100" />, ssr: false }
+  {
+    loading: () => <MediSparkLoader size="small" label="Loading course manager…" />,
+    ssr: false,
+  }
 );
 
-// Firebase Auth - preload on idle
+// Firebase Auth - preload on idle (network-aware: skip on saveData/2G)
 let firebaseAuthPromise: Promise<typeof import("firebase/auth")> | null = null;
 
+function shouldPreload(): boolean {
+  if (typeof navigator === "undefined") return true;
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData) return false;
+  if (conn?.effectiveType && (conn.effectiveType.includes("2g") || conn.effectiveType === "slow-2g")) return false;
+  return true;
+}
+
 export function preloadFirebaseAuth(): void {
+  if (!shouldPreload()) return;
   if (!firebaseAuthPromise) {
     firebaseAuthPromise = import("firebase/auth");
   }
 }
 
-// Preload on first user interaction
+// Preload on first user interaction — lightweight, deferred
 if (typeof window !== "undefined") {
   ["click", "keydown", "mousemove", "touchstart"].forEach((evt) => {
     window.addEventListener(
@@ -50,6 +62,13 @@ if (typeof window !== "undefined") {
       { once: true, passive: true }
     );
   });
+  // Idle preload after 2.5s on fast networks only
+  const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback;
+  const preloadIdle = () => {
+    if (shouldPreload()) preloadFirebaseAuth();
+  };
+  if (idle) idle(preloadIdle, { timeout: 3000 });
+  else setTimeout(preloadIdle, 2500);
 }
 
 export function getFirebaseAuth(): Promise<typeof import("firebase/auth")> {

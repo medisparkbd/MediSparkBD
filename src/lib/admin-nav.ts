@@ -20,6 +20,8 @@ export type AdminSubSection = {
 /**
  * Permission category required to see/use a nav section.
  * null = available to every signed-in admin (e.g. profile).
+ * NOTE: this label is informational only — actual route/API enforcement uses
+ * the canonical Role → Permission → Control map in `src/lib/admin-access.ts`.
  */
 export type AdminNavPermission =
   | "manageContent"
@@ -27,6 +29,11 @@ export type AdminNavPermission =
   | "manageExams"
   | "manageStudents"
   | "manageAdmins"
+  | "manageSystem"
+  | "manageCourseContent"
+  | "managePublicExam"
+  | "manageQa"
+  | "manageResults"
   | null;
 
 export type AdminCategory = {
@@ -179,7 +186,7 @@ export const adminCategories: AdminCategory[] = [
     description:
       "Manage system-level settings, storage, cache, backup and logs.",
     icon: ServerIcon,
-    permission: "manageAdmins",
+    permission: "manageSystem",
     subsections: [
       { label: "System Status", href: "/admin/system/status" },
       { label: "Storage", href: "/admin/system/storage" },

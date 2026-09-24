@@ -15,8 +15,8 @@
 -- still stored for visibility in the Roles matrix UI.
 INSERT INTO role_permissions (role, permissions) VALUES
   ('admin', '["manageContent","manageCourses","manageExams","manageStudents","manageAdmins","manageSystem","manageCourseContent","managePublicExam","manageQa","manageResults"]'),
-  ('moderator', '["manageContent","manageCourses","manageExams"]'),
-  ('teacher', '["manageCourseContent","managePublicExam","manageQa","manageResults"]')
+  ('moderator', '["manageContent","manageCourses","manageExams","manageStudents","manageSystem","manageCourseContent","managePublicExam","manageQa","manageResults"]'),
+  ('teacher', '["manageContent","manageExams","manageCourseContent","managePublicExam","manageQa","manageResults"]')
 ON DUPLICATE KEY UPDATE permissions = VALUES(permissions);
 
 -- Migrate legacy Super Admin to Admin (Admin now has previous Super Admin controls).
