@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Paste Format Guide — MediSpark BD</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif; background: #f1f5f9; color: #0b1e3a; margin: 0; padding: 16px; line-height: 1.8; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid #dbeafe; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(11,30,58,.06); }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0 0 8px; color: #1a3a78; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 12px; }
+  pre { background: #0b1e3a; color: #e8eefc; border-radius: 12px; padding: 14px; overflow-x: auto; font-size: 13.5px; line-height: 1.9; white-space: pre-wrap; }
+  code.inline { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 6px; padding: 0 6px; font-size: 13px; color: #1a3a78; }
+  .ok { border-left: 5px solid #16a34a; }
+  .bad { border-left: 5px solid #dc2626; }
+  .info { border-left: 5px solid #234e9f; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 10px; margin-bottom: 8px; }
+  .tag.ok { background: #dcfce7; color: #166534; }
+  .tag.bad { background: #fee2e2; color: #991b1b; }
+  .tag.info { background: #dbeafe; color: #1a3a78; }
+  ul { margin: 6px 0; padding-left: 20px; font-size: 14px; }
+  li { margin-bottom: 4px; }
+  button.copy { background: #1a3a78; color: #fff; border: 0; border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+  button.copy:active { transform: scale(.97); }
+  .steps { display: grid; gap: 8px; font-size: 14px; }
+  .step { background: #f8fbff; border: 1px solid #dbeafe; border-radius: 10px; padding: 8px 12px; }
+  .step b { color: #1a3a78; }
+  @media (max-width: 560px) { body { padding: 10px; } .card { padding: 14px; } h1 { font-size: 19px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>📝 Exam Paste Format Guide</h1>
+    <div class="sub">Admin Panel → Add Exam → Paste Questions → <b>Detect Questions</b> — ১০ / ২০ / ৫০ / ১০০+ প্রশ্ন একসাথে সাপোর্ট করে। নিচের ফরম্যাটে paste করলে সব প্রশ্ন + উত্তর সঠিকভাবে detect হবে (৫৫/৫৫ verified)।</div>
+    <div class="steps">
+      <div class="step"><b>ধাপ ১:</b> নিচের <b>সঠিক ফরম্যাটে</b> প্রশ্ন paste করুন।</div>
+      <div class="step"><b>ধাপ ২:</b> <b>Detect Questions</b> চাপুন → সব প্রশ্ন preview-তে আসবে।</div>
+      <div class="step"><b>ধাপ ৩:</b> Review করে <b>Save Questions</b> চাপুন।</div>
+    </div>
+  </div>
+
+  <div class="card ok">
+    <span class="tag ok">✓ সঠিক ফরম্যাট (এইভাবে paste করুন)</span>
+    <h2>বাংলা MCQ — উত্তর শুধু লেবেল (ক / খ / গ / ঘ) লিখুন</h2>
+<pre id="goodFormat">১। কোনটির পুচ্ছ পাখনা হেটারোসার্কাল ধরনের? [ঢা. বো. ১৯]
+(ক) রুই
+(খ) লাংফিশ
+(গ) টাকি
+(ঘ) হাঙ্গর
+সঠিক উত্তর: ঘ
+
+২। সম্পূর্ণ চার প্রকোষ্ঠবিশিষ্ট হৃৎপিণ্ড কোন প্রাণীতে দেখা যায়? [ঢা. বো. ১৯]
+(ক) টিকটিকি
+(খ) কুমির
+(গ) কচ্ছপ
+(ঘ) সাপ
+সঠিক উত্তর: খ
+
+৩। ত্রিপদ নামকরণের প্রবক্তা কোন বিজ্ঞানী? [চ. বো. ১৯]
+(ক) লিনিয়াস
+(খ) স্লেজেল
+(গ) ল্যামার্ক
+(ঘ) হ্যাক্সেলে
+সঠিক উত্তর: খ</pre>
+    <button class="copy" onclick="copyGood()">📋 ফরম্যাট কপি করুন</button>
+    <ul>
+      <li>প্রশ্ন নম্বর: <code class="inline">১।</code> <code class="inline">২।</code> … অথবা <code class="inline">1.</code> <code class="inline">2)</code> <code class="inline">Q1.</code></li>
+      <li>অপশন: <code class="inline">(ক) (খ) (গ) (ঘ)</code> অথবা <code class="inline">ক. খ. গ. ঘ.</code> অথবা <code class="inline">A. B. C. D.</code></li>
+      <li>উত্তর: <b>শুধু লেবেল</b> — <code class="inline">সঠিক উত্তর: ঘ</code> / <code class="inline">উত্তর: খ</code> / <code class="inline">Answer: D</code></li>
+      <li>বোর্ড ট্যাগ প্রশ্নের লাইনেই রাখুন: <code class="inline">[ঢা. বো. ১৯]</code> — সমস্যা নেই।</li>
+      <li>প্রশ্নগুলোর মাঝে <b>এক লাইন ফাঁকা</b> রাখুন।</li>
+    </ul>
+  </div>
+
+  <div class="card bad">
+    <span class="tag bad">✗ ভুল ফরম্যাট (এইভাবে paste করবেন না)</span>
+    <h2>উত্তরের সাথে ব্র্যাকেটে অপশন-টেক্সট লিখবেন না</h2>
+<pre>সঠিক উত্তর: (ঘ) হাঙ্গর     ← ভুল
+সঠিক উত্তর: ঘ              ← সঠিক</pre>
+    <ul>
+      <li><code class="inline">সঠিক উত্তর: (ঘ) হাঙ্গর</code> — এই ফরম্যাটে উত্তর detect হয় না, আর বড় সেটে (১১টার পর) প্রশ্নও ভাগ হয়ে যায়।</li>
+      <li>উত্তরের লাইনে শুধু <b>এক অক্ষরের লেবেল</b> রাখুন — অপশনের টেক্সট আবার লিখবেন না।</li>
+      <li>প্রশ্নের মাঝখানে <code class="inline">Answer Key:</code> / <code class="inline">উত্তরমালা</code> হেডিং দেবেন না (থাকলে শেষের অংশ আলাদা answer-key ধরা হয়)।</li>
+    </ul>
+  </div>
+
+  <div class="card info">
+    <span class="tag info">ⓘ আলাদা Answer Key (নতুন সুবিধা)</span>
+    <h2>প্রশ্নে উত্তর না থাকলে — Answer source: “Separate”</h2>
+    <ul>
+      <li>প্রশ্ন paste করে Detect করুন (উত্তর খালি থাকবে)।</li>
+      <li>Answer Key ঘরে key paste করুন — ফরম্যাট: <code class="inline">1-A</code> <code class="inline">2-B</code> … অথবা <code class="inline">1. A</code> <code class="inline">2. B</code> … অথবা <code class="inline">1 A</code> <code class="inline">2 B</code> … অথবা <code class="inline">1A 2B 3C</code></li>
+      <li><b>Detect Answer Key</b> → preview-তে মিলিয়ে দেখুন (✓ Matched / ⚠ Missing / Extra) → <b>Apply Answer Key</b> → Save।</li>
+      <li>মিল হয় <b>প্রশ্ন নম্বর</b> দিয়ে (২৫→B মানে ২৫ নম্বর প্রশ্নের উত্তর B) — ৫০/১০০+ key-ও একসাথে সাপোর্ট করে।</li>
+      <li>Answer-key ছবি থাকলে <b>Upload Answer Key Image</b> দিয়েও detect করা যায়।</li>
+    </ul>
+<pre>1-A
+2-B
+3-C
+4-D
+5-A</pre>
+  </div>
+
+  <div class="card">
+    <h2>✅ চেকলিস্ট (Save-এর আগে)</h2>
+    <ul>
+      <li>Detected সংখ্যা আপনার প্রশ্নসংখ্যার সমান কি না দেখুন (যেমন ৫৫ paste → Detected 55)।</li>
+      <li>কোনো উত্তরে “Needs review” থাকলে ঠিক করে নিন।</li>
+      <li>Separate key ব্যবহার করলে Missing/Extra warning না থাকা নিশ্চিত করুন।</li>
+      <li>তারপর <b>Save Questions</b> চাপুন।</li>
+    </ul>
+  </div>
+
+</div>
+<script>
+function copyGood() {
+  var t = document.getElementById("goodFormat").innerText;
+  if (navigator.clipboard) { navigator.clipboard.writeText(t).then(function(){ alert("ফরম্যাট কপি হয়েছে ✓"); }); }
+  else { var ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); alert("ফরম্যাট কপি হয়েছে ✓"); }
+}
+</script>
+</body>
+</html>
