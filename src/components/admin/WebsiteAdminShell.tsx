@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -59,6 +59,15 @@ function WebsiteAdminShellInner({
   const { theme } = useAdminTheme();
   // Browser/device Back closes the drawer first (no navigation).
   useOverlayBackClose(menuOpen, () => setMenuOpen(false));
+
+  // Close drawer only after route actually changes (mirrors AdminShell)
+  const lastPathRef = useRef(pathname);
+  useEffect(() => {
+    if (menuOpen && pathname !== lastPathRef.current) {
+      lastPathRef.current = pathname;
+      setMenuOpen(false);
+    }
+  }, [menuOpen, pathname]);
 
   if (!gate.ready) {
     return gate.denied ? (
@@ -124,7 +133,12 @@ function WebsiteAdminShellInner({
             {/* Hamburger — opens left-side drawer on all screen sizes (laptop, tablet, mobile and desktop) */}
             <button
               type="button"
-              onClick={() => setMenuOpen((open) => !open)}
+              data-no-global-loader
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbeafe] bg-[#f8fbff] text-[#1a3a78] transition hover:border-[#93c5fd] hover:bg-[#eff6ff] focus:outline-none focus:ring-2 focus:ring-[#2f6bce]/20 admin-dark:border-[#1e3a65] admin-dark:bg-[#132a4f] admin-dark:text-[#93c5fd] admin-dark:hover:bg-[#1a3a78]"
@@ -207,8 +221,13 @@ function WebsiteAdminShellInner({
         <button
           type="button"
           aria-label="Close menu"
+          data-no-global-loader
           tabIndex={menuOpen ? 0 : -1}
-          onClick={() => setMenuOpen(false)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenuOpen(false);
+          }}
           className={`absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-opacity duration-300 ${
             menuOpen ? "opacity-100" : "opacity-0"
           }`}
@@ -227,7 +246,12 @@ function WebsiteAdminShellInner({
             <button
               type="button"
               aria-label="Close menu"
-              onClick={() => setMenuOpen(false)}
+              data-no-global-loader
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMenuOpen(false);
+              }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" strokeLinecap="round">
@@ -245,7 +269,6 @@ function WebsiteAdminShellInner({
                   {homeItem && (
                     <Link
                       href={homeItem.href}
-                      onClick={() => setMenuOpen(false)}
                       aria-current={isActive(homeItem.href) ? "page" : undefined}
                       className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${
                         isActive(homeItem.href)
@@ -265,7 +288,6 @@ function WebsiteAdminShellInner({
                       <li key={item.href}>
                         <Link
                           href={item.href}
-                          onClick={() => setMenuOpen(false)}
                           aria-current={isActive(item.href) ? "page" : undefined}
                           className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${
                             isActive(item.href)

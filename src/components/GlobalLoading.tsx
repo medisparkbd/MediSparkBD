@@ -119,26 +119,70 @@ export function GlobalLoadingProvider({ children }: { children: ReactNode }) {
 
   // Capture internal navigation clicks early (Link / router.push) to show bar instantly
   // Respects saveData / slow connection: still show but allow earlier hide.
+  // IMPORTANT: hamburger/menu/drawer toggles, dropdowns, modals, tabs, etc. are UI
+  // interactions — they must NOT trigger the global loader. Only genuine
+  // <a href="/..."> navigations with a different pathname should start loading.
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!target) return;
+      // Ignore any click that originates from a UI control (button, summary, etc.)
+      // This prevents hamburger, dropdown, modal, accordion, tabs, and other
+      // non-navigation interactions from ever triggering the progress bar.
+      // Check before anchor lookup: if the closest button/data-ignore is closer
+      // than the anchor, it is a UI interaction.
+      if (target.closest("[data-no-global-loader], [data-global-loader-ignore]")) return;
+      const button = target.closest("button");
+      const anchorCandidate = target.closest("a[href]") as HTMLAnchorElement | null;
+      if (button) {
+        if (!anchorCandidate) return; // pure button click (e.g. hamburger) → never navigation
+        // Button is inside an anchor or anchor inside button (invalid nesting) → treat as UI, ignore
+        // Walk from target up to anchorCandidate: if we hit a button before anchor, ignore
+        let el: HTMLElement | null = target;
+        while (el && el !== anchorCandidate) {
+          if (el.tagName === "BUTTON") return;
+          el = el.parentElement;
+        }
+        if (button.contains(anchorCandidate)) return;
+      }
+      const anchor = anchorCandidate;
       if (!anchor) return;
+      // Also ignore anchors that are explicitly marked or inside ignored containers
+      if (anchor.closest("[data-no-global-loader], [data-global-loader-ignore]")) return;
+      if (anchor.closest("button")) return;
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("#") || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
       if (href.startsWith("/") && pathname !== href.split("?")[0].split("#")[0]) {
         startLoading();
       }
     };
-    const onPopState = () => startLoading();
+    const onPopState = (event: PopStateEvent) => {
+      // Ignore overlay / drawer / modal trap back-presses.
+      // useOverlayBackClose pushes {overlayBackClose:true}; UI-initiated close does
+      // history.back() which fires popstate with the previous state's value.
+      // Those are not real navigations and must not show the progress bar.
+      const state = (event.state as Record<string, unknown> | null) ?? (history.state as Record<string, unknown> | null);
+      if (state && (state as Record<string, unknown>).overlayBackClose) return;
+      if (state && (state as Record<string, unknown>).examLock) return;
+      if (document.documentElement.hasAttribute("data-exam-locked")) return;
+      // Overlay close keeps the URL identical (history.back() to same href). Ignore if pathname+search unchanged.
+      try {
+        const current = window.location.pathname + (window.location.search || "");
+        const expected = pathname + (searchString ? `?${searchString}` : "");
+        if (current === expected) return;
+      } catch {
+        // ignore
+      }
+      startLoading();
+    };
     document.addEventListener("click", onClick, true);
     window.addEventListener("popstate", onPopState);
     return () => {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", onPopState);
     };
-  }, [pathname, startLoading]);
+  }, [pathname, searchString, startLoading]);
 
   // Cleanup pending timers on unmount to prevent stuck UI
   useEffect(() => {
@@ -249,11 +293,12 @@ export function FirstLoadOverlay() {
       aria-live="polite"
       aria-busy="true"
       aria-label="Loading MediSpark"
-      className="fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-dark-950 px-6"
+      className={`fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-dark-950 px-6 ${fading ? "pointer-events-none" : ""}`}
       style={{
         opacity: fading ? 0 : 1,
         transition: "opacity 420ms ease, visibility 420ms ease",
         visibility: fading ? "hidden" : "visible",
+        pointerEvents: fading ? "none" : undefined,
       }}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">

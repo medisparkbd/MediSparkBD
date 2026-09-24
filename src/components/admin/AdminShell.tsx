@@ -279,7 +279,12 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
       <div className="shrink-0 border-t border-white/10 p-3">
         <button
           type="button"
-          onClick={toggleCollapsed}
+          data-no-global-loader
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCollapsed();
+          }}
           className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition hover:bg-white/5 hover:text-white ${
             collapsed ? "justify-center px-0" : ""
           }`}
@@ -312,14 +317,24 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
+            data-no-global-loader
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMobileOpen(false);
+            }}
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           />
           <aside className="absolute left-0 top-0 z-10 flex h-full w-72 max-w-[85vw] flex-col bg-zinc-950 shadow-2xl shadow-black/60">
             <button
               type="button"
               aria-label="Close menu"
-              onClick={() => setMobileOpen(false)}
+              data-no-global-loader
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMobileOpen(false);
+              }}
               className="absolute right-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
             >
               <CloseIcon className="h-5 w-5" />
@@ -336,7 +351,12 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
+            data-no-global-loader
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMobileOpen(true);
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-200 text-zinc-700 transition hover:border-primary-500/60 hover:bg-neutral-50 lg:hidden admin-dark:border-zinc-700 admin-dark:text-zinc-200 admin-dark:hover:bg-zinc-800"
           >
             <MenuIcon className="h-5 w-5" />
