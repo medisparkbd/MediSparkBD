@@ -22,13 +22,18 @@ export async function GET() {
 
 /**
  * Create or update a review.
- * - Admins (manageContent): multipart form — full control, as before.
- * - Signed-in registered students: JSON { rating, text } — creates or
- *   updates ONLY their own review, using their real account info.
+ * - Admin Panel (multipart form + manageContent): full control, as before.
+ * - Homepage form (JSON { rating, text }): creates/updates ONLY the caller's
+ *   own review using their real account info — including admins submitting
+ *   as students, since the homepage always sends JSON.
  */
 export async function POST(request: NextRequest) {
-  const admin = await requirePermission(request, "manageContent");
-  if (admin) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const admin = await requirePermission(request, "manageContent");
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
     return handleAdminPost(request);
   }
   return handleStudentPost(request);
@@ -36,7 +41,15 @@ export async function POST(request: NextRequest) {
 
 /** Admin create/update (multipart — supports optional photo upload). */
 async function handleAdminPost(request: NextRequest) {
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid form submission. Please try again." },
+      { status: 400 },
+    );
+  }
   const rawId = formData.get("id");
   const studentName = formData.get("student_name");
   const text = formData.get("text");
