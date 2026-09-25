@@ -16,7 +16,8 @@ type ExamQuestion = {
   subject: string;
   question: string;
   options: string[];
-  correctIndex: number;
+  /** NULL = not yet chosen (nothing pre-selected — never silently A). */
+  correctIndex: number | null;
   explanation: string | null;
   marks: number;
 };
@@ -45,7 +46,8 @@ export default function ExamQuestions({
     subject: exam.subject || "",
     question: "",
     options: EMPTY_OPTIONS,
-    correctIndex: 0,
+    // Unknown until the admin picks an answer — never pre-selected as A.
+    correctIndex: null as number | null,
     explanation: "",
     marks: "1",
   });
@@ -97,7 +99,7 @@ export default function ExamQuestions({
       setError("At least two non-empty options are required.");
       return;
     }
-    if (form.correctIndex < 0 || form.correctIndex >= form.options.length || !form.options[form.correctIndex]?.trim()) {
+    if (form.correctIndex === null || form.correctIndex === undefined || form.correctIndex < 0 || form.correctIndex >= form.options.length || !form.options[form.correctIndex]?.trim()) {
       setError("Select a valid correct answer.");
       return;
     }
@@ -130,7 +132,7 @@ export default function ExamQuestions({
         subject: form.subject,
         question: "",
         options: EMPTY_OPTIONS,
-        correctIndex: 0,
+        correctIndex: null,
         explanation: "",
         marks: form.marks,
       });
@@ -365,7 +367,7 @@ export default function ExamQuestions({
                 className={buttonSecondaryClass}
                 onClick={() => {
                   setEditingId(null);
-                  setForm({ subject: exam.subject || "", question: "", options: EMPTY_OPTIONS, correctIndex: 0, explanation: "", marks: "1" });
+                  setForm({ subject: exam.subject || "", question: "", options: EMPTY_OPTIONS, correctIndex: null, explanation: "", marks: "1" });
                   setError(null);
                 }}
               >

@@ -133,7 +133,8 @@ export type SubmissionOutcome = {
 type ResultDetail = {
   questionId: number;
   chosenIndex: number | null;
-  correctIndex: number;
+  /** NULL = unknown answer (never defaulted to 0/A; cannot award marks). */
+  correctIndex: number | null;
   marks: number;
   /** Marks obtained for this question — negative when a wrong answer costs marks. */
   obtained: number;
@@ -217,7 +218,8 @@ async function updateMeritPositions(examId: string): Promise<void> {
 
 type GradingQuestionRow = {
   id: number;
-  correct_index: number;
+  /** NULL = unknown answer (never defaulted to 0/A; cannot award marks). */
+  correct_index: number | null;
   marks: string | number;
 };
 
@@ -720,7 +722,7 @@ async function finalizeAttempt(
   let rows: GradingQuestionRow[];
   try {
     const baseRows = await query<
-      { id: number; correct_index: number; marks: string | number }[]
+      { id: number; correct_index: number | null; marks: string | number }[]
     >(
       `SELECT id, correct_index, marks FROM exam_questions
        WHERE exam_id = ? AND is_active = 1`,
@@ -1005,8 +1007,15 @@ async function latestOutcome(
     );
     return legacy as { answers: string | null; question_version?: string | null; assigned_set?: string | null }[];
   });
-  const correctById = new Map<number, number>();
-  for (const q of questions) correctById.set(Number(q.id), q.correct_index);
+  // Counts come from the last stored answers snapshot when available.
+  // Correctness is evaluated against the locked Version/Set mapping stored
+  // with the result (permanent Question IDs) — never the display serial.
+  // Unknown answers stay unknown (NULL) — never coerced to 0/A.
+  const correctById = new Map<number, number | null>();
+  for (const q of questions) {
+    const base = q.correct_index;
+    correctById.set(Number(q.id), base === null || base === undefined ? null : base);
+  }
   try {
     const snapVersion = normalizeVersion(resultRows[0]?.question_version);
     const snapSetRaw = String(resultRows[0]?.assigned_set ?? "").toUpperCase();
@@ -1015,7 +1024,12 @@ async function latestOutcome(
       const variants = await fetchVariantMap(examId);
       for (const q of questions) {
         const v = variants.get(`${Number(q.id)}:${snapVersion}:${snapSet}`);
-        if (v) correctById.set(Number(q.id), Number(v.correct_index) || 0);
+        if (v) {
+          correctById.set(
+            Number(q.id),
+            v.correct_index === null || v.correct_index === undefined ? null : Number(v.correct_index) || 0,
+          );
+        }
       }
     }
   } catch {
@@ -1029,9 +1043,13 @@ async function latestOutcome(
   let rawMarks = 0;
   for (const question of questions) {
     const chosen = answers[String(question.id)];
-    const correctIndex = correctById.get(Number(question.id)) ?? question.correct_index;
+    // `.has()` (not `??`): an explicit stored unknown (NULL) must survive —
+    // `null ?? fallback` would wrongly fall through to the base value.
+    const correctIndex = correctById.has(Number(question.id))
+      ? (correctById.get(Number(question.id)) ?? null)
+      : (question.correct_index ?? null);
     if (typeof chosen !== "number") skippedCount += 1;
-    else if (chosen === correctIndex) {
+    else if (correctIndex !== null && chosen === correctIndex) {
       correctCount += 1;
       rawMarks += Number(question.marks) || 1;
     } else wrongCount += 1;
@@ -1128,7 +1146,7 @@ export async function getExamForTaking(
       question: string;
       options: string;
       marks: string | number;
-      correct_index: number;
+      correct_index: number | null;
       explanation: string | null;
       question_image?: string | null;
       sort_order?: number | null;
@@ -1184,7 +1202,8 @@ export async function getExamForTaking(
         question: row.question,
         options: parsed.map(String),
         marks: Number(row.marks) || 1,
-        correctIndex: Number(row.correct_index) || 0,
+        // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
+        correctIndex: row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
         explanation: row.explanation ?? null,
         questionImage: (row.question_image as string | null) ?? null,
         fromVariant: false,
@@ -1470,7 +1489,8 @@ export type AnswerScriptQuestion = {
   marks: number;
   /** Index the student selected — null when the question was left unanswered. */
   chosenIndex: number | null;
-  correctIndex: number;
+  /** NULL = unknown answer (rendered as "—", never as A). */
+  correctIndex: number | null;
   /** Marks obtained for this question — negative on wrong answers. */
   obtained: number;
   explanation: string | null;
@@ -1608,7 +1628,7 @@ export async function getExamResultScript(
     question: string;
     options: string;
     marks: string | number;
-    correct_index: number;
+    correct_index: number | null;
     explanation: string | null;
     question_image?: string | null;
   }[]>(
@@ -1632,7 +1652,8 @@ export async function getExamResultScript(
     question: string;
     options: string[];
     marks: number;
-    correctIndex: number;
+    /** NULL = unknown answer (rendered as "—", never as A). */
+    correctIndex: number | null;
     explanation: string | null;
     questionImage: string | null;
   }>();
@@ -1641,7 +1662,7 @@ export async function getExamResultScript(
     question: string | null | undefined,
     options: string[],
     marks: number,
-    correctIndex: number,
+    correctIndex: number | null,
     explanation: string | null | undefined,
     questionImage: string | null | undefined,
   ) => {
@@ -1661,7 +1682,7 @@ export async function getExamResultScript(
     question: string;
     options: string;
     marks: string | number;
-    correct_index: number;
+    correct_index: number | null;
     explanation: string | null;
     question_image?: string | null;
   }) => {
@@ -1671,7 +1692,8 @@ export async function getExamResultScript(
       row.question,
       parsed.map(String),
       Number(row.marks) || 1,
-      Number(row.correct_index) || 0,
+      // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
+      row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
       row.explanation,
       (row.question_image as string | null) ?? null,
     );
@@ -1684,7 +1706,10 @@ export async function getExamResultScript(
       variant.question,
       parsed.map(String),
       Number(variant.marks) || fallbackMarks,
-      Number(variant.correct_index) || 0,
+      // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
+      variant.correct_index === null || variant.correct_index === undefined
+        ? null
+        : Number(variant.correct_index) || 0,
       variant.explanation,
       variant.question_image ?? null,
     );
@@ -1744,7 +1769,8 @@ export async function getExamResultScript(
         question: String(row.question ?? ""),
         options: Array.isArray(parsed) ? parsed.map(String) : [],
         marks: baseMarks,
-        correctIndex: Number(row.correct_index) || 0,
+        correctIndex:
+          row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
         explanation: row.explanation ?? null,
         questionImage: (row.question_image as string | null) ?? null,
       };

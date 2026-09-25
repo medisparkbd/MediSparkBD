@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
           hasVariant: true,
           question: v.question,
           options: Array.isArray(opts) ? opts.map(String) : q.options,
-          correctIndex: Number(v.correct_index) || 0,
+          // Preserve an explicit unknown (NULL) — never coerce it to 0/A here.
+          correctIndex: v.correct_index === null || v.correct_index === undefined ? null : Number(v.correct_index) || 0,
           explanation: v.explanation ?? null,
           marks: Number(v.marks) || q.marks,
           questionImage: v.question_image ?? null,
@@ -89,6 +90,9 @@ export async function POST(request: NextRequest) {
       const asString = (v: unknown): string => (typeof v === "string" ? v : "");
       const str = (v: unknown, fb = ""): string => (typeof v === "string" ? v : fb);
       const num = (v: unknown, fb = 0): number => {
+        // Empty strings must fall back — Number("") is 0, which would
+        // silently store answer A for a missing correctIndex.
+        if (typeof v === "string" && v.trim() === "") return fb;
         const n = Number(v);
         return Number.isFinite(n) ? n : fb;
       };
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest) {
         const inserted = await exec(
           `INSERT INTO exam_questions (exam_id, bank_subject, question, question_image, options, correct_index, explanation, marks, sort_order, is_active)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [examId, "", "", null, JSON.stringify(["", "", "", ""]), 0, null, marksPerSlot, order, 1],
+          [examId, "", "", null, JSON.stringify(["", "", "", ""]), null, null, marksPerSlot, order, 1],
         );
         const insertId = (inserted as unknown as { insertId?: number })?.insertId;
         if (insertId) return Number(insertId);

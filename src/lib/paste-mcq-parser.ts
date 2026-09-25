@@ -61,6 +61,66 @@ function romanToIndex(tok: string): number | null {
   return null;
 }
 
+// ── canonical answer representation ─────────────────────────────────────────
+// The pipeline normalizes every detected answer to "A" | "B" | "C" | "D".
+// Anything missing/malformed/out-of-range is explicit null (unknown) —
+// it is NEVER defaulted to "A"/index 0. Storage, grading and rendering must
+// preserve null and surface it instead of silently converting it.
+export type CanonicalAnswerLetter = "A" | "B" | "C" | "D";
+
+/** Index → canonical letter. Anything outside 0–3 (incl. null/undefined) → null. */
+export function answerIndexToLetter(
+  index: number | null | undefined,
+): CanonicalAnswerLetter | null {
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index > 3) {
+    return null;
+  }
+  return String.fromCharCode(65 + index) as CanonicalAnswerLetter;
+}
+
+/** Canonical letter (EN A–D or BN ক–ঘ, with or without brackets/dots) → index. Else null. */
+export function answerLetterToIndex(
+  letter: string | null | undefined,
+): number | null {
+  if (letter === null || letter === undefined) return null;
+  const c = String(letter)
+    .trim()
+    .replace(/^[\(\[]\s*/, "")
+    .replace(/\s*[\)\]\.]+$/g, "")
+    .trim();
+  if (/^[A-Da-d]$/.test(c)) return c.toUpperCase().charCodeAt(0) - 65;
+  if (/^[কখগঘ]$/.test(c)) return BN_OPT_MAP[c] ?? null;
+  return null;
+}
+
+/**
+ * Strict answer-index normalization for STORAGE boundaries.
+ * Accepts only real integers in [0, optionCount). Empty strings, null,
+ * undefined, booleans, NaN, non-integer numbers, letters and out-of-range
+ * values all yield null. It NEVER returns 0 for missing/malformed input —
+ * the old `Number(x) || 0` idiom silently stored "A".
+ */
+export function strictAnswerIndex(
+  value: unknown,
+  optionCount: number,
+): number | null {
+  if (typeof value === "boolean" || value === null || value === undefined) {
+    return null;
+  }
+  let n: number;
+  if (typeof value === "number") {
+    n = value;
+  } else if (typeof value === "string") {
+    if (value.trim() === "") return null;
+    n = Number(value);
+  } else {
+    return null;
+  }
+  if (!Number.isInteger(n)) return null;
+  if (n < 0 || n >= optionCount) return null;
+  return n;
+}
+
 // ── question header detection ──────────────────────────────────────────────
 function stripQuestionHeader(line: string): { stripped: string; header: string } | null {
   const raw = line;
@@ -292,6 +352,31 @@ function extractAnswerPayload(line: string): string | null {
   return null;
 }
 
+// A line that is ONLY a per-question answer prefix ("Correct Answer:" with no
+// payload). The payload may sit on the next line ("Answer:\nB") — joinable,
+// never A. NOTE: key-section headings ("Answer Key:", "Solution:") are
+// deliberately EXCLUDED here — those belong to the answer-key flow, and this
+// check must run BEFORE the key-section defense below.
+const BARE_QUESTION_ANSWER_PREFIX_RE =
+  /^\s*(?:সঠিক\s*উত্তর|উত্তর|Correct\s+Answer|Correct\s+option|Correct|Ans(?:wer)?\.?)\s*[:\-=—ঃ.:]\s*$/i;
+
+function isBareAnswerPrefix(line: string): boolean {
+  return BARE_QUESTION_ANSWER_PREFIX_RE.test(line);
+}
+
+/** True when a line may serve as the payload of a preceding bare answer prefix. */
+function isJoinableAnswerContinuation(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (isQuestionHeaderLine(line)) return false;
+  if (parseOptionLine(line, true) !== null) return false;
+  if (extractAnswerPayload(line) !== null) return false;
+  if (extractExplanationPayload(line) !== null) return false;
+  if (isMarkLine(line)) return false;
+  if (answerKeyHeadingRemainder(line) !== null) return false;
+  return true;
+}
+
 // ── explanation detection ─────────────────────────────────────────────────
 function extractExplanationPayload(line: string): string | null {
   const t = line.trim();
@@ -314,35 +399,14 @@ function extractExplanationPayload(line: string): string | null {
   return null;
 }
 
-function mapAnswerPayloadToIndex(payload: string, options: [string, string, string, string]): number | null {
-  const raw = payload.trim();
-  if (!raw) return null;
-  // Remove surrounding brackets/parens and trailing dot
-  let clean = raw.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
-
-  // 1) Single label check
-  // English A-D
-  if (/^[A-Da-d]$/.test(clean)) {
-    return clean.toUpperCase().charCodeAt(0) - 65;
-  }
-  // Bangla
-  if (/^[কখগঘ]$/.test(clean)) {
-    return BN_OPT_MAP[clean];
-  }
-  // Numeric 1-4 / Bangla ১-৪
-  if (/^[1-4]$/.test(clean) || /^[১-৪]$/.test(clean)) {
-    const ascii = bnDigitsToAscii(clean);
-    const idx = parseInt(ascii, 10) - 1;
-    if (idx >= 0 && idx < 4) return idx;
-  }
-  // Roman i-iv
-  const romanIdx = romanToIndex(clean);
-  if (romanIdx !== null) return romanIdx;
-
-  // Handle payload like "B." or "(B)" already stripped, but also "Option B" etc. Not needed.
-
-  // 2) Full text match: compare normalized payload with each option text
-  const normPayload = normalizeForCompare(clean);
+/** Compare free text against the four option texts (normalized). Content is
+ *  ground truth when the answer line carries the option text itself. */
+function matchTextToOptionIndex(
+  text: string,
+  options: [string, string, string, string],
+): number | null {
+  const normPayload = normalizeForCompare(text);
+  if (!normPayload) return null;
   // Try exact normalized equality
   for (let i = 0; i < 4; i++) {
     const opt = options[i] ?? "";
@@ -370,6 +434,67 @@ function mapAnswerPayloadToIndex(payload: string, options: [string, string, stri
         return i;
       }
     }
+  }
+  return null;
+}
+
+function mapAnswerPayloadToIndex(payload: string, options: [string, string, string, string]): number | null {
+  const raw = payload.trim();
+  if (!raw) return null;
+  // Remove surrounding brackets/parens and trailing dot
+  const clean = raw.replace(/^[\(\[]\s*/, "").replace(/\s*[\)\]\.]+$/g, "").trim();
+
+  // 1) Single label check
+  // English A-D
+  if (/^[A-Da-d]$/.test(clean)) {
+    return clean.toUpperCase().charCodeAt(0) - 65;
+  }
+  // Bangla
+  if (/^[কখগঘ]$/.test(clean)) {
+    return BN_OPT_MAP[clean];
+  }
+  // Numeric 1-4 / Bangla ১-৪
+  if (/^[1-4]$/.test(clean) || /^[১-৪]$/.test(clean)) {
+    const ascii = bnDigitsToAscii(clean);
+    const idx = parseInt(ascii, 10) - 1;
+    if (idx >= 0 && idx < 4) return idx;
+  }
+  // Roman i-iv
+  const romanIdx = romanToIndex(clean);
+  if (romanIdx !== null) return romanIdx;
+
+  // Handle payload like "B." or "(B)" already stripped, but also "Option B" etc. Not needed.
+
+  // 2) Full text match: compare normalized payload with each option text
+  const viaText = matchTextToOptionIndex(clean, options);
+  if (viaText !== null) return viaText;
+  // 2b) Leading letter marker with trailing text, e.g. "(d) Shark", "D - Shark",
+  // "D: Shark", "[B] Urochrome". The remainder text is matched first (content is
+  // ground truth against the current option order); when it does not match,
+  // the explicit letter is trusted over returning unknown.
+  const lead = clean.match(
+    /^(?:\(\s*([A-Da-d])\s*[\)\]\.:]|\[\s*([A-Da-d])\s*[\]\)\.:]|([A-Da-d])\s*[\)\.\:\-\—–])\s+(\S[\s\S]*)$/,
+  );
+  if (lead) {
+    const letter = (lead[1] ?? lead[2] ?? lead[3] ?? "").toUpperCase();
+    const rest = (lead[4] ?? "").trim();
+    if (rest) {
+      const viaRest = matchTextToOptionIndex(rest, options);
+      if (viaRest !== null) return viaRest;
+    }
+    if (/^[A-D]$/.test(letter)) return letter.charCodeAt(0) - 65;
+  }
+  const bnLead = clean.match(
+    /^(?:\(\s*([কখগঘ])\s*[\)\]\.:।]|\[\s*([কখগঘ])\s*[\]\)\.:।]|([কখগঘ])\s*[\)\.\:\-\—–।])\s+(\S[\s\S]*)$/,
+  );
+  if (bnLead) {
+    const letter = bnLead[1] ?? bnLead[2] ?? bnLead[3] ?? "";
+    const rest = (bnLead[4] ?? "").trim();
+    if (rest) {
+      const viaRest = matchTextToOptionIndex(rest, options);
+      if (viaRest !== null) return viaRest;
+    }
+    if (/^[কখগঘ]$/.test(letter)) return BN_OPT_MAP[letter] ?? null;
   }
   // Try case where payload is like "B - Urochrome" includes letter and text? Extract letter inside
   const letterInPayload = clean.match(/(?:^|[^A-Za-z])([A-Da-d])(?:[^A-Za-z]|$)/);
@@ -689,6 +814,16 @@ function isStatementLine(line: string): boolean {
 }
 
 // ── inline helpers ─────────────────────────────────────────────────────────
+// A line that already carries an explicit answer payload must keep that
+// payload on the SAME line — option-marker splitting must never cut inside it
+// (e.g. "Correct Answer: (c) Shark" must not become "Correct Answer:" + "(c) Shark").
+// The guard is a lookbehind placed AFTER the lookahead in each rule below, so
+// it is evaluated at the post-whitespace position: with the `m` flag, `^`
+// anchors at line starts and `[^\n]*` cannot cross lines, so a split
+// positioned after an answer prefix on the same line is suppressed while
+// splits before the prefix (real inline options) still work.
+const NOT_IN_ANSWER_LINE = String.raw`(?<!^[^\n]*(?:সঠিক\s*উত্তর|উত্তর|Correct\s+Answer|Correct\s+option|Correct|Ans(?:wer)?\.?|Answer\s*Key|Key|Solution)\s*[:\-=—ঃ.:][^\n]*)`;
+
 function injectNewlinesForInline(text: string): string {
   // Insert newline before option markers that appear inline after at least one space, if not already at line start
   // This helps split "Q? A. opt B. opt" into separate lines
@@ -699,15 +834,17 @@ function injectNewlinesForInline(text: string): string {
   const optionInlineRe = /[ \t]{1,}(?=((?:\(?\s*[A-Da-d]\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*[কখগঘ]\s*\)?\s*[\.\)\:\-।]?\s+)|(?:\(?\s*[1-4]\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*[১-৪]\s*\)?\s*[\.\)\:\-।]?\s+)|(?:\(?\s*(?:i{1,3}|iv)\s*\)?\s*[\.\)\:\-]\s+)|(?:\(?\s*(?:I{1,3}|IV)\s*\)?\s*[\.\)\:\-]\s+)))/g;
   // Instead of complex lookahead, we scan and insert
   // Simpler: replace occurrences of "  A. " or " A. " with "\nA. " when not at line start via regex with capture
-  s = s.replace(/([^\n])\s{2,}(?=[A-Da-d]\s*[\.\)\:\-])/g, "$1\n");
-  s = s.replace(/([^\n])\s+(?=\([A-Da-d]\)\s*[\.\)\:\-]?)/g, "$1\n");
-  s = s.replace(/([^\n])\s{2,}(?=[কখগঘ]\s*[\.\)\:\-।])/g, "$1\n");
-  s = s.replace(/([^\n])\s+(?=\([কখগঘ]\))/g, "$1\n");
-  s = s.replace(/([^\n])\s{2,}(?=[1-4]\s*[\.\)\:\-])/g, "$1\n");
-  s = s.replace(/([^\n])\s{2,}(?=[১-৪]\s*[\.\)\:\-।])/g, "$1\n");
+  // Every rule below carries the NOT_IN_ANSWER_LINE guard AFTER its lookahead
+  // (needs the `m` flag so `^` anchors at line starts).
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=[A-Da-d]\\s*[\\.\\)\\:\\-])${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s+(?=\\([A-Da-d]\\)\\s*[\\.\\)\\:\\-]?)${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=[কখগঘ]\\s*[\\.\\)\\:\\-।])${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s+(?=\\([কখগঘ]\\))${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=[1-4]\\s*[\\.\\)\\:\\-])${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=[১-৪]\\s*[\\.\\)\\:\\-।])${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
   // Roman inline
-  s = s.replace(/([^\n])\s{2,}(?=(?:i{1,3}|iv)\s*[\.\)\:\-])/gi, "$1\n");
-  s = s.replace(/([^\n])\s{2,}(?=(?:I{1,3}|IV)\s*[\.\)\:\-])/g, "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=(?:i{1,3}|iv)\\s*[\\.\\)\\:\\-])${NOT_IN_ANSWER_LINE}`, "gim"), "$1\n");
+  s = s.replace(new RegExp(`([^\\n])\\s{2,}(?=(?:I{1,3}|IV)\\s*[\\.\\)\\:\\-])${NOT_IN_ANSWER_LINE}`, "gm"), "$1\n");
   // Answer inline: handle multi-word prefixes first, then single-word with lookbehind to avoid splitting "Correct Answer" inside
   s = s.replace(/([^\n])\s+(?=(?:Correct\s+Answer|Correct\s+option|সঠিক\s+উত্তর)\s*[:\-=—ঃ.:])/gi, "$1\n");
   s = s.replace(/([^\n])\s+(?<!Correct\s)(?<!সঠিক\s)(?=(?:Ans(?:wer)?\.?|Correct|উত্তর\s*ঃ?)\s*[:\-=—ঃ.:])/gi, "$1\n");
@@ -742,6 +879,25 @@ function parseSingleBlock(blockText: string): ParsedPasteMcq {
   let explanationRaw: string | null = null;
   for (let i = 0; i < linesRaw.length; i++) {
     const line = linesRaw[i];
+    // Bare per-question answer prefix ("Correct Answer:" alone) — the payload
+    // may sit on the next line ("Answer:\nB"). Join it when eligible; must run
+    // BEFORE the key-section defense (a bare prefix is not a key heading).
+    // Otherwise the answer stays unknown (null), never A, and the stray line
+    // never becomes question/option text.
+    if (isBareAnswerPrefix(line)) {
+      let j = i + 1;
+      while (j < linesRaw.length && !linesRaw[j].trim()) j++;
+      const next = j < linesRaw.length ? linesRaw[j] : "";
+      if (next && isJoinableAnswerContinuation(next)) {
+        const joined = extractAnswerPayload(`${line.trim()} ${next.trim()}`);
+        if (joined !== null) {
+          answerPayloadRaw = joined; // keep last
+          i = j;
+          continue;
+        }
+      }
+      continue;
+    }
     // Defense-in-depth: a bare answer-key heading that survived section
     // splitting must never become question/option text.
     const keyRem = answerKeyHeadingRemainder(line);
@@ -1201,7 +1357,7 @@ function splitByNumbering(text: string): string[] | null {
 function parseViaLineScan(text: string): ParsedPasteMcq[] {
   const withInlines = injectNewlinesForInline(text.replace(/\r\n/g, "\n"));
   const rawLines = withInlines.split("\n");
-  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; explanation: string; marks: number; rawLines: string[]; originalNumber: string | null };
+  type Block = { questionLines: string[]; statements: string[]; options: [string, string, string, string]; correctIndex: number | null; explanation: string; marks: number; rawLines: string[]; originalNumber: string | null; _pendingAnswerPayload?: string };
   const blocks: Block[] = [];
   let current: Block | null = null;
 
@@ -1216,6 +1372,29 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
     const line = rawLines[idx];
     const trimmed = line.trim();
     if (trimmed === "") continue;
+    // Bare per-question answer prefix ("Correct Answer:" alone) — payload may
+    // sit on the next line. Stash it as pending so it resolves once options
+    // are known. Runs BEFORE the key-section defense (not a key heading).
+    if (isBareAnswerPrefix(trimmed)) {
+      if (!current) continue;
+      let j = idx + 1;
+      while (j < rawLines.length && !rawLines[j].trim()) j++;
+      const next = j < rawLines.length ? rawLines[j].trim() : "";
+      if (next && isJoinableAnswerContinuation(next)) {
+        const joined = extractAnswerPayload(`${trimmed} ${next}`);
+        if (joined !== null) {
+          const mapped = mapAnswerPayloadToIndex(joined, current.options);
+          if (mapped !== null) current.correctIndex = mapped;
+          else current._pendingAnswerPayload = joined;
+        }
+        current.rawLines.push(line);
+        // Skip the consumed continuation line on the next iteration.
+        rawLines[j] = "";
+        continue;
+      }
+      current.rawLines.push(line);
+      continue;
+    }
     // Defense-in-depth: stray answer-key heading/entries never become questions.
     // (Only when the remainder is empty or actually parses as key entries —
     // a question that merely starts with the word "Answers" must survive.)
@@ -1246,7 +1425,7 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
         // For now, if not mappable, keep payload to try later with full options
         // We'll store as temporary marker: keep payload in a hidden field via rawLines and resolve after block completion
         // Instead, save payload raw for later: we set a property via rawLines with special marker
-        (current as any)._pendingAnswerPayload = payload;
+        current._pendingAnswerPayload = payload;
       }
       current.rawLines.push(line);
       continue;
@@ -1337,12 +1516,12 @@ function parseViaLineScan(text: string): ParsedPasteMcq[] {
 
   // Resolve pending answer payloads for blocks where answer was full text not yet mapped
   for (const b of blocks) {
-    const pending = (b as any)._pendingAnswerPayload as string | undefined;
+    const pending = b._pendingAnswerPayload;
     if (pending && b.correctIndex === null) {
       const mapped = mapAnswerPayloadToIndex(pending, b.options);
       if (mapped !== null) b.correctIndex = mapped;
     }
-    delete (b as any)._pendingAnswerPayload;
+    delete b._pendingAnswerPayload;
   }
 
   return blocks.map((b) => {

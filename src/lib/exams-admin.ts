@@ -1,5 +1,6 @@
 import { exec, parseJsonColumn, query, ensureColumn, withTransaction } from "@/lib/mysql";
 import { seedDefaultExamRules } from "@/lib/exam-rules";
+import { strictAnswerIndex } from "@/lib/paste-mcq-parser";
 import { revalidateTag, unstable_cache } from "next/cache";
 
 let ensureTablesReady = false;
@@ -136,7 +137,8 @@ export type ExamQuestion = {
   /** Optional per-question image (question_image column). */
   questionImage?: string | null;
   options: ExamQuestionOption[];
-  correctIndex: number;
+  /** NULL = unknown answer (rendered as "—", never defaulted to A). */
+  correctIndex: number | null;
   explanation: string | null;
   marks: number;
   isActive: boolean;
@@ -209,7 +211,8 @@ type QuestionRow = {
   question: string;
   question_image?: string | null;
   options: string;
-  correct_index: number;
+  /** NULL = unknown (never defaulted to 0/A). */
+  correct_index: number | null;
   explanation: string | null;
   marks: string | number;
   sort_order?: number | null;
@@ -303,7 +306,8 @@ function rowToQuestion(row: QuestionRow): ExamQuestion {
     question: row.question,
     questionImage: row.question_image ?? null,
     options: Array.isArray(options) ? options.map(String) : [],
-    correctIndex: row.correct_index ?? 0,
+    // Preserve an explicit unknown (NULL) — never coerce it to 0/A here.
+    correctIndex: row.correct_index === null || row.correct_index === undefined ? null : row.correct_index,
     explanation: row.explanation,
     marks: toNumber(row.marks),
     isActive: Boolean(row.is_active),
@@ -606,7 +610,7 @@ async function ensureTables(): Promise<void> {
     bank_subject VARCHAR(191) NOT NULL DEFAULT '',
     question TEXT NOT NULL,
     options JSON NOT NULL,
-    correct_index INT NOT NULL DEFAULT 0,
+    correct_index INT NULL DEFAULT NULL,
     explanation TEXT NULL,
     marks DECIMAL(5,2) NOT NULL DEFAULT 1,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -1236,9 +1240,10 @@ export async function saveQuestion(
   if (options.length < 2 || options.some((option) => option.length === 0)) {
     throw new Error("At least two non-empty options are required.");
   }
-  const correctIndex = Number(input.correctIndex);
-  if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
-    throw new Error("Correct answer index is out of range.");
+  // Strict: missing/malformed answers are rejected loudly — never stored as A.
+  const correctIndex = strictAnswerIndex(input.correctIndex as unknown, options.length);
+  if (correctIndex === null) {
+    throw new Error("Correct answer is missing or invalid — select A, B, C or D.");
   }
   const marks = Math.max(0.5, Number(input.marks) || 1);
   if (!Number.isFinite(marks) || marks <= 0) throw new Error("Marks must be a positive number.");
@@ -1334,8 +1339,9 @@ export async function saveQuestionsBulk(
     if (text.length < 3 && !qImage) throw new Error(`Q${String(idx + 1).padStart(2, "0")}: Question text or image is required.`);
     const options = Array.isArray(input.options) ? input.options.map((o) => String(o)) : [];
     if (options.length < 2 || options.some((o) => o.length === 0)) throw new Error(`Q${String(idx + 1).padStart(2, "0")}: At least two non-empty options are required.`);
-    const correctIndex = Number(input.correctIndex);
-    if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) throw new Error(`Q${String(idx + 1).padStart(2, "0")}: Correct answer index is out of range.`);
+    // Strict: missing/malformed answers fail loudly — never stored as A.
+    const correctIndex = strictAnswerIndex(input.correctIndex as unknown, options.length);
+    if (correctIndex === null) throw new Error(`Q${String(idx + 1).padStart(2, "0")}: Correct answer is missing or invalid — select A, B, C or D.`);
     const marks = Math.max(0.5, Number(input.marks) || 1);
     if (!Number.isFinite(marks) || marks <= 0) throw new Error(`Q${String(idx + 1).padStart(2, "0")}: Marks must be positive.`);
   }

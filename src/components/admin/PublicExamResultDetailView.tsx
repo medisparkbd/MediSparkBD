@@ -629,7 +629,9 @@ export default function PublicExamResultDetailView({
                           <span className="text-slate-500">
                             Correct Answer:{" "}
                             <span className="text-[#0b1e3a] admin-dark:text-zinc-200">
-                              {OPTION_LETTERS[question.correctAnswer] ?? question.correctAnswer + 1}
+                              {question.correctAnswer == null
+                                ? "—"
+                                : (OPTION_LETTERS[question.correctAnswer] ?? question.correctAnswer + 1)}
                             </span>
                           </span>
                           <span className="text-slate-500">

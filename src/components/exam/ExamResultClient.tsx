@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading, AccessMessage } from "@/components/auth/AccessGuard";
+import { answerIndexToLetter } from "@/lib/paste-mcq-parser";
 
 type ScriptQuestion = {
   questionId: number;
@@ -11,7 +12,8 @@ type ScriptQuestion = {
   options: string[];
   marks: number;
   chosenIndex: number | null;
-  correctIndex: number;
+  /** NULL = unknown answer — rendered as "—", never defaulted to A. */
+  correctIndex: number | null;
   obtained: number;
   explanation: string | null;
   questionImage?: string | null;
@@ -134,7 +136,12 @@ export default function ExamResultClient({
         </div>
         <ol className="space-y-4">
           {script.questions.map((item, index) => {
-            const isCorrect = item.chosenIndex !== null && item.chosenIndex === item.correctIndex;
+            // An unknown correct answer (null) can never match — the old
+            // `65 + null` fallback rendered it as "A"; now it shows "—".
+            const isCorrect =
+              item.chosenIndex !== null &&
+              item.correctIndex !== null &&
+              item.chosenIndex === item.correctIndex;
             // Per Spec §17/18: negative marking is shown only as a total on the Rules page/result summary, not beside each question.
             const status = item.chosenIndex === null ? "Unanswered" : isCorrect ? "Correct" : "Wrong";
             return (
@@ -212,7 +219,7 @@ export default function ExamResultClient({
                     Your Answer: <span className="text-heading">{item.chosenIndex == null ? "Not Answered" : String.fromCharCode(65 + item.chosenIndex)}</span>
                   </span>
                   <span className="text-neutral-400">
-                    Correct: <span className="text-heading">{String.fromCharCode(65 + item.correctIndex)}</span>
+                    Correct: <span className="text-heading">{answerIndexToLetter(item.correctIndex) ?? "—"}</span>
                   </span>
                 </div>
                 {item.explanation && (

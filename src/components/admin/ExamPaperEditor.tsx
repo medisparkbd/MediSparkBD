@@ -34,7 +34,8 @@ type ExamQuestion = {
   question: string;
   questionImage?: string | null;
   options: string[];
-  correctIndex: number;
+  /** Saved answer index, or null when unknown (rendered unset — never shown as A). */
+  correctIndex: number | null;
   explanation: string | null;
   marks: number;
   isActive?: boolean;
@@ -64,7 +65,9 @@ type SlotDraft = {
 };
 
 function emptyDraft(): SlotDraft {
-  return { question: "", options: [...EMPTY_OPTIONS], correctIndex: 0, explanation: "", questionImage: null, sourceNumber: null };
+  // Unknown answer starts unset (-1 = nothing selected) so saving without
+  // picking an answer is impossible — it can never silently become A.
+  return { question: "", options: [...EMPTY_OPTIONS], correctIndex: -1, explanation: "", questionImage: null, sourceNumber: null };
 }
 
 function draftFromQuestion(q: ExamQuestion | null | undefined): SlotDraft {
@@ -75,7 +78,8 @@ function draftFromQuestion(q: ExamQuestion | null | undefined): SlotDraft {
   return {
     question: q?.question || "",
     options: opts.slice(0, 4),
-    correctIndex: q?.correctIndex ?? 0,
+    // Preserve an explicit unknown as unset (-1) — never coerce it to 0/A.
+    correctIndex: q?.correctIndex ?? -1,
     explanation: q?.explanation ?? "",
     questionImage: q?.questionImage ?? null,
     sourceNumber: null,
@@ -90,7 +94,7 @@ function isDraftDirty(d: SlotDraft | undefined, q: ExamQuestion | null | undefin
   for (let i = 0; i < 4; i++) {
     if ((d.options[i] || "") !== (qOpts[i] || "")) return true;
   }
-  if ((d.correctIndex ?? 0) !== (q?.correctIndex ?? 0)) return true;
+  if ((d.correctIndex ?? -1) !== (q?.correctIndex ?? -1)) return true;
   if ((d.explanation || "") !== (q?.explanation || "")) return true;
   if ((d.questionImage ?? null) !== (q?.questionImage ?? null)) return true;
   return false;
@@ -101,6 +105,8 @@ function isCompleted(q: ExamQuestion | null | undefined): boolean {
   if (!q.question || q.question.trim().length < 3) return false;
   const filled = q.options.filter((o) => o && o.trim().length > 0);
   if (filled.length < 2) return false;
+  // An unknown answer (null) is never complete — it must not read as A.
+  if (q.correctIndex === null || q.correctIndex === undefined) return false;
   if (q.correctIndex < 0 || q.correctIndex >= q.options.length) return false;
   if (!q.options[q.correctIndex]?.trim()) return false;
   return true;

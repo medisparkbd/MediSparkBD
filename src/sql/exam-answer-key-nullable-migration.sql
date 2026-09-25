@@ -1,0 +1,92 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- MCQ Answer-Key NULL migration + audit queries
+-- ───────────────────────────────────────────────────────────────────────────
+-- Problem: every question rendered "Correct: A" even when the true answer was
+-- B/C/D. Root causes found in code (all fixed alongside this migration):
+--   1. `Number(x) || 0` / `?? 0` fallbacks converted missing/NULL answers to
+--      index 0 (A) on every read path (grading, result script, admin GET).
+--   2. `Number("")` / `Number(null)` are 0, so save paths with a missing
+--      correctIndex passed validation and stored A silently.
+--   3. The paste parser split "Correct Answer: (c) X" into a bare prefix
+--      (empty payload → unknown) plus a stray "(c) X" option line.
+--   4. The Answer Sheet rendered `65 + null` (= 65 = "A") for unknown answers.
+--   5. Schema `INT NOT NULL DEFAULT 0` baked A in at the storage layer.
+--
+-- After this migration, an unknown answer is explicit NULL end-to-end:
+-- writers reject it loudly (never stored), readers preserve it, and the UI
+-- renders "—" instead of "A".
+--
+-- Apply: ssh <vm> 'sudo mysql bloodare_medispark' < src/sql/exam-answer-key-nullable-migration.sql
+-- (Runtime CREATE TABLEs were updated too, so fresh installs already comply.)
+-- ═══════════════════════════════════════════════════════════════════
+
+-- ─── 1) SCHEMA: allow explicit unknown (NULL), drop the silent-A default ───
+ALTER TABLE exam_questions
+  MODIFY COLUMN correct_index INT NULL DEFAULT NULL;
+ALTER TABLE exam_question_variants
+  MODIFY COLUMN correct_index INT NULL DEFAULT NULL;
+
+-- ─── 2) AUDIT (read-only — run BEFORE any repair) ──────────────────────────
+-- 2a) Distribution of stored answers per exam (spot the all-A corruption):
+-- SELECT exam_id,
+--        COUNT(*) AS total,
+--        SUM(correct_index = 0) AS answer_a,
+--        SUM(correct_index = 1) AS answer_b,
+--        SUM(correct_index = 2) AS answer_c,
+--        SUM(correct_index = 3) AS answer_d,
+--        SUM(correct_index IS NULL) AS answer_unknown,
+--        SUM(correct_index NOT IN (0,1,2,3) AND correct_index IS NOT NULL) AS answer_invalid
+--   FROM exam_questions WHERE is_active = 1 GROUP BY exam_id;
+--
+-- 2b) Same distribution for authored variant cells:
+-- SELECT q.exam_id, v.lang, v.set_label,
+--        COUNT(*) AS total,
+--        SUM(v.correct_index = 0) AS answer_a,
+--        SUM(v.correct_index = 1) AS answer_b,
+--        SUM(v.correct_index = 2) AS answer_c,
+--        SUM(v.correct_index = 3) AS answer_d,
+--        SUM(v.correct_index IS NULL) AS answer_unknown
+--   FROM exam_question_variants v
+--   JOIN exam_questions q ON q.id = v.question_id
+--  WHERE q.is_active = 1
+--  GROUP BY q.exam_id, v.lang, v.set_label;
+--
+-- 2c) Per-question detail for one exam (replace <EXAM_ID>):
+-- SELECT q.id, q.sort_order,
+--        LEFT(q.question, 60) AS question,
+--        q.correct_index AS base_answer,
+--        (SELECT v.correct_index FROM exam_question_variants v
+--          WHERE v.question_id = q.id AND v.lang = 'bangla' AND v.set_label = 'A') AS variant_bn_a,
+--        (SELECT v.correct_index FROM exam_question_variants v
+--          WHERE v.question_id = q.id AND v.lang = 'english' AND v.set_label = 'A') AS variant_en_a
+--   FROM exam_questions q
+--  WHERE q.exam_id = '<EXAM_ID>' AND q.is_active = 1
+--  ORDER BY q.sort_order ASC, q.id ASC;
+
+-- ─── 3) REPAIR PROCEDURE (not a blind overwrite) ───────────────────────────
+-- The corrupted rows cannot be auto-fixed: index 0 is ambiguous (genuine A vs
+-- corrupted B/C/D). The safe repair is RE-IMPORT through the fixed pipeline:
+--   1. Run the audit queries above; record counts.
+--   2. Open Admin → the exam → ExamPaperEditor (same version/set workspace).
+--   3. Paste the ORIGINAL source (questions WITH inline answers such as
+--      "Correct Answer: (d) Shark", or questions + a separate Answer Key
+--      such as "1-D 2-B …" / "সঠিক উত্তর: …"). The fixed parser now detects
+--      letters, Bangla labels, "(x) text" and "X — text" forms; anything it
+--      cannot detect stays explicitly unknown and is SKIPPED on save
+--      (reported as "Skipped (need review)"), never stored as A.
+--   4. Review the detection preview (per-question warnings included),
+--      Apply the Answer Key when used, then Save Questions.
+--   5. Re-run the audit queries; counts must now match the source key.
+--   6. Spot-check the student Answer Sheet for B/C/D questions.
+--
+-- DO NOT blindly UPDATE correct_index per the expected-letters list below:
+-- Q41 (Sarcopterygii options) has an incorrect/ambiguous option set and Q55
+-- (radial symmetry) is ambiguous between Hydra and Starfish — both need human
+-- review against the source/reference first. Reference expectations (for
+-- human verification AFTER re-import, 1-based Q number → letter):
+-- 1 D, 2 B, 3 B, 4 C, 5 B, 6 A, 7 B, 8 B, 9 D, 10 B,
+-- 11 A, 12 D, 13 C, 14 A, 15 A, 16 A, 17 A, 18 D, 19 C, 20 B,
+-- 21 D, 22 C, 23 C, 24 B, 25 B, 26 C, 27 A, 28 A, 29 B, 30 B,
+-- 31 D, 32 C, 33 D, 34 C, 35 B, 36 A, 37 C, 38 B, 39 D, 40 B,
+-- 41 REVIEW REQUIRED (do not set), 42 B, 43 C, 44 A, 45 B, 46 A, 47 B, 48 D, 49 C, 50 C,
+-- 51 C, 52 A, 53 B, 54 C, 55 B (verify against source: Hydra vs Starfish ambiguity).

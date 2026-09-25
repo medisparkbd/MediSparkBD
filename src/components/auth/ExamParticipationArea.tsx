@@ -10,6 +10,7 @@ import {
   ExamRulesList,
   type ExamRulesData,
 } from "@/components/ExamRules";
+import { answerIndexToLetter } from "@/lib/paste-mcq-parser";
 
 type TakingExam = ExamRulesData & {
   id: string;
@@ -48,7 +49,8 @@ type ScriptQuestion = {
   options: string[];
   marks: number;
   chosenIndex: number | null;
-  correctIndex: number;
+  /** NULL = unknown answer — rendered as "—", never defaulted to A. */
+  correctIndex: number | null;
   obtained: number;
   explanation?: string | null;
   questionImage?: string | null;
@@ -843,8 +845,12 @@ export default function ExamParticipationArea({
 
           <ol className="space-y-4">
             {script.questions.map((item, index) => {
+              // An unknown correct answer (null) can never match — the old
+              // `65 + null` fallback rendered it as "A"; now it shows "—".
               const isCorrect =
-                item.chosenIndex !== null && item.chosenIndex === item.correctIndex;
+                item.chosenIndex !== null &&
+                item.correctIndex !== null &&
+                item.chosenIndex === item.correctIndex;
               return (
                 <li
                   key={item.questionId}
@@ -938,7 +944,7 @@ export default function ExamParticipationArea({
                       Your Answer: <span className="text-heading">{item.chosenIndex == null ? "Not Answered" : String.fromCharCode(65 + item.chosenIndex)}</span>
                     </span>
                     <span className="text-neutral-400">
-                      Correct: <span className="text-heading">{String.fromCharCode(65 + item.correctIndex)}</span>
+                      Correct: <span className="text-heading">{answerIndexToLetter(item.correctIndex) ?? "—"}</span>
                     </span>
                   </div>
                   {item.explanation && (

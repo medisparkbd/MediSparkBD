@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import { ensureColumn, exec, parseJsonColumn, query } from "@/lib/mysql";
+import { strictAnswerIndex } from "@/lib/paste-mcq-parser";
 
 // Exam Language Version + Set A/B + Question Order Randomization.
 //
@@ -47,7 +48,7 @@ export function ensureVariantTables(): Promise<void> {
         set_label ENUM('A','B') NOT NULL,
         question TEXT NOT NULL,
         options JSON NOT NULL,
-        correct_index INT NOT NULL DEFAULT 0,
+        correct_index INT NULL DEFAULT NULL,
         explanation TEXT NULL,
         marks DECIMAL(5,2) NOT NULL DEFAULT 1,
         question_image VARCHAR(1024) NULL,
@@ -108,6 +109,9 @@ export function isValidVariantContent(
   if (!Array.isArray(parsed) || parsed.length < 2) return false;
   const options = parsed.map((o) => String(o));
   if (options.some((o) => o.length === 0)) return false;
+  // An unknown answer (null/undefined) is never valid — it must not count
+  // toward set availability and must never resolve to A (index 0).
+  if (correctIndex === null || correctIndex === undefined) return false;
   const ci = Number(correctIndex);
   if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) return false;
   return true;
@@ -210,7 +214,8 @@ export type VariantRow = {
   set_label: string;
   question: string;
   options: string;
-  correct_index: number;
+  /** NULL = unknown (never defaulted to 0/A). */
+  correct_index: number | null;
   explanation: string | null;
   marks: string | number;
   question_image: string | null;
@@ -246,7 +251,8 @@ export type ResolvedQuestion = {
   question: string;
   options: string[];
   marks: number;
-  correctIndex: number;
+  /** NULL = unknown answer (rendered as "—", never as A). */
+  correctIndex: number | null;
   explanation: string | null;
   questionImage: string | null;
   /** True when this content came from the authored version/set variant. */
@@ -258,11 +264,19 @@ export type BaseQuestionRow = {
   question: string;
   options: string;
   marks: string | number;
-  correct_index: number;
+  /** NULL = unknown (never defaulted to 0/A). */
+  correct_index: number | null;
   explanation: string | null;
   question_image?: string | null;
   sort_order?: number | null;
 };
+
+/** Preserve an explicit unknown (NULL) — never coerce it to 0/A. */
+function preserveAnswerIndex(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 /**
  * Resolve displayable questions for one (version, set): variant content wins,
@@ -286,7 +300,7 @@ export function resolveQuestions(
           question: variant.question,
           options: parsed.map(String),
           marks: Number(variant.marks) || Number(row.marks) || 1,
-          correctIndex: Number(variant.correct_index) || 0,
+          correctIndex: preserveAnswerIndex(variant.correct_index),
           explanation: variant.explanation ?? null,
           questionImage: variant.question_image ?? null,
           fromVariant: true,
@@ -301,7 +315,7 @@ export function resolveQuestions(
       question: row.question,
       options: parsed.map(String),
       marks: Number(row.marks) || 1,
-      correctIndex: Number(row.correct_index) || 0,
+      correctIndex: preserveAnswerIndex(row.correct_index),
       explanation: row.explanation ?? null,
       questionImage: (row.question_image as string | null) ?? null,
       fromVariant: false,
@@ -367,8 +381,10 @@ export async function saveVariant(input: VariantInput): Promise<void> {
   if (options.length < 2 || options.some((o) => o.length === 0)) {
     throw new Error("At least two non-empty options are required.");
   }
-  if (!Number.isInteger(input.correctIndex) || input.correctIndex < 0 || input.correctIndex >= options.length) {
-    throw new Error("Correct answer index is out of range.");
+  // Strict: missing/malformed answers are rejected loudly — never stored as A.
+  const strictIndex = strictAnswerIndex(input.correctIndex as unknown, options.length);
+  if (strictIndex === null) {
+    throw new Error("Correct answer is missing or invalid — select A, B, C or D.");
   }
   const marks = Number(input.marks);
   const safeMarks = Number.isFinite(marks) && marks > 0 ? marks : 1;
@@ -385,7 +401,7 @@ export async function saveVariant(input: VariantInput): Promise<void> {
       input.set,
       text,
       JSON.stringify(options),
-      input.correctIndex,
+      strictIndex,
       input.explanation ?? null,
       safeMarks,
       input.questionImage ?? null,

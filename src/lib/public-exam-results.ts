@@ -58,7 +58,8 @@ export type AnswerSheetQuestion = {
   question: string;
   options: string[];
   studentAnswer: number | null;
-  correctAnswer: number;
+  /** NULL = unknown answer (rendered as "—", never as A). */
+  correctAnswer: number | null;
   status: "correct" | "wrong" | "unanswered";
   marks: number;
   obtained: number;
@@ -295,13 +296,17 @@ export async function fetchPublicExamRankedResults(
     }
 
     // Load active questions once for counting; also for negativePerWrong.
-    let questionMeta: Map<number, number> = new Map();
+    // Unknown answers stay unknown (NULL) — never coerced to 0/A.
+    const questionMeta: Map<number, number | null> = new Map();
     try {
-      const qRows = await query<{ id: number; correct_index: number }[]>(
+      const qRows = await query<{ id: number; correct_index: number | null }[]>(
         `SELECT id, correct_index FROM exam_questions WHERE exam_id = ? AND is_active = 1`,
         [examId],
       );
-      for (const q of qRows) questionMeta.set(Number(q.id), Number(q.correct_index) || 0);
+      for (const q of qRows) {
+        const ci = q.correct_index;
+        questionMeta.set(Number(q.id), ci === null || ci === undefined ? null : Number(ci) || 0);
+      }
     } catch {
       // No questions → counts stay 0
     }
@@ -422,7 +427,7 @@ export async function fetchPublicExamStudentResult(
 
     // Question order = insertion order of the exam's active questions.
     const questionRows = await query<
-      { id: number; question: string; options: string; correct_index: number; marks: string | number; explanation: string | null }[]
+      { id: number; question: string; options: string; correct_index: number | null; marks: string | number; explanation: string | null }[]
     >(
       `SELECT id, question, options, correct_index, marks, explanation
           FROM exam_questions
