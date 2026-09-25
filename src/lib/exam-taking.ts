@@ -1027,7 +1027,9 @@ async function latestOutcome(
         if (v) {
           correctById.set(
             Number(q.id),
-            v.correct_index === null || v.correct_index === undefined ? null : Number(v.correct_index) || 0,
+            v.correct_index === null || v.correct_index === undefined
+              ? null
+              : (Number.isFinite(Number(v.correct_index)) ? Number(v.correct_index) : null),
           );
         }
       }
@@ -1693,7 +1695,10 @@ export async function getExamResultScript(
       parsed.map(String),
       Number(row.marks) || 1,
       // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
-      row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
+      // `|| 0` would wrongly turn a valid 0 (answer A) into 0 via falsy — use isFinite guard instead.
+      row.correct_index === null || row.correct_index === undefined
+        ? null
+        : (Number.isFinite(Number(row.correct_index)) ? Number(row.correct_index) : null),
       row.explanation,
       (row.question_image as string | null) ?? null,
     );
@@ -1707,9 +1712,10 @@ export async function getExamResultScript(
       parsed.map(String),
       Number(variant.marks) || fallbackMarks,
       // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
+      // `|| 0` would wrongly coerce non-finite into 0 — use isFinite guard.
       variant.correct_index === null || variant.correct_index === undefined
         ? null
-        : Number(variant.correct_index) || 0,
+        : (Number.isFinite(Number(variant.correct_index)) ? Number(variant.correct_index) : null),
       variant.explanation,
       variant.question_image ?? null,
     );
@@ -1782,6 +1788,12 @@ export async function getExamResultScript(
   // snapshot + question keys when details are missing (older results).
   const fallbackAnswers =
     parseJsonColumn<Record<string, number>>(result.answers) ?? {};
+  // Build a correctIndex lookup from stored details — grading-time values are
+  // authoritative and must NOT be overwritten by base-row placeholders.
+  const correctByDetailId = new Map<number, number | null>();
+  for (const detail of details) {
+    correctByDetailId.set(detail.questionId, detail.correctIndex);
+  }
   const questions: AnswerScriptQuestion[] = [];
   const seen = new Set<number>();
   for (const detail of details) {
@@ -1804,17 +1816,22 @@ export async function getExamResultScript(
     if (seen.has(key)) continue;
     const raw = fallbackAnswers[String(key)];
     const chosen = typeof raw === "number" ? raw : null;
+    // Prefer the correctIndex stored at grading time (detail); only fall back
+    // to meta.correctIndex when no detail exists for this question (legacy path).
+    const correctIndex = correctByDetailId.has(key)
+      ? correctByDetailId.get(key) ?? null
+      : meta.correctIndex;
     questions.push({
       questionId: key,
       question: meta.question,
       options: meta.options,
       marks: meta.marks,
       chosenIndex: chosen,
-      correctIndex: meta.correctIndex,
+      correctIndex,
       obtained:
         chosen === null
           ? 0
-          : chosen === meta.correctIndex
+          : chosen === correctIndex
             ? meta.marks
             : 0, // Legacy rows lack per-question deductions; totals stay authoritative.
       explanation: meta.explanation,
