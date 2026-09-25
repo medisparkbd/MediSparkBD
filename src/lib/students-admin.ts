@@ -15,6 +15,15 @@ export type AdminStudent = {
   isActive: boolean;
   createdAt: number | null;
   enrollmentCount: number;
+  studentLevel: string;
+};
+
+export type StudentProgressSummary = {
+  courseId: string;
+  courseName: string;
+  totalClasses: number;
+  completedClasses: number;
+  percent: number;
 };
 
 export type StudentEnrollmentInfo = {
@@ -48,6 +57,7 @@ type StudentRow = {
   email: string;
   facebook_url: string | null;
   profile_picture_url: string | null;
+  student_level?: string | null;
   provider: string;
   is_active?: number | boolean | null;
   created_at: Date | string | null;
@@ -82,6 +92,7 @@ function mapStudent(row: StudentRow): AdminStudent {
     isActive: row.is_active === undefined || row.is_active === null ? true : Boolean(row.is_active),
     createdAt: parseTime(row.created_at),
     enrollmentCount: toNumber(row.enrollment_count),
+    studentLevel: row.student_level ?? "",
   };
 }
 
@@ -117,14 +128,14 @@ export async function fetchStudents(
     // subquery per student row (500 index probes → 1 grouped scan).
     const rows = await query<StudentRow[]>(
       `SELECT s.uid, s.student_id, s.full_name, s.gender, s.institution, s.hsc_batch,
-              s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
+              s.student_level, s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
               s.provider, s.is_active, s.created_at,
               COUNT(e.student_uid) AS enrollment_count
        FROM students s
        LEFT JOIN enrollments e ON e.student_uid = s.uid
        ${whereClause}
        GROUP BY s.uid, s.student_id, s.full_name, s.gender, s.institution, s.hsc_batch,
-                s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
+                s.student_level, s.contact_number, s.email, s.facebook_url, s.profile_picture_url,
                 s.provider, s.is_active, s.created_at
        ORDER BY s.created_at DESC
        LIMIT 500`,
@@ -154,15 +165,28 @@ export async function fetchStudentDetail(uid: string): Promise<{
   student: AdminStudent;
   enrollments: StudentEnrollmentInfo[];
   examResults: StudentExamResult[];
+  progress: StudentProgressSummary[];
 } | null> {
   try {
-    const rows = await query<StudentRow[]>(
-      `SELECT uid, student_id, full_name, gender, institution, hsc_batch,
-              contact_number, email, facebook_url, profile_picture_url,
-              provider, is_active, created_at
-       FROM students WHERE uid = ? LIMIT 1`,
-      [uid],
-    );
+    // student_level may not be migrated yet on older DBs — retry without it.
+    let rows: StudentRow[];
+    try {
+      rows = await query<StudentRow[]>(
+        `SELECT uid, student_id, full_name, gender, institution, hsc_batch,
+                student_level, contact_number, email, facebook_url, profile_picture_url,
+                provider, is_active, created_at
+         FROM students WHERE uid = ? LIMIT 1`,
+        [uid],
+      );
+    } catch {
+      rows = await query<StudentRow[]>(
+        `SELECT uid, student_id, full_name, gender, institution, hsc_batch,
+                contact_number, email, facebook_url, profile_picture_url,
+                provider, is_active, created_at
+         FROM students WHERE uid = ? LIMIT 1`,
+        [uid],
+      );
+    }
     if (!rows[0]) return null;
 
     let enrollments: StudentEnrollmentInfo[] = [];
@@ -232,7 +256,23 @@ export async function fetchStudentDetail(uid: string): Promise<{
       examResults = [];
     }
 
-    return { student: mapStudent(rows[0]), enrollments, examResults };
+    // Learning progress per enrolled course (best-effort, read-only).
+    let progress: StudentProgressSummary[] = [];
+    try {
+      const { getMyCourseProgress } = await import("@/lib/my-learning");
+      const details = await getMyCourseProgress(uid);
+      progress = details.map((course) => ({
+        courseId: course.slug,
+        courseName: course.name,
+        totalClasses: course.totalClasses,
+        completedClasses: course.completedClasses,
+        percent: course.percent,
+      }));
+    } catch {
+      progress = [];
+    }
+
+    return { student: mapStudent(rows[0]), enrollments, examResults, progress };
   } catch {
     return null;
   }

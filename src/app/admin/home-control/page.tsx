@@ -44,6 +44,7 @@ export default async function HomeControlPage() {
 
   const publishedReviews: StudentReview[] = reviewRecords.map((record, index) => ({
     id: record.id,
+    studentUid: record.studentUid,
     studentName: record.studentName,
     studentAvatar: record.studentAvatar ?? "/avatars/student.svg",
     courseName: record.courseName,

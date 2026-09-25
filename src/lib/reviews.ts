@@ -2,6 +2,8 @@ export type ReviewStatus = "published" | "unpublished";
 
 export type StudentReview = {
   id: string;
+  /** Firebase UID of the student who submitted it (if student-owned). */
+  studentUid?: string | null;
   studentName: string;
   studentAvatar: string;
   courseName: string;

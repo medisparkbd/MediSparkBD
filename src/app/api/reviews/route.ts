@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin";
+import { getFirebaseUser } from "@/lib/auth-api";
+import { query } from "@/lib/mysql";
 import {
   fetchAllReviewRecords,
   fetchPublishedReviewRecords,
   saveReviewRecord,
+  saveStudentReview,
   setReviewPublished,
   reorderReviews,
   deleteReviewRecord,
@@ -17,13 +20,22 @@ export async function GET() {
   return NextResponse.json({ reviews });
 }
 
-/** Create or update a review (multipart — supports optional photo upload). */
+/**
+ * Create or update a review.
+ * - Admins (manageContent): multipart form — full control, as before.
+ * - Signed-in registered students: JSON { rating, text } — creates or
+ *   updates ONLY their own review, using their real account info.
+ */
 export async function POST(request: NextRequest) {
   const admin = await requirePermission(request, "manageContent");
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (admin) {
+    return handleAdminPost(request);
   }
+  return handleStudentPost(request);
+}
 
+/** Admin create/update (multipart — supports optional photo upload). */
+async function handleAdminPost(request: NextRequest) {
   const formData = await request.formData();
   const rawId = formData.get("id");
   const studentName = formData.get("student_name");
@@ -59,6 +71,100 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to save the review.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+type StudentRow = {
+  full_name: string | null;
+  profile_picture_url: string | null;
+  hsc_batch: string | null;
+};
+
+/** Student self-submission — creates/updates only the caller's own review. */
+async function handleStudentPost(request: NextRequest) {
+  const user = await getFirebaseUser(request);
+  if (!user) {
+    return NextResponse.json(
+      { error: "Sign in to submit a review." },
+      { status: 401 },
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as {
+    rating?: unknown;
+    text?: unknown;
+  } | null;
+  const rating = Math.round(Number(body?.rating) || 0);
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  if (rating < 1 || rating > 5) {
+    return NextResponse.json(
+      { error: "Please select a star rating from 1 to 5." },
+      { status: 400 },
+    );
+  }
+  if (!text) {
+    return NextResponse.json(
+      { error: "Please write your review before submitting." },
+      { status: 400 },
+    );
+  }
+  if (text.length > 2000) {
+    return NextResponse.json(
+      { error: "Review is too long (max 2000 characters)." },
+      { status: 400 },
+    );
+  }
+
+  // Real account info — never trust client-supplied name/photo.
+  let student: StudentRow | null = null;
+  try {
+    const rows = await query<StudentRow[]>(
+      "SELECT full_name, profile_picture_url, hsc_batch FROM students WHERE uid = ? LIMIT 1",
+      [user.uid],
+    );
+    student = rows[0] ?? null;
+  } catch {
+    return NextResponse.json(
+      { error: "Could not verify your student account. Please try again." },
+      { status: 500 },
+    );
+  }
+  if (!student?.full_name) {
+    return NextResponse.json(
+      { error: "Complete your student registration before submitting a review." },
+      { status: 403 },
+    );
+  }
+
+  // Course context from the student's latest active enrollment (if any).
+  let courseName: string | null = null;
+  try {
+    const enrollments = await query<{ course_name: string | null }[]>(
+      `SELECT course_name FROM enrollments
+        WHERE student_uid = ? AND enrollment_status = 'active'
+        ORDER BY enrollment_date DESC LIMIT 1`,
+      [user.uid],
+    );
+    courseName = enrollments[0]?.course_name ?? null;
+  } catch {
+    courseName = null;
+  }
+
+  try {
+    const review = await saveStudentReview({
+      studentUid: user.uid,
+      studentName: student.full_name,
+      studentAvatar: student.profile_picture_url,
+      text,
+      rating,
+      courseName,
+      batchLabel: student.hsc_batch ? `${student.hsc_batch} Batch` : null,
+    });
+    return NextResponse.json({ review });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to save your review.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

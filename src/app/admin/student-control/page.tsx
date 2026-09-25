@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 
@@ -13,6 +14,12 @@ type Student = {
   isActive?: boolean;
   institution?: string;
   hscBatch?: string;
+};
+
+type CourseOption = {
+  slug: string;
+  name: string;
+  totalApplications: number;
 };
 
 type Tab = "all" | "enrolled" | "active" | "inactive";
@@ -29,6 +36,13 @@ export default function StudentControlPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [students, setStudents] = useState<Student[] | null>(null);
   const [enrolledUids, setEnrolledUids] = useState<Set<string> | null>(null);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [courseSlug, setCourseSlug] = useState("");
+  // Members keyed by course slug — avoids sync setState in effects.
+  const [courseData, setCourseData] = useState<{
+    slug: string;
+    members: Map<string, string>;
+  } | null>(null);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
@@ -36,9 +50,10 @@ export default function StudentControlPage() {
     setError(false);
     try {
       const auth = { Authorization: `Bearer ${await user.getIdToken()}` };
-      const [studentsRes, enrollmentsRes] = await Promise.all([
+      const [studentsRes, enrollmentsRes, coursesRes] = await Promise.all([
         fetch("/api/admin/students?status=all", { headers: auth, cache: "no-store" }),
         fetch("/api/admin/enrollments?status=active", { headers: auth, cache: "no-store" }),
+        fetch("/api/admin/enrollment-control/summary", { headers: auth, cache: "no-store" }),
       ]);
       if (!studentsRes.ok) throw new Error("failed");
       const data = (await studentsRes.json()) as { students?: Student[] };
@@ -51,6 +66,10 @@ export default function StudentControlPage() {
           new Set((data.enrollments ?? []).map((item) => item.studentUid)),
         );
       }
+      if (coursesRes.ok) {
+        const data = (await coursesRes.json()) as { courses?: CourseOption[] };
+        setCourses(Array.isArray(data.courses) ? data.courses : []);
+      }
     } catch {
       setError(true);
     }
@@ -61,6 +80,38 @@ export default function StudentControlPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [authLoading, user, load]);
+
+  // Course-wise student control: members of the selected course.
+  useEffect(() => {
+    if (!user || !courseSlug || courseData?.slug === courseSlug) return;
+    let cancelled = false;
+    const slug = courseSlug;
+    user
+      .getIdToken()
+      .then((token) =>
+        fetch(`/api/admin/enrollments?course=${encodeURIComponent(slug)}&status=all`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        }),
+      )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { enrollments?: Array<{ studentUid: string; status: string }> } | null) => {
+        if (cancelled) return;
+        const members = new Map<string, string>();
+        for (const item of data?.enrollments ?? []) {
+          if (item.studentUid && !members.has(item.studentUid)) {
+            members.set(item.studentUid, item.status);
+          }
+        }
+        setCourseData({ slug, members });
+      })
+      .catch(() => {
+        if (!cancelled) setCourseData({ slug, members: new Map() });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, courseSlug, courseData]);
 
   async function setActive(student: Student, isActive: boolean) {
     if (!user) return;
@@ -87,8 +138,18 @@ export default function StudentControlPage() {
     }
   }
 
+  const activeMembers =
+    courseSlug !== "" && courseData?.slug === courseSlug
+      ? courseData.members
+      : null;
+
   const visible = useMemo(() => {
-    const list = students ?? [];
+    let list = students ?? [];
+    // Course-wise filter first.
+    if (courseSlug) {
+      if (!activeMembers) return [];
+      list = list.filter((student) => activeMembers.has(student.uid));
+    }
     switch (tab) {
       case "active":
         return list.filter((student) => student.isActive !== false);
@@ -101,11 +162,13 @@ export default function StudentControlPage() {
       default:
         return list;
     }
-  }, [students, tab, enrolledUids]);
+  }, [students, tab, enrolledUids, courseSlug, activeMembers]);
 
   if (authLoading || (!user && authLoading)) {
     return <AccessLoading label="Loading Student Control…" />;
   }
+
+  const courseLoadingState = courseSlug !== "" && activeMembers === null;
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -114,7 +177,36 @@ export default function StudentControlPage() {
         Registered MediSpark students and their account status.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      {/* Course-wise Student Control */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <label htmlFor="student-control-course" className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+          Course-wise
+        </label>
+        <select
+          id="student-control-course"
+          value={courseSlug}
+          onChange={(event) => setCourseSlug(event.target.value)}
+          className="min-w-0 flex-1 rounded-xl border border-ink/15 bg-ink/5 px-4 py-2 text-sm font-semibold text-heading outline-none transition focus:border-primary-500/60 sm:max-w-xs"
+        >
+          <option value="">All Courses</option>
+          {courses.map((course) => (
+            <option key={course.slug} value={course.slug}>
+              {course.name}
+            </option>
+          ))}
+        </select>
+        {courseSlug !== "" && (
+          <button
+            type="button"
+            onClick={() => setCourseSlug("")}
+            className="rounded-xl border border-ink/15 bg-ink/5 px-3 py-2 text-xs font-bold text-neutral-300 transition hover:border-primary-500/50 hover:text-heading"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
         {TABS.map((item) => (
           <button
             key={item.key}
@@ -136,11 +228,13 @@ export default function StudentControlPage() {
         <p className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           Failed to load students. Please try again.
         </p>
-      ) : students === null ? (
+      ) : students === null || courseLoadingState ? (
         <AccessLoading label="Loading students…" />
       ) : visible.length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-neutral-500">
-          No students in this view.
+          {courseSlug !== ""
+            ? "No students enrolled in this course yet."
+            : "No students in this view."}
         </p>
       ) : (
         <ul className="mt-5 space-y-2">
@@ -159,11 +253,22 @@ export default function StudentControlPage() {
                     .join(" · ")}
                 </p>
               </div>
-              {enrolledUids?.has(student.uid) && (
+              {courseSlug !== "" && activeMembers?.get(student.uid) && (
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400">
+                  {activeMembers.get(student.uid)}
+                </span>
+              )}
+              {courseSlug === "" && enrolledUids?.has(student.uid) && (
                 <span className="rounded-full border border-blue-500/30 bg-blue-600/10 px-2.5 py-1 text-[11px] font-bold text-blue-400">
                   Enrolled
                 </span>
               )}
+              <Link
+                href={`/admin/students/details/${encodeURIComponent(student.uid)}`}
+                className="rounded-lg border border-blue-500/40 bg-blue-600/10 px-3 py-1.5 text-xs font-bold text-blue-400 transition hover:bg-blue-600/20"
+              >
+                View Profile
+              </Link>
               <button
                 type="button"
                 onClick={() => void setActive(student, student.isActive === false)}

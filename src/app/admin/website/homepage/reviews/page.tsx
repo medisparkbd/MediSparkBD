@@ -9,6 +9,7 @@ import type { ReviewRecord } from "@/lib/reviews-store";
 
 type ReviewDraft = {
   id: string;
+  studentUid: string | null;
   studentName: string;
   courseName: string;
   batchLabel: string;
@@ -130,6 +131,7 @@ export default function ReviewsManagementPage() {
           setReviews(
             data.reviews.map((record) => ({
               id: record.id,
+              studentUid: record.studentUid ?? null,
               studentName: record.studentName,
               courseName: record.courseName,
               batchLabel: record.batchLabel,
@@ -218,6 +220,7 @@ export default function ReviewsManagementPage() {
       setReviews(
         (data.reviews ?? []).map((record) => ({
           id: record.id,
+          studentUid: record.studentUid ?? null,
           studentName: record.studentName,
           courseName: record.courseName,
           batchLabel: record.batchLabel,
@@ -389,6 +392,7 @@ export default function ReviewsManagementPage() {
       setReviews(
         (data.reviews ?? []).map((record) => ({
           id: record.id,
+          studentUid: record.studentUid ?? null,
           studentName: record.studentName,
           courseName: record.courseName,
           batchLabel: record.batchLabel,
@@ -593,6 +597,18 @@ export default function ReviewsManagementPage() {
                   <p className="truncate text-xs text-slate-500 admin-dark:text-slate-400">
                     {[review.courseName, review.batchLabel].filter(Boolean).join(" · ") || "—"}
                   </p>
+                  {review.studentUid ? (
+                    <span
+                      title={`Student account: ${review.studentUid}`}
+                      className="mt-1 inline-block rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-px text-[10px] font-bold text-emerald-600 admin-dark:text-emerald-400"
+                    >
+                      Submitted by student
+                    </span>
+                  ) : (
+                    <span className="mt-1 inline-block rounded-full border border-zinc-300 bg-zinc-100 px-2 py-px text-[10px] font-bold text-slate-500 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-slate-400">
+                      Added by admin
+                    </span>
+                  )}
                 </div>
                 <Stars value={review.rating} disabled />
                 <div className="flex shrink-0 items-center gap-1">

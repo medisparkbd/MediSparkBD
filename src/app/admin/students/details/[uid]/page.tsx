@@ -17,6 +17,7 @@ import type {
   AdminStudent,
   StudentEnrollmentInfo,
   StudentExamResult,
+  StudentProgressSummary,
 } from "@/lib/students-admin";
 
 function formatDate(value: number | null): string {
@@ -57,6 +58,7 @@ export default function StudentDetailsPage({
   const [student, setStudent] = useState<AdminStudent | null>(null);
   const [enrollments, setEnrollments] = useState<StudentEnrollmentInfo[]>([]);
   const [examResults, setExamResults] = useState<StudentExamResult[]>([]);
+  const [progress, setProgress] = useState<StudentProgressSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -79,11 +81,13 @@ export default function StudentDetailsPage({
         student?: AdminStudent;
         enrollments?: StudentEnrollmentInfo[];
         examResults?: StudentExamResult[];
+        progress?: StudentProgressSummary[];
       };
       if (data.student) {
         setStudent(data.student);
         setEnrollments(data.enrollments ?? []);
         setExamResults(data.examResults ?? []);
+        setProgress(data.progress ?? []);
       } else {
         setLoadError(true);
       }
@@ -226,6 +230,7 @@ export default function StudentDetailsPage({
           <InfoRow label="Gender" value={student.gender || "—"} />
           <InfoRow label="Institution" value={student.institution || "—"} />
           <InfoRow label="HSC Batch" value={student.hscBatch || "—"} />
+          <InfoRow label="Student Level" value={student.studentLevel || "—"} />
           <InfoRow label="Sign-in Method" value={student.provider} />
           <InfoRow label="Registration Date" value={formatDate(student.createdAt)} />
           <InfoRow label="Facebook" value={student.facebookUrl || "—"} />
@@ -270,6 +275,49 @@ export default function StudentDetailsPage({
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${enrollment.status === "active" ? "bg-emerald-500/10 text-emerald-600 admin-dark:text-emerald-400" : enrollment.status === "pending" ? "bg-yellow-500/10 text-yellow-600 admin-dark:text-yellow-400" : "bg-zinc-200 text-slate-500 admin-dark:bg-zinc-700 admin-dark:text-zinc-300"}`}>
                   {enrollment.status}
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Learning Progress */}
+      <div className={`${cardClass} mt-4 p-5`}>
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+          Learning Progress ({progress.length})
+        </h3>
+        {progress.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-dashed border-neutral-300 p-4 text-center text-xs font-semibold text-slate-500 admin-dark:border-zinc-700">
+            No learning activity yet.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {progress.map((course) => (
+              <li
+                key={course.courseId}
+                className="rounded-xl bg-[#f8fbff] px-4 py-3 admin-dark:bg-[#132a4f]/60"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#0b1e3a] admin-dark:text-zinc-100">
+                    {course.courseName}
+                  </p>
+                  <span className="text-xs font-extrabold text-[#1a3a78] admin-dark:text-[#93c5fd]">
+                    {course.completedClasses}/{course.totalClasses} · {course.percent}%
+                  </span>
+                </div>
+                <div
+                  className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0] admin-dark:bg-[#0f2547]"
+                  role="progressbar"
+                  aria-valuenow={course.percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${course.courseName} progress`}
+                >
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#1a3a78] to-[#2f6bce] admin-dark:from-[#234e9f] admin-dark:to-[#3b82f6]"
+                    style={{ width: `${Math.min(100, Math.max(0, course.percent))}%` }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
