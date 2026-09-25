@@ -445,7 +445,9 @@ async function startExamAttempt(
     if (!isPracticeMode || (examForCheck?.kind === "enrolled")) {
       // Post-live Practice phase: retakes are allowed — every attempt after
       // the live window is recorded as an unranked practice attempt.
-      const isPostLivePractice = await isPostLivePracticeExam(examForCheck).catch(() => false);
+      const isPostLivePractice = examForCheck
+        ? await isPostLivePracticeExam(examForCheck).catch(() => false)
+        : false;
       if (!isPostLivePractice) {
         const hasCompleted = await hasPriorExamAttempt(examId, uid);
         if (hasCompleted) {
