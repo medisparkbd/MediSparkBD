@@ -130,18 +130,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // (2b) Paid enrollment required — user must have at least one active paid course.
-    const paidEnrolled = await query<{ found: number }[]>(
-      `SELECT 1 AS found FROM enrollments
-        WHERE student_uid = ? AND enrollment_status = 'active'
-          AND course_kind = 'paid' LIMIT 1`,
-      [user.uid],
+    // (2b) Course-level Q&A access check: the submitted course must have Q&A Access = ON.
+    const courseQa = await query<{ qa_access: number | null }[]>(
+      `SELECT COALESCE(qa_access, 1) AS qa_access FROM catalog_courses WHERE slug = ? LIMIT 1`,
+      [courseId],
     );
-    if (paidEnrolled.length === 0) {
+    if (courseQa.length === 0 || courseQa[0].qa_access !== 1) {
       return NextResponse.json(
         {
-          error:
-            "Asking questions is available only to students enrolled in a paid course. Please enroll in a paid course to ask questions.",
+          error: "Q&A facility is currently disabled for this course.",
         },
         { status: 403 },
       );

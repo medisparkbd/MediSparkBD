@@ -146,6 +146,7 @@ export default async function AdminCourseDetailsPage({
             ["Total Exams", String(counts.exams.get(slug) ?? 0)],
             ["Publish Status", course.status],
             ["Featured", course.featured ? "ON" : "OFF"],
+            ["Q&A Access", course.qaAccess !== false ? "ON" : "OFF"],
             ["Coupon", course.couponEnabled ? "Enabled" : "Disabled"],
             ["Mentors", mentors.length > 0 ? mentors.map((m) => m.name).join(", ") : "—"],
           ].map(([label, value]) => (

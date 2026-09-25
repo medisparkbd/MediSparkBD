@@ -135,6 +135,8 @@ export type CatalogCourse = {
   availability: "available" | "hidden";
   couponEnabled: boolean;
   featured: boolean;
+  /** Q&A Access control: ON (true) / OFF (false) per course. */
+  qaAccess: boolean;
   contentLayout: CourseContentLayout;
   /** Admin-entered totals (card display). */
   totalClasses?: number;
@@ -168,6 +170,7 @@ type CatalogCourseRow = {
   availability: string;
   coupon_enabled: number | boolean;
   is_featured?: number | boolean | null;
+  qa_access?: number | boolean | null;
   content_layout?: string | null;
   total_classes?: string | number | null;
   total_exams?: string | number | null;
@@ -227,6 +230,10 @@ export function rowToCourse(row: CatalogCourseRow): CatalogCourse {
     couponEnabled: Boolean(row.coupon_enabled),
     contentLayout: normalizeContentLayout(row.content_layout),
     featured: Boolean(row.is_featured),
+    qaAccess:
+      row.qa_access === null || row.qa_access === undefined
+        ? true
+        : Boolean(row.qa_access),
     totalClasses: row.total_classes != null ? toNumber(row.total_classes) : undefined,
     totalExams: row.total_exams != null ? toNumber(row.total_exams) : undefined,
     courseDetails: parseJsonObject<CourseDetails>(row.course_details ?? null),
@@ -259,6 +266,7 @@ async function ensureTables(): Promise<void> {
     availability ENUM('available','hidden') NOT NULL DEFAULT 'available',
     coupon_enabled TINYINT(1) NOT NULL DEFAULT 0,
     is_featured TINYINT(1) NOT NULL DEFAULT 0,
+    qa_access TINYINT(1) NOT NULL DEFAULT 1,
     sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -267,6 +275,12 @@ async function ensureTables(): Promise<void> {
   // Databases created before the featured flag need the column added.
   try {
     await ensureColumn("catalog_courses", "is_featured", "`is_featured` TINYINT(1) NOT NULL DEFAULT 0");
+  } catch {
+    // Best effort — column may already exist.
+  }
+  // Course-level Q&A access (ON / OFF).
+  try {
+    await ensureColumn("catalog_courses", "qa_access", "`qa_access` TINYINT(1) NOT NULL DEFAULT 1");
   } catch {
     // Best effort — column may already exist.
   }
@@ -640,14 +654,16 @@ export async function saveCatalogCourse(
   // Deduplicate while preserving order, cap at 20 pages to prevent abuse.
   routineUrls = Array.from(new Set(routineUrls)).slice(0, 20);
 
+  const qaAccess = input.qaAccess !== undefined ? (input.qaAccess ? 1 : 0) : 1;
+
   await exec(
     `INSERT INTO catalog_courses
        (slug, name, category, category_id, batch_id, image_url, short_description, description,
         teacher_name, teacher_photo_url, teacher_designation, duration,
         fee, discount_fee, features, overview_title, overview,
-        status, availability, coupon_enabled, is_featured, content_layout,
+        status, availability, coupon_enabled, is_featured, qa_access, content_layout,
         total_classes, total_exams, course_details, routine_urls, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        name = VALUES(name), category = VALUES(category), category_id = VALUES(category_id),
        batch_id = VALUES(batch_id),
@@ -659,6 +675,7 @@ export async function saveCatalogCourse(
        overview_title = VALUES(overview_title), overview = VALUES(overview),
        status = VALUES(status), availability = VALUES(availability),
        coupon_enabled = VALUES(coupon_enabled), is_featured = VALUES(is_featured),
+       qa_access = VALUES(qa_access),
        content_layout = VALUES(content_layout),
        total_classes = VALUES(total_classes), total_exams = VALUES(total_exams),
        course_details = VALUES(course_details), routine_urls = VALUES(routine_urls), updated_by = VALUES(updated_by)`,
@@ -684,6 +701,7 @@ export async function saveCatalogCourse(
       input.availability === "hidden" ? "hidden" : "available",
       input.couponEnabled ? 1 : 0,
       input.featured ? 1 : 0,
+      qaAccess,
       normalizeContentLayout(input.contentLayout),
       input.totalClasses != null && input.totalClasses !== "" ? Math.max(0, Number(input.totalClasses) || 0) : null,
       input.totalExams != null && input.totalExams !== "" ? Math.max(0, Number(input.totalExams) || 0) : null,
@@ -734,6 +752,7 @@ export async function saveCatalogCourse(
       availability: input.availability === "hidden" ? "hidden" : "available",
       couponEnabled: Boolean(input.couponEnabled),
       featured: Boolean(input.featured),
+      qaAccess: Boolean(qaAccess),
       contentLayout: normalizeContentLayout(input.contentLayout),
       totalClasses: input.totalClasses != null && input.totalClasses !== "" ? Math.max(0, Number(input.totalClasses) || 0) : undefined,
       totalExams: input.totalExams != null && input.totalExams !== "" ? Math.max(0, Number(input.totalExams) || 0) : undefined,
@@ -799,8 +818,13 @@ export async function setCourseMentors(
 /** Quick flags update — publish/unpublish and/or feature a course. */
 export async function setCatalogCourseFlags(
   slug: string,
-  patch: { status?: "published" | "unpublished"; featured?: boolean },
-): Promise<CatalogCourse> {  await ensureTables();
+  patch: {
+    status?: "published" | "unpublished";
+    featured?: boolean;
+    qaAccess?: boolean;
+  },
+): Promise<CatalogCourse> {
+  await ensureTables();
   const existing = await fetchCatalogCourse(slug);
   if (!existing) throw new Error("Course not found.");
   const sets: string[] = [];
@@ -812,6 +836,10 @@ export async function setCatalogCourseFlags(
   if (patch.featured !== undefined) {
     sets.push("is_featured = ?");
     values.push(patch.featured ? 1 : 0);
+  }
+  if (patch.qaAccess !== undefined) {
+    sets.push("qa_access = ?");
+    values.push(patch.qaAccess ? 1 : 0);
   }
   if (sets.length > 0) {
     values.push(slug);

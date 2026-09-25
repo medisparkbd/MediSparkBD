@@ -461,6 +461,7 @@ export async function fetchQaAskOptions(uid: string): Promise<QaAskOptions> {
            FROM enrollments e
            JOIN catalog_courses c ON c.slug = e.course_id
           WHERE e.student_uid = ? AND e.enrollment_status = 'active'
+            AND COALESCE(c.qa_access, 1) = 1
           ORDER BY c.name ASC`,
         [uid],
       );
@@ -495,8 +496,18 @@ export async function fetchQaAskOptions(uid: string): Promise<QaAskOptions> {
       }
     }
 
+    const eligibleCategoryIds = new Set(
+      courses.map((course) => course.categoryId).filter(Boolean),
+    );
+    const availableCategories = categories.filter((cat) =>
+      eligibleCategoryIds.has(cat.id),
+    );
+
     return {
-      categories: categories.map((category) => ({
+      categories: (availableCategories.length > 0
+        ? availableCategories
+        : categories
+      ).map((category) => ({
         id: category.id,
         name: category.name,
       })),

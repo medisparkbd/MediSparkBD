@@ -26,6 +26,7 @@ export function useCourseAccess(course: Course): CourseAccess {
 
   const isActive = enrollment?.enrollmentStatus === "active";
   const isPaid = enrollment?.courseKind === "paid";
+  const isQaAllowed = course.qaAccess !== false && enrollment?.qaAccess !== false;
 
   return {
     enrollment,
@@ -35,6 +36,6 @@ export function useCourseAccess(course: Course): CourseAccess {
     isCompleted: enrollment?.enrollmentStatus === "completed",
     isPaid,
     canAccessContent: !!user && isActive,
-    canAccessQa: !!user && isActive && isPaid,
+    canAccessQa: !!user && isActive && isQaAllowed,
   };
 }

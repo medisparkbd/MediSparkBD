@@ -26,6 +26,8 @@ export type PdfMaterialQuestion = {
   issues: string[];
   image?: PdfMaterialImage | null;
   isStandaloneImage?: boolean; // true if block is image-only between questions
+  /** Topic group heading — set when pasted text contains Topic: headers. */
+  topic?: string;
 };
 
 export type PdfMaterialPayload = {

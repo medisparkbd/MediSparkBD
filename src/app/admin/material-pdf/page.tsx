@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, Fragment } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 import { parsePastedMcqs } from "@/lib/paste-mcq-parser";
@@ -11,14 +11,18 @@ import {
   type LineSpacing,
   lineSpacingFactor,
 } from "@/components/admin/MaterialPdf/pagination";
+import CqPdfGenerator from "@/components/admin/MaterialPdf/CqPdfGenerator";
 
 type Step = "paste" | "preview";
+
+/** Main generator selection — exactly TWO cards, never a third "setup" card. */
+type GeneratorMode = "select" | "mcq" | "cq";
 
 function uid() {
   return `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function mapParserToQuestions(parsed: ReturnType<typeof parsePastedMcqs>): PdfMaterialQuestion[] {
+function mapParserToQuestions(parsed: ReturnType<typeof parsePastedMcqs>, topic = ""): PdfMaterialQuestion[] {
   return parsed.map((p, idx) => {
     let ans = "";
     if (p.correctIndex !== null && p.correctIndex >= 0 && p.correctIndex < 4) {
@@ -34,8 +38,40 @@ function mapParserToQuestions(parsed: ReturnType<typeof parsePastedMcqs>): PdfMa
       issues: p.issues ?? [],
       image: null,
       isStandaloneImage: false,
+      topic: topic || undefined,
     };
   });
+}
+
+/**
+ * Split pasted text into topic sections. A section starts at a line like:
+ *   Topic: Cell Biology · টপিক: কোষ · Topic - X · [Cell Biology]
+ * Sections without a header keep topic "". Questions are arranged
+ * topic-wise in the preview only when such headers are present.
+ */
+function splitPasteByTopic(raw: string): { topic: string; text: string }[] {
+  const lines = raw.split("\n");
+  const sections: { topic: string; text: string }[] = [];
+  let currentTopic = "";
+  let currentLines: string[] = [];
+  const topicRe = /^\s*(?:topic|টপিক|বিষয়|বিষয়|অধ্যায়|অধ্যায়|chapter)\s*[:：\-–]\s*(.+?)\s*$/i;
+  const bracketRe = /^\s*\[([^\]\n]{1,80})\]\s*$/;
+  for (const line of lines) {
+    const m = line.match(topicRe) ?? line.match(bracketRe);
+    if (m && (m[1] ?? "").trim()) {
+      if (currentLines.join("\n").trim()) {
+        sections.push({ topic: currentTopic, text: currentLines.join("\n") });
+      }
+      currentTopic = (m[1] ?? "").trim();
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  if (currentLines.join("\n").trim() || sections.length === 0) {
+    sections.push({ topic: currentTopic, text: currentLines.join("\n") });
+  }
+  return sections.filter((s) => s.text.trim());
 }
 
 function sanitizeQuestions(questions: PdfMaterialQuestion[]): PdfMaterialQuestion[] {
@@ -58,6 +94,7 @@ function fileToDataUrl(file: File): Promise<string> {
 
 export default function MaterialPdfGeneratorPage() {
   const { user, authLoading } = useAuth();
+  const [mode, setMode] = useState<GeneratorMode>("select");
   const [materialName, setMaterialName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [questions, setQuestions] = useState<PdfMaterialQuestion[]>([]);
@@ -80,6 +117,12 @@ export default function MaterialPdfGeneratorPage() {
   const [watermarkBusy, setWatermarkBusy] = useState<"save" | "remove" | null>(null);
   const [watermarkNotice, setWatermarkNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const watermarkFileRef = useRef<HTMLInputElement>(null);
+  // Watermark appearance controls — applied to the A4 preview, so the
+  // generated PDF (captured from the preview) reflects them on every page.
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [watermarkOpacity, setWatermarkOpacity] = useState(7); // percent
+  const [watermarkSize, setWatermarkSize] = useState(280); // px width
+  const [watermarkPosition, setWatermarkPosition] = useState<"top" | "center" | "bottom">("center");
 
   function sanitizeFileName(name: string): string {
     const raw = (name || "MediSpark-Material").trim();
@@ -145,13 +188,15 @@ export default function MaterialPdfGeneratorPage() {
   // Invalidate generated PDF when preview content changes (requires regeneration)
   const prevPreviewKeyRef = useRef<string>("");
   useEffect(() => {
-    const key = JSON.stringify(questions) + "|" + materialName + "|" + String(lineSpacing);
+    const key = JSON.stringify(questions) + "|" + materialName + "|" + String(lineSpacing)
+      + "|" + (watermarkEnabled ? "wm1" : "wm0") + "|" + watermarkOpacity + "|" + watermarkSize + "|" + watermarkPosition
+      + "|" + (watermarkLogo ?? "");
     if (prevPreviewKeyRef.current && prevPreviewKeyRef.current !== key && pdfReady) {
       setPdfReady(false);
       setGenerateError(null);
     }
     prevPreviewKeyRef.current = key;
-  }, [questions, materialName, lineSpacing, pdfReady]);
+  }, [questions, materialName, lineSpacing, watermarkEnabled, watermarkOpacity, watermarkSize, watermarkPosition, watermarkLogo, pdfReady]);
 
   // Usable column height depends on lineSpacing? Keep fixed, pagination estimates handle spacing
   const usableColumnHeight = 740; // px per column after header + answer box reserved
@@ -165,17 +210,33 @@ export default function MaterialPdfGeneratorPage() {
       setToast("Please paste questions first.");
       return;
     }
-    const parsed = parsePastedMcqs(pasteText);
-    if (parsed.length === 0) {
+    // Arrange topic-wise when the pasted text carries Topic: headers.
+    const sections = splitPasteByTopic(pasteText);
+    let mapped: PdfMaterialQuestion[] = [];
+    for (const section of sections) {
+      const parsed = parsePastedMcqs(section.text);
+      mapped = mapped.concat(mapParserToQuestions(parsed, section.topic));
+    }
+    if (mapped.length === 0) {
       setToast("No MCQs detected. Check format.");
       return;
     }
-    const mapped = mapParserToQuestions(parsed);
     const sanitized = sanitizeQuestions(mapped);
+    const topicCount = new Set(sanitized.map((q) => q.topic ?? "")).size;
     setQuestions(sanitized);
     setDetection({ total: sanitized.filter((q) => !q.isStandaloneImage).length });
-    setToast(`${sanitized.filter((q) => !q.isStandaloneImage).length} questions detected & formatted (1..${sanitized.filter((q) => !q.isStandaloneImage).length})`);
+    setToast(
+      `${sanitized.filter((q) => !q.isStandaloneImage).length} questions detected & formatted (1..${sanitized.filter((q) => !q.isStandaloneImage).length})${topicCount > 1 ? ` • ${topicCount} topics` : ""}`,
+    );
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** Rename a topic group heading — updates every question in that group. */
+  const handleRenameTopic = (oldTopic: string, newTopic: string) => {
+    const next = newTopic.trim();
+    if (!next || next === oldTopic) return;
+    setQuestions((prev) => prev.map((q) => (q.topic === oldTopic ? { ...q, topic: next } : q)));
+    setToast("Topic renamed");
   };
 
   const handleUpdate = (id: string, patch: Partial<PdfMaterialQuestion>) => {
@@ -605,6 +666,71 @@ export default function MaterialPdfGeneratorPage() {
 
   if (authLoading) return <AccessLoading label="Loading Material PDF Generator…" />;
 
+  // ── Main page: ONLY TWO generator cards (MCQ + CQ). No third card. ──
+  if (mode === "select") {
+    return (
+      <div className="min-h-screen bg-[#f1f5f9] admin-dark:bg-[#0a162e]">
+        <div className="mx-auto max-w-[1280px] px-3 py-6 sm:px-6 sm:py-8">
+          <div className="rounded-2xl border border-[#dbeafe] bg-white p-4 sm:p-6 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#234e9f] admin-dark:text-[#93c5fd]">
+              Admin Tool • Materials PDF Generator
+            </p>
+            <h1 className="mt-1 text-xl font-extrabold text-[#0b1e3a] sm:text-2xl admin-dark:text-white">
+              Materials PDF Generator
+            </h1>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm admin-dark:text-[#8da0c0]">
+              Choose a generator — paste questions, Detect &amp; Format, edit the A4 preview, then Generate PDF.
+            </p>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setMode("mcq")}
+              className="group rounded-2xl border border-[#dbeafe] bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#234e9f]/50 hover:shadow-md admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:hover:border-[#3b82f6]/60"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0b1e3a]/5 text-xl font-black text-[#0b1e3a] transition group-hover:bg-[#0b1e3a] group-hover:text-white admin-dark:bg-white/10 admin-dark:text-white admin-dark:group-hover:bg-white admin-dark:group-hover:text-[#0b1e3a]">
+                ☰
+              </span>
+              <span className="mt-4 block text-base font-extrabold text-[#0b1e3a] admin-dark:text-white">
+                MCQ PDF Generator
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-slate-500 admin-dark:text-[#8da0c0]">
+                Paste 10 / 20 / 50 / 100+ MCQs → Detect &amp; Format → editable two-column A4 preview with images, logo &amp; watermark → Generate PDF.
+              </span>
+              <span className="mt-4 inline-block rounded-xl bg-[#0b1e3a] px-5 py-2 text-xs font-extrabold text-white admin-dark:bg-[#234e9f]">
+                Open MCQ Generator →
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMode("cq")}
+              className="group rounded-2xl border border-[#dbeafe] bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-600/50 hover:shadow-md admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:hover:border-emerald-500/60"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600/10 text-xl font-black text-emerald-700 transition group-hover:bg-emerald-600 group-hover:text-white admin-dark:bg-emerald-500/10 admin-dark:text-emerald-300">
+                ✎
+              </span>
+              <span className="mt-4 block text-base font-extrabold text-[#0b1e3a] admin-dark:text-white">
+                CQ PDF Generator
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-slate-500 admin-dark:text-[#8da0c0]">
+                Paste creative questions (উদ্দীপক + ক / খ / গ / ঘ) → Detect &amp; Format → editable single-column A4 preview → Generate PDF.
+              </span>
+              <span className="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white hover:bg-emerald-700">
+                Open CQ Generator →
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === "cq") {
+    return <CqPdfGenerator onBack={() => setMode("select")} />;
+  }
+
   const spacingLabel = typeof lineSpacing === "string" ? lineSpacing : `${lineSpacing}`;
   const lineHeightStyle = lineSpacingFactor(lineSpacing);
   const questionCount = questions.filter((q) => !q.isStandaloneImage).length;
@@ -617,11 +743,18 @@ export default function MaterialPdfGeneratorPage() {
       <div className="mx-auto max-w-[1280px] px-3 py-6 sm:px-6 sm:py-8">
         {/* Top Title */}
         <div className="rounded-2xl border border-[#dbeafe] bg-white p-4 sm:p-6 shadow-sm admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+          <button
+            type="button"
+            onClick={() => setMode("select")}
+            className="mb-3 rounded-xl border border-[#cbd5e1] bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-white"
+          >
+            ← All Generators
+          </button>
           <p className="text-[11px] font-bold uppercase tracking-widest text-[#234e9f] admin-dark:text-[#93c5fd]">
-            Admin Tool • Materials PDF Generator
+            Admin Tool • MCQ PDF Generator
           </p>
           <h1 className="mt-1 text-xl font-extrabold text-[#0b1e3a] sm:text-2xl admin-dark:text-white">
-            Materials PDF Generator
+            MCQ PDF Generator
           </h1>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm admin-dark:text-[#8da0c0]">
             Material Name → Paste MCQs → Detect & Format → Editable A4 Preview → Generate PDF → Download. Two-column A4, never-split MCQ blocks, page-specific উত্তরমালা. Manual image insertion (no OCR).
@@ -734,6 +867,55 @@ export default function MaterialPdfGeneratorPage() {
             <span className="ml-auto self-center text-xs text-slate-500 admin-dark:text-slate-400">
               {watermarkLogo ? "Watermark active — will appear on all PDFs" : "No watermark — PDFs generate without watermark"}
             </span>
+          </div>
+          {/* Watermark appearance — applied to every PDF page via the A4 preview */}
+          <div className="mt-4 grid gap-3 rounded-xl border border-[#dbeafe] bg-[#f8fafc] p-3 sm:grid-cols-2 lg:grid-cols-4 admin-dark:border-[#1e3a65] admin-dark:bg-[#0a162e]">
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 admin-dark:text-white">
+              <input
+                type="checkbox"
+                checked={watermarkEnabled}
+                onChange={(e) => setWatermarkEnabled(e.target.checked)}
+                className="h-4 w-4 accent-[#0b1e3a]"
+              />
+              Watermark: {watermarkEnabled ? "ON" : "OFF"}
+            </label>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 admin-dark:text-white">
+              Opacity
+              <input
+                type="range"
+                min={2}
+                max={30}
+                value={watermarkOpacity}
+                onChange={(e) => setWatermarkOpacity(parseInt(e.target.value, 10))}
+                className="h-1 w-24 accent-[#0b1e3a]"
+              />
+              <span className="w-10 text-slate-500 admin-dark:text-slate-400">{watermarkOpacity}%</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 admin-dark:text-white">
+              Size
+              <input
+                type="range"
+                min={140}
+                max={420}
+                step={10}
+                value={watermarkSize}
+                onChange={(e) => setWatermarkSize(parseInt(e.target.value, 10))}
+                className="h-1 w-24 accent-[#0b1e3a]"
+              />
+              <span className="w-14 text-slate-500 admin-dark:text-slate-400">{watermarkSize}px</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 admin-dark:text-white">
+              Position
+              <select
+                value={watermarkPosition}
+                onChange={(e) => setWatermarkPosition(e.target.value as "top" | "center" | "bottom")}
+                className="rounded-lg border border-[#cbd5e1] bg-white px-2 py-1 text-xs font-bold text-[#0b1e3a] outline-none admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-white"
+              >
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -866,17 +1048,23 @@ D. 150 দিন
                   zIndex: 0,
                 }}
               >
-                {watermarkLogo && (
+                {watermarkEnabled && watermarkLogo && (
                   <img
                     src={watermarkLogo}
                     alt=""
                     aria-hidden="true"
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    className={
+                      watermarkPosition === "top"
+                        ? "absolute left-1/2 top-[16%] -translate-x-1/2"
+                        : watermarkPosition === "bottom"
+                          ? "absolute bottom-[16%] left-1/2 -translate-x-1/2"
+                          : "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    }
                     style={{
-                      width: "280px",
-                      maxWidth: "35%",
+                      width: `${watermarkSize}px`,
+                      maxWidth: "60%",
                       height: "auto",
-                      opacity: 0.07,
+                      opacity: watermarkOpacity / 100,
                       zIndex: -1,
                       pointerEvents: "none",
                     }}
@@ -910,8 +1098,35 @@ D. 150 দিন
                   } as React.CSSProperties}
                 >
                   {/* Blocks: questions + standalone images interleaved already via pagination */}
-                  {page.questions.map((q) =>
-                    q.isStandaloneImage ? (
+                  {page.questions.map((q, qi) => {
+                    // Topic-wise grouping: header whenever the topic changes within the page.
+                    const showTopic =
+                      !q.isStandaloneImage &&
+                      !!q.topic?.trim() &&
+                      (qi === 0 || page.questions[qi - 1]?.topic !== q.topic);
+                    return (
+                      <Fragment key={q.id}>
+                        {showTopic && (
+                          <div
+                            className="bangla mb-2 break-inside-avoid rounded bg-[#0b1e3a] px-2.5 py-1 text-[11px] font-extrabold text-white"
+                            style={{ breakInside: "avoid", pageBreakInside: "avoid", WebkitColumnBreakInside: "avoid" } as React.CSSProperties}
+                          >
+                            <span
+                              className="cursor-text outline-none focus:bg-white/20 focus:ring-1 focus:ring-white/50 rounded px-0.5"
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => {
+                                const txt = (e.currentTarget.innerText || "").trim();
+                                if (txt && txt !== q.topic) handleRenameTopic(q.topic ?? "", txt);
+                                else e.currentTarget.innerText = q.topic ?? "";
+                              }}
+                              title="Click to rename topic (updates whole group)"
+                            >
+                              {q.topic}
+                            </span>
+                          </div>
+                        )}
+                        {q.isStandaloneImage ? (
                       <div
                         key={q.id}
                         className="mb-3 break-inside-avoid rounded border border-[#cbd5e1] bg-[#f8fafc] p-2"
@@ -1112,9 +1327,11 @@ D. 150 দিন
                           </select>
                           <span className="text-[9px] text-slate-400">editable — updates Answer Box</span>
                         </div>
-                      </div>
-                    ),
-                  )}
+                        </div>
+                      )}
+                      </Fragment>
+                    );
+                  })}
                   {page.questions.length === 0 && (
                     <p className="py-10 text-center text-sm text-slate-400 col-span-2">No questions</p>
                   )}

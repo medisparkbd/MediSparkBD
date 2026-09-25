@@ -48,10 +48,58 @@ export async function getAccessLevel(
     : "free";
 }
 
-/** Q&A is available ONLY to students with an active PAID course. */
+/** Q&A is available ONLY to students with an active PAID course (legacy helper). */
 export async function hasPaidEnrollment(uid: string): Promise<boolean> {
   const enrollments = await getActiveEnrollments(uid);
   return enrollments.some((enrollment) => enrollment.kind === "paid");
+}
+
+/**
+ * Course-level Q&A access: checks that the student has an ACTIVE enrollment
+ * in the specific course, and that course has Q&A Access = ON (qa_access = 1).
+ * Works independently for every course, regardless of whether Free or Paid.
+ */
+export async function canAccessCourseQa(
+  uid: string,
+  courseId: string,
+): Promise<boolean> {
+  if (!uid || !courseId) return false;
+  try {
+    const rows = await query<{ found: number }[]>(
+      `SELECT 1 AS found
+         FROM enrollments e
+         JOIN catalog_courses c ON c.slug = e.course_id
+        WHERE e.student_uid = ?
+          AND e.course_id = ?
+          AND e.enrollment_status = 'active'
+          AND COALESCE(c.qa_access, 1) = 1
+        LIMIT 1`,
+      [uid, courseId],
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Check if student is actively enrolled in at least one course with Q&A Access = ON. */
+export async function hasAnyQaAccess(uid: string): Promise<boolean> {
+  if (!uid) return false;
+  try {
+    const rows = await query<{ found: number }[]>(
+      `SELECT 1 AS found
+         FROM enrollments e
+         JOIN catalog_courses c ON c.slug = e.course_id
+        WHERE e.student_uid = ?
+          AND e.enrollment_status = 'active'
+          AND COALESCE(c.qa_access, 1) = 1
+        LIMIT 1`,
+      [uid],
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Course-wise protected-content check: this uid + THIS course only. */

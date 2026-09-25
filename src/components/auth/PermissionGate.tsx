@@ -80,9 +80,9 @@ function qaRestrictedGuidance(): PermissionGuidance {
   return {
     title: "Q&A Access Restricted",
     message:
-      "Q&A সুবিধাটি শুধুমাত্র Paid Course-এ enrolled students-এর জন্য available।",
-    actionLabel: "Explore Paid Courses",
-    actionHref: "/courses?kind=paid",
+      "Q&A সুবিধাটি শুধুমাত্র Q&A access চালু থাকা Course-এ enrolled students-এর জন্য available।",
+    actionLabel: "Explore Courses",
+    actionHref: "/courses",
   };
 }
 
@@ -180,7 +180,9 @@ export default function PermissionGate({
       });
     }
   } else if (requirement === "qa") {
-    allowed = access.hasPaidEnrollment;
+    // Course-level Q&A access: active enrollment in at least one course
+    // with Q&A Access = ON (free or paid) — never paid-only.
+    allowed = access.hasQaAccess;
     if (!allowed) {
       guidance = qaRestrictedGuidance();
     }

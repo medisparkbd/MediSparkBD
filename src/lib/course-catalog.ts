@@ -66,6 +66,7 @@ function toCourse(
     status: (row.status === "published" ? "published" : "unpublished") as CourseStatus,
     availability: (row.availability === "hidden" ? "hidden" : "available") as CourseAvailability,
     couponEnabled: row.couponEnabled,
+    qaAccess: row.qaAccess !== false,
     totalClasses: row.totalClasses ?? counts?.classes.get(row.slug),
     totalExams: row.totalExams ?? counts?.exams.get(row.slug),
     courseDetails: row.courseDetails,

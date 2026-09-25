@@ -121,9 +121,15 @@ export async function PATCH(request: NextRequest) {
       ? body.status
       : undefined;
   const featured = typeof body.featured === "boolean" ? body.featured : undefined;
-  if (status === undefined && featured === undefined) {
+  const qaAccess =
+    typeof body.qaAccess === "boolean"
+      ? body.qaAccess
+      : typeof body.qaAccess === "string"
+        ? body.qaAccess.toLowerCase() === "on" || body.qaAccess.toLowerCase() === "true"
+        : undefined;
+  if (status === undefined && featured === undefined && qaAccess === undefined) {
     return NextResponse.json(
-      { error: "Nothing to update — pass status and/or featured." },
+      { error: "Nothing to update — pass status, featured, and/or qaAccess." },
       { status: 400 },
     );
   }
@@ -131,6 +137,7 @@ export async function PATCH(request: NextRequest) {
     const course = await setCatalogCourseFlags(body.slug, {
       status,
       featured,
+      qaAccess,
     });
     await logAdminAction(admin, "course.flags", `slug=${body.slug}`, request);
     return NextResponse.json({ course });

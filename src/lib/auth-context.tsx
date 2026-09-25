@@ -46,6 +46,8 @@ export type StudentAccess = {
   registered: boolean;
   hasEnrollment: boolean;
   hasPaidEnrollment: boolean;
+  /** True if the student is actively enrolled in at least one course with Q&A enabled. */
+  hasQaAccess: boolean;
 };
 
 type AuthContextValue = {
@@ -374,6 +376,9 @@ const access = useMemo<StudentAccess>(() => {
       hasEnrollment: activeEnrollments.length > 0,
       hasPaidEnrollment: activeEnrollments.some(
         (enrollment) => enrollment.courseKind === "paid",
+      ),
+      hasQaAccess: activeEnrollments.some(
+        (enrollment) => enrollment.qaAccess !== false,
       ),
     };
   }, [profile, enrollments]);

@@ -25,6 +25,7 @@ type EnrollmentRow = {
   enrollment_status: "pending" | "active" | "cancelled" | "completed";
   enrollment_date: Date | string;
   updated_at: Date | string;
+  qa_access?: number | boolean | null;
 };
 
 function mapEnrollment(row: EnrollmentRow): Enrollment {
@@ -38,6 +39,7 @@ function mapEnrollment(row: EnrollmentRow): Enrollment {
     enrollmentStatus: row.enrollment_status,
     enrollmentDate: parseDate(row.enrollment_date),
     updatedAt: parseDate(row.updated_at),
+    qaAccess: row.qa_access === null || row.qa_access === undefined ? true : Boolean(row.qa_access),
   };
 }
 
@@ -48,7 +50,11 @@ export async function GET(request: NextRequest) {
   }
   try {
     const rows = await query<EnrollmentRow[]>(
-      "SELECT * FROM enrollments WHERE student_uid = ? ORDER BY updated_at DESC",
+      `SELECT e.*, COALESCE(c.qa_access, 1) AS qa_access
+         FROM enrollments e
+         LEFT JOIN catalog_courses c ON c.slug = e.course_id
+        WHERE e.student_uid = ?
+        ORDER BY e.updated_at DESC`,
       [user.uid],
     );
     return NextResponse.json({
@@ -272,8 +278,13 @@ export async function POST(request: NextRequest) {
     );
     // Read back the authoritative row so the client always sees the real
     // stored status (new or revived) without needing manual DB entry.
+    // Includes the course Q&A flag so the returned enrollment carries the
+    // correct qaAccess even when the course has Q&A turned OFF.
     const rows = await query<EnrollmentRow[]>(
-      "SELECT * FROM enrollments WHERE student_uid = ? AND course_id = ? LIMIT 1",
+      `SELECT e.*, COALESCE(c.qa_access, 1) AS qa_access
+         FROM enrollments e
+         LEFT JOIN catalog_courses c ON c.slug = e.course_id
+        WHERE e.student_uid = ? AND e.course_id = ? LIMIT 1`,
       [user.uid, courseId],
     );
     if (!rows[0]) {

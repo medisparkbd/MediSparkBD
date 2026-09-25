@@ -51,6 +51,8 @@ export type Course = {
   status: CourseStatus;
   availability: CourseAvailability;
   couponEnabled: boolean;
+  /** Course-level Q&A access: ON (true) / OFF (false). */
+  qaAccess?: boolean;
   /** Admin-entered totals (card display). */
   totalClasses?: number;
   totalExams?: number;

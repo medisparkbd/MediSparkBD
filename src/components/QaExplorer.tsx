@@ -41,6 +41,7 @@ export default function QaExplorer({
     user,
     access,
     authLoading,
+    profileLoading,
     configured,
     signInWithGoogle,
   } = useAuth();
@@ -333,28 +334,32 @@ export default function QaExplorer({
       )
     : [];
 
-  // Load the ask-form dropdown data — gated to paid enrollments.
-  // Everyone can VIEW questions/answers; only paid-enrolled students may ASK.
+  // Load the ask-form dropdown data — gated to Q&A-enabled enrollments.
+  // Everyone can VIEW questions/answers; only students actively enrolled in
+  // a course with Q&A Access = ON (free or paid) may ASK.
   const openAsk = async () => {
-    if (authLoading) return;
-    if (!access.hasPaidEnrollment) {
+    // Wait for enrollment data before judging access — otherwise an eligible
+    // student clicking Ask during profile load would wrongly see the
+    // "Q&A Access Required" guidance.
+    if (authLoading || profileLoading) return;
+    if (!access.hasQaAccess) {
       if (!user) {
         const guidance: PermissionGuidance = configured
           ? {
               title: "Enrollment Required",
               message:
-                "Asking questions is available only to students enrolled in a paid course. Please sign in and enroll in a paid course to ask questions.",
-              actionLabel: "View Paid Courses",
-              actionHref: "/courses?kind=paid",
+                "Asking questions is available only to students enrolled in a course with Q&A access enabled. Please sign in and enroll in a course to ask questions.",
+              actionLabel: "View Courses",
+              actionHref: "/courses",
               secondaryLabel: signingIn ? "Please wait..." : "Continue with Google",
               onAction: undefined,
             }
           : {
               title: "Enrollment Required",
               message:
-                "Asking questions is available only to students enrolled in a paid course. Please sign in and enroll in a paid course to ask questions.",
-              actionLabel: "View Paid Courses",
-              actionHref: "/courses?kind=paid",
+                "Asking questions is available only to students enrolled in a course with Q&A access enabled. Please sign in and enroll in a course to ask questions.",
+              actionLabel: "View Courses",
+              actionHref: "/courses",
             };
         // For guests with Firebase configured, offer Google sign-in as the
         // primary action and keep View Courses as secondary.
@@ -367,8 +372,8 @@ export default function QaExplorer({
               .finally(() => setSigningIn(false));
           };
           guidance.actionPending = signingIn;
-          guidance.secondaryLabel = "View Paid Courses";
-          guidance.secondaryHref = "/courses?kind=paid";
+          guidance.secondaryLabel = "View Courses";
+          guidance.secondaryHref = "/courses";
         }
         // Add close handler so the overlay can be dismissed.
         setAskGuidance({
@@ -377,11 +382,11 @@ export default function QaExplorer({
         });
       } else {
         setAskGuidance({
-          title: "Paid Enrollment Required",
+          title: "Q&A Access Required",
           message:
-            "Asking questions is available only to students enrolled in a paid course. You can view all questions and answers, but you need an active paid course enrollment to ask a new question.",
-          actionLabel: "Explore Paid Courses",
-          actionHref: "/courses?kind=paid",
+            "Asking questions is available only in courses with Q&A access enabled. You can view all questions and answers, but you need an active enrollment in a Q&A-enabled course to ask a new question.",
+          actionLabel: "Explore Courses",
+          actionHref: "/courses",
           secondaryLabel: "View My Courses",
           secondaryHref: "/dashboard/enrolled-courses",
           onClose: () => setAskGuidance(null),
@@ -497,14 +502,28 @@ export default function QaExplorer({
                   {askOptionsError}
                 </div>
               ) : askOptions ? (
-                <QaAskForm
-                  options={askOptions}
-                  initialSubjectId={selectedSubjectId ?? undefined}
-                  onSubmit={handleAskSubmit}
-                  onUploadImage={handleUploadImage}
-                  onClose={closeAsk}
-                  cardSettings={askCardSettings}
-                />
+                askOptions.courses.length === 0 ? (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-center">
+                    <p className="font-semibold text-amber-300">
+                      Q&A Access Required
+                    </p>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-amber-200/80">
+                      Asking questions is available only in courses with Q&A
+                      access enabled. None of your enrolled courses have Q&A
+                      turned on right now — you can still view all questions
+                      and answers.
+                    </p>
+                  </div>
+                ) : (
+                  <QaAskForm
+                    options={askOptions}
+                    initialSubjectId={selectedSubjectId ?? undefined}
+                    onSubmit={handleAskSubmit}
+                    onUploadImage={handleUploadImage}
+                    onClose={closeAsk}
+                    cardSettings={askCardSettings}
+                  />
+                )
               ) : (
                 <div className="flex items-center justify-center gap-3 rounded-2xl border border-ink/10 bg-dark-900 p-8 text-sm text-neutral-400">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />

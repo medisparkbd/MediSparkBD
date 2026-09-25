@@ -41,6 +41,8 @@ export type CatalogCourse = {
   availability: "available" | "hidden";
   couponEnabled: boolean;
   featured: boolean;
+  /** Q&A Access control: ON (true) / OFF (false) per course. */
+  qaAccess: boolean;
   contentLayout: CourseContentLayout;
   totalClasses?: number;
   totalExams?: number;
@@ -64,6 +66,7 @@ const EMPTY_FORM = {
   status: "unpublished" as "published" | "unpublished",
   couponEnabled: false,
   featured: false,
+  qaAccess: true,
   contentLayout: "flow-1" as "flow-1" | "flow-2" | "flow-3" | "flow-4" | "flow-5",
   totalClasses: "",
   totalExams: "",
@@ -111,6 +114,7 @@ function toForm(course: CatalogCourse): FormState {
     status: course.status,
     couponEnabled: course.couponEnabled,
     featured: course.featured,
+    qaAccess: course.qaAccess !== false,
     contentLayout: (course.contentLayout === "flow-1" || course.contentLayout === "flow-2" || course.contentLayout === "flow-3" || course.contentLayout === "flow-4" || course.contentLayout === "flow-5"
       ? course.contentLayout
       : course.contentLayout === "paper" ? "flow-2" : course.contentLayout === "subject" ? "flow-3" : "flow-1"),
@@ -331,7 +335,11 @@ export default function CourseManager({
   async function toggleFlags(
     slug: string,
     label: string,
-    patch: { status?: "published" | "unpublished"; featured?: boolean },
+    patch: {
+      status?: "published" | "unpublished";
+      featured?: boolean;
+      qaAccess?: boolean;
+    },
   ) {
     setBusy(true);
     setNotice(null);
@@ -541,6 +549,15 @@ export default function CourseManager({
                         ★ Featured
                       </span>
                     )}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${
+                        course.qaAccess !== false
+                          ? "bg-emerald-500/10 text-emerald-600"
+                          : "bg-rose-500/10 text-rose-500"
+                      }`}
+                    >
+                      Q&A: {course.qaAccess !== false ? "ON" : "OFF"}
+                    </span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500 admin-dark:text-slate-400">
                     {course.shortDescription ?? "—"}
@@ -551,6 +568,24 @@ export default function CourseManager({
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Toggle Q&A access for ${course.name}`}
+                    title={course.qaAccess !== false ? "Turn Q&A OFF" : "Turn Q&A ON"}
+                    onClick={() =>
+                      void toggleFlags(course.slug, course.name, {
+                        qaAccess: !(course.qaAccess !== false),
+                      })
+                    }
+                    className={
+                      course.qaAccess !== false
+                        ? "rounded-lg border border-emerald-500/60 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600 transition hover:bg-emerald-500/20"
+                        : "rounded-lg border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-500 transition hover:bg-rose-500/20"
+                    }
+                  >
+                    Q&A: {course.qaAccess !== false ? "ON" : "OFF"}
+                  </button>
                   <button
                     type="button"
                     disabled={busy}
@@ -698,6 +733,11 @@ export default function CourseManager({
                   <input type="checkbox" className="h-4 w-4 accent-primary-600" checked={form.featured}
                     onChange={(e) => setForm({ ...form, featured: e.target.checked })} />
                   ★ Featured Course
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 admin-dark:text-zinc-200">
+                  <input type="checkbox" className="h-4 w-4 accent-primary-600" checked={form.qaAccess}
+                    onChange={(e) => setForm({ ...form, qaAccess: e.target.checked })} />
+                  Q&A Access: {form.qaAccess ? "ON" : "OFF"}
                 </label>
               </div>
             </div>

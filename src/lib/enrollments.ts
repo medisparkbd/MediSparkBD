@@ -20,6 +20,8 @@ export type Enrollment = {
   enrollmentStatus: EnrollmentStatus;
   enrollmentDate?: unknown;
   updatedAt?: unknown;
+  /** Course-level Q&A access for this enrolled course. */
+  qaAccess?: boolean;
 };
 
 export function getCourseKind(course: Course): CourseKind {

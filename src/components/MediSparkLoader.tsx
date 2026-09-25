@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_LOGO } from "@/lib/logo";
+import { useEffect, useState } from "react";
 
 type LoaderSize = "small" | "medium" | "large";
 
@@ -12,47 +12,114 @@ type MediSparkLoaderProps = {
   /** Show MediSpark BD branding text (default true for fullscreen, false for inline) */
   withBranding?: boolean;
   showDots?: boolean;
+  /**
+   * Real loading progress (0–100). Drives both the progress ring and the
+   * center percentage so they stay perfectly synchronized.
+   * When omitted, the loader runs a lifecycle-synced simulated progress
+   * (eases toward 90% while mounted) rendered from the same state —
+   * never a fake fixed value like 50%.
+   */
+  progress?: number | null;
 };
 
-const sizeMap: Record<LoaderSize, { container: number; logoW: number; logoH: number; ringInset: string }> = {
-  small: { container: 48, logoW: 28, logoH: 12, ringInset: "inset-[6px]" },
-  medium: { container: 72, logoW: 40, logoH: 18, ringInset: "inset-[8px]" },
-  large: { container: 92, logoW: 52, logoH: 24, ringInset: "inset-[10px]" },
+const sizeMap: Record<LoaderSize, { container: number; percentText: string }> = {
+  small: { container: 48, percentText: "text-[11px]" },
+  medium: { container: 72, percentText: "text-sm" },
+  large: { container: 92, percentText: "text-xl" },
 };
+
+function clampProgress(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+}
+
+/**
+ * Lifecycle-synced progress: uses the explicit value when provided,
+ * otherwise eases toward 90% while the loader is mounted (same easing
+ * curve as the global top progress bar). The ring and the percentage
+ * both render from this single state, so they can never drift apart.
+ */
+function useLoaderProgress(external: number | null | undefined): number {
+  const [simulated, setSimulated] = useState(() =>
+    external == null ? 6 : clampProgress(external),
+  );
+  useEffect(() => {
+    if (external != null) return;
+    const id = window.setInterval(() => {
+      setSimulated((prev) => {
+        if (prev >= 90) return 90;
+        const remaining = 90 - prev;
+        return Math.min(90, prev + Math.max(0.5, remaining * 0.07));
+      });
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [external]);
+  return external == null ? simulated : clampProgress(external);
+}
 
 function LoaderCore({
   size = "medium",
   label,
   withBranding,
   showDots = true,
-}: Pick<MediSparkLoaderProps, "size" | "label" | "withBranding" | "showDots">) {
+  progress: progressProp,
+}: Pick<MediSparkLoaderProps, "size" | "label" | "withBranding" | "showDots" | "progress">) {
   const cfg = sizeMap[size ?? "medium"];
   const showBranding = withBranding ?? false;
+  const progress = useLoaderProgress(progressProp);
+  const percent = Math.round(progress);
+  // SVG ring geometry (viewBox 100): track + progress arc.
+  const RADIUS = 44;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const dashOffset = CIRCUMFERENCE * (1 - progress / 100);
 
   return (
     <div className="flex flex-col items-center">
       <div
         className="relative flex items-center justify-center"
         style={{ width: cfg.container, height: cfg.container }}
-        aria-hidden="true"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-label={`Loading ${percent} percent`}
       >
-        {/* outer subtle ring */}
-        <span className="absolute inset-0 rounded-full border border-white/10" />
-        {/* spinning ring: MediSpark red */}
-        <span
-          className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary-600 animate-spin"
-          style={{ animationDuration: "0.9s" }}
-        />
+        {/* subtle track ring */}
+        <svg
+          viewBox="0 0 100 100"
+          className="absolute inset-0 h-full w-full -rotate-90"
+          aria-hidden="true"
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r={RADIUS}
+            fill="none"
+            strokeWidth="8"
+            className="stroke-white/10"
+          />
+          {/* progress arc: MediSpark red, driven by the same state as the percentage */}
+          <circle
+            cx="50"
+            cy="50"
+            r={RADIUS}
+            fill="none"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            className="stroke-primary-600"
+            style={{ transition: "stroke-dashoffset 150ms linear" }}
+          />
+        </svg>
         <span className="absolute inset-[10px] rounded-full bg-white/5 backdrop-blur" />
-        <img
-          src={DEFAULT_LOGO.url}
-          alt=""
-          width={cfg.logoW}
-          height={cfg.logoH}
-          draggable={false}
-          className="relative h-6 w-auto max-w-[60%] select-none object-contain"
-          style={{ width: cfg.logoW }}
-        />
+        {/* center percentage — perfectly centered, big and readable */}
+        <span
+          className={`relative font-extrabold tabular-nums text-white ${cfg.percentText}`}
+          aria-hidden="true"
+        >
+          {percent}%
+        </span>
       </div>
 
       {showBranding && (
@@ -90,9 +157,10 @@ export default function MediSparkLoader({
   className = "",
   withBranding,
   showDots,
+  progress,
 }: MediSparkLoaderProps) {
   const content = (
-    <LoaderCore size={size} label={label} withBranding={withBranding ?? fullscreen} showDots={showDots} />
+    <LoaderCore size={size} label={label} withBranding={withBranding ?? fullscreen} showDots={showDots} progress={progress} />
   );
 
   if (fullscreen) {
