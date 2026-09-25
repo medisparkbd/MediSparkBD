@@ -1005,7 +1005,7 @@ async function latestOutcome(
     );
     return legacy as { answers: string | null; question_version?: string | null; assigned_set?: string | null }[];
   });
-  let correctById = new Map<number, number>();
+  const correctById = new Map<number, number>();
   for (const q of questions) correctById.set(Number(q.id), q.correct_index);
   try {
     const snapVersion = normalizeVersion(resultRows[0]?.question_version);
@@ -1474,6 +1474,8 @@ export type AnswerScriptQuestion = {
   /** Marks obtained for this question — negative on wrong answers. */
   obtained: number;
   explanation: string | null;
+  /** Optional per-question image (question_image column / variant cell). */
+  questionImage?: string | null;
 };
 
 export type ExamResultScript = {
@@ -1608,18 +1610,23 @@ export async function getExamResultScript(
     marks: string | number;
     correct_index: number;
     explanation: string | null;
+    question_image?: string | null;
   }[]>(
-    `SELECT id, question, options, marks, correct_index, explanation FROM exam_questions
+    `SELECT id, question, options, marks, correct_index, explanation, question_image FROM exam_questions
       WHERE exam_id = ? AND is_active = 1 ORDER BY id ASC`,
     [examId],
   );
+  // The student's language version/set replay: variant content wins when the
+  // result carries a version/set snapshot. Base exam_questions rows may be
+  // EMPTY placeholders (the admin paper editor stores content only in
+  // exam_question_variants), so a result must NEVER render base placeholders
+  // when a valid variant cell exists — otherwise the result page shows a
+  // question number with blank text and empty/dark option blocks.
   let variantOverlay = new Map<string, VariantRow>();
-  if (snapVersion && snapSet) {
-    try {
-      variantOverlay = await fetchVariantMap(examId);
-    } catch {
-      variantOverlay = new Map();
-    }
+  try {
+    variantOverlay = await fetchVariantMap(examId);
+  } catch {
+    variantOverlay = new Map();
   }
   const byId = new Map<number, {
     question: string;
@@ -1627,35 +1634,122 @@ export async function getExamResultScript(
     marks: number;
     correctIndex: number;
     explanation: string | null;
+    questionImage: string | null;
   }>();
-  for (const row of questionRows) {
+  /** Displayable content takes question text (or an image) plus ≥2 non-empty options. */
+  const usableMeta = (
+    question: string | null | undefined,
+    options: string[],
+    marks: number,
+    correctIndex: number,
+    explanation: string | null | undefined,
+    questionImage: string | null | undefined,
+  ) => {
+    const text = String(question ?? "");
+    if (text.trim().length === 0 && !questionImage) return null;
+    if (options.length < 2 || options.some((o) => o.length === 0)) return null;
+    return {
+      question: text,
+      options,
+      marks,
+      correctIndex,
+      explanation: explanation ?? null,
+      questionImage: questionImage ?? null,
+    };
+  };
+  const baseMeta = (row: {
+    question: string;
+    options: string;
+    marks: string | number;
+    correct_index: number;
+    explanation: string | null;
+    question_image?: string | null;
+  }) => {
     const parsed = parseJsonColumn<unknown[]>(row.options);
-    if (Array.isArray(parsed)) {
-      const overlay =
-        snapVersion && snapSet
-          ? variantOverlay.get(`${Number(row.id)}:${snapVersion}:${snapSet}`)
-          : undefined;
-      if (overlay) {
-        const overlayOpts = parseJsonColumn<unknown[]>(overlay.options);
-        if (Array.isArray(overlayOpts)) {
-          byId.set(row.id, {
-            question: overlay.question,
-            options: overlayOpts.map(String),
-            marks: Number(overlay.marks) || Number(row.marks) || 1,
-            correctIndex: Number(overlay.correct_index) || 0,
-            explanation: overlay.explanation ?? null,
-          });
-          continue;
+    if (!Array.isArray(parsed)) return null;
+    return usableMeta(
+      row.question,
+      parsed.map(String),
+      Number(row.marks) || 1,
+      Number(row.correct_index) || 0,
+      row.explanation,
+      (row.question_image as string | null) ?? null,
+    );
+  };
+  const variantMeta = (variant: VariantRow | undefined, fallbackMarks: number) => {
+    if (!variant) return null;
+    const parsed = parseJsonColumn<unknown[]>(variant.options);
+    if (!Array.isArray(parsed)) return null;
+    return usableMeta(
+      variant.question,
+      parsed.map(String),
+      Number(variant.marks) || fallbackMarks,
+      Number(variant.correct_index) || 0,
+      variant.explanation,
+      variant.question_image ?? null,
+    );
+  };
+  /** All authored variant cells for one question — attempt version/set first, then any. */
+  const variantsFor = (questionId: number): VariantRow[] => {
+    const ordered: VariantRow[] = [];
+    const seen = new Set<string>();
+    const langs = Array.from(
+      new Set([snapVersion, "bangla", "english"].filter(Boolean) as string[]),
+    );
+    const sets = Array.from(
+      new Set([snapSet, "A", "B"].filter(Boolean) as string[]),
+    );
+    for (const lang of langs) {
+      for (const set of sets) {
+        const key = `${questionId}:${lang}:${set}`;
+        const row = variantOverlay.get(key);
+        if (row && !seen.has(key)) {
+          seen.add(key);
+          ordered.push(row);
         }
       }
-      byId.set(row.id, {
-        question: row.question,
-        options: parsed.map(String),
-        marks: Number(row.marks) || 1,
+    }
+    for (const [key, row] of variantOverlay) {
+      if (key.startsWith(`${questionId}:`) && !seen.has(key)) {
+        seen.add(key);
+        ordered.push(row);
+      }
+    }
+    return ordered;
+  };
+  for (const row of questionRows) {
+    const qid = Number(row.id);
+    const baseMarks = Number(row.marks) || 1;
+    // 1) The exact locked variant for this attempt (grading is replayed from it too).
+    let meta =
+      snapVersion && snapSet
+        ? variantMeta(variantOverlay.get(`${qid}:${snapVersion}:${snapSet}`), baseMarks)
+        : null;
+    // 2) Base-row content (legacy exams without authored variants).
+    if (!meta) meta = baseMeta(row);
+    // 3) Any valid variant cell — blank placeholder base rows must never reach the UI.
+    if (!meta) {
+      for (const candidate of variantsFor(qid)) {
+        const m = variantMeta(candidate, baseMarks);
+        if (m) {
+          meta = m;
+          break;
+        }
+      }
+    }
+    // 4) Last resort — keep whatever the base row has (never drop the question from the script).
+    if (!meta) {
+      const parsed = parseJsonColumn<unknown[]>(row.options);
+      meta = {
+        question: String(row.question ?? ""),
+        options: Array.isArray(parsed) ? parsed.map(String) : [],
+        marks: baseMarks,
         correctIndex: Number(row.correct_index) || 0,
         explanation: row.explanation ?? null,
-      });
+        questionImage: (row.question_image as string | null) ?? null,
+      };
     }
+    byId.set(qid, meta);
   }
 
   // Prefer the stored per-question breakdown; fall back to the answers
@@ -1677,6 +1771,7 @@ export async function getExamResultScript(
       correctIndex: detail.correctIndex,
       obtained: Number(detail.obtained) || 0,
       explanation: meta.explanation,
+      questionImage: meta.questionImage,
     });
   }
   for (const [key, meta] of byId.entries()) {
@@ -1697,6 +1792,7 @@ export async function getExamResultScript(
             ? meta.marks
             : 0, // Legacy rows lack per-question deductions; totals stay authoritative.
       explanation: meta.explanation,
+      questionImage: meta.questionImage,
     });
   }
   // Student's display order first (locked at start), then any extras by ID.

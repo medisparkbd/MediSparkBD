@@ -51,6 +51,7 @@ type ScriptQuestion = {
   correctIndex: number;
   obtained: number;
   explanation?: string | null;
+  questionImage?: string | null;
 };
 
 type ResultScript = {
@@ -698,7 +699,11 @@ export default function ExamParticipationArea({
 
   /** Select an answer — allowed only once per question, no changing later. */
   async function chooseOption(question: TakingQuestion, optionIndex: number) {
-    if (answers[question.id] !== undefined || submitting || outcome) return;
+    // Per-question lock ONLY: this guard touches question.id alone.
+    // - answersRef (synchronous) is authoritative so rapid taps on the same
+    //   question can never overwrite the first selection before re-render.
+    // - submitting/outcome never lock OTHER questions; they only stop new picks.
+    if (answersRef.current[question.id] !== undefined || submitting || outcome) return;
     // Lock locally right away — option-circle selection IS the lock mechanism.
     const next = { ...answersRef.current, [question.id]: optionIndex };
     answersRef.current = next;
@@ -872,6 +877,15 @@ export default function ExamParticipationArea({
                     </span>
                   </div>
 
+                  {item.questionImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.questionImage}
+                      alt={`Question ${index + 1} image`}
+                      className="mt-3 max-h-72 w-full rounded-xl border border-ink/10 object-contain bg-dark-950"
+                    />
+                  ) : null}
+
                   <div className="mt-3 space-y-2">
                     {item.options.map((option, optionIndex) => {
                       const chosen = item.chosenIndex === optionIndex;
@@ -879,12 +893,12 @@ export default function ExamParticipationArea({
                       return (
                         <div
                           key={optionIndex}
-                          className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-semibold ${
+                          className={`result-option flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-semibold ${
                             correct
-                              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
+                              ? "result-option--correct border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
                               : chosen
-                                ? "border-red-500/50 bg-red-500/10 text-red-200"
-                                : "border-ink/10 bg-dark-850 text-neutral-400"
+                                ? "result-option--chosen border-red-500/50 bg-red-500/10 text-red-200"
+                                : "border-ink/10 bg-dark-850 text-neutral-300"
                           }`}
                         >
                           <span
@@ -914,16 +928,16 @@ export default function ExamParticipationArea({
                     })}
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-semibold">
-                    <span className="text-slate-500">
+                    <span className="text-neutral-400">
                       Marks: <span className="text-heading">{item.marks}</span>
-                      <span className="ml-2 text-neutral-500">
+                      <span className="ml-2 text-neutral-400">
                         Obtained: <span className={isCorrect ? "text-emerald-400" : "text-neutral-400"}>{isCorrect ? `+${item.marks}` : "0"}</span>
                       </span>
                     </span>
-                    <span className="text-slate-500">
-                      Your Answer: <span className="text-heading">{item.chosenIndex == null ? "—" : String.fromCharCode(65 + item.chosenIndex)}</span>
+                    <span className="text-neutral-400">
+                      Your Answer: <span className="text-heading">{item.chosenIndex == null ? "Not Answered" : String.fromCharCode(65 + item.chosenIndex)}</span>
                     </span>
-                    <span className="text-slate-500">
+                    <span className="text-neutral-400">
                       Correct: <span className="text-heading">{String.fromCharCode(65 + item.correctIndex)}</span>
                     </span>
                   </div>
@@ -1181,14 +1195,19 @@ export default function ExamParticipationArea({
         {/* Questions list */}
         <ol className="mt-6 space-y-6">
           {questions.map((q, idx) => {
+            // ── Per-question answer lock ──────────────────────────
+            // The ONLY lock signal is THIS question's own id in the answers
+            // map: answers[question.id] → the selected option index.
+            // There is intentionally NO global/module-level `isLocked` boolean —
+            // answering Q1 locks Q1 alone; Q2/Q3/… stay fully selectable.
             const selectedIndex = answers[q.id];
-            const isLocked = selectedIndex !== undefined;
-            const isUnanswered = !isLocked;
+            const isQuestionLocked = selectedIndex !== undefined;
+            const isUnanswered = !isQuestionLocked;
             return (
               <li
                 key={q.id}
                 id={`q-${q.id}`}
-                className={`rounded-2xl border p-4 sm:p-5 ${isLocked ? "border-primary-500/25 bg-primary-600/[0.04]" : "border-ink/10 bg-dark-850/50"}`}
+                className={`rounded-2xl border p-4 sm:p-5 ${isQuestionLocked ? "border-primary-500/25 bg-primary-600/[0.04]" : "border-ink/10 bg-dark-850/50"}`}
               >
                 {/* Question header */}
                 <div className="flex items-start justify-between gap-3">
@@ -1224,7 +1243,11 @@ export default function ExamParticipationArea({
                 <div className="mt-3 space-y-2">
                   {q.options.map((option, optionIndex) => {
                     const isSelected = selectedIndex === optionIndex;
-                    const disabled = isLocked || submitting;
+                    // Per-question ONLY: an answered question disables ITS OWN
+                    // options; unanswered questions are NEVER disabled (no global
+                    // boolean may freeze the whole paper — chooseOption itself
+                    // already ignores taps while submitting).
+                    const disabled = isQuestionLocked;
                     // Unanswered: all options are enabled. Answered: selected shows locked, others disabled grey.
                     return (
                       <button
@@ -1235,7 +1258,7 @@ export default function ExamParticipationArea({
                         className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm font-semibold transition sm:px-4 ${
                           isSelected
                             ? "border-primary-500 bg-primary-600/15 text-heading shadow-sm"
-                            : isLocked
+                            : isQuestionLocked
                               ? "border-ink/10 bg-dark-800 text-neutral-500 opacity-60 cursor-not-allowed"
                               : "border-ink/10 bg-dark-900 text-neutral-200 hover:border-primary-500/40 hover:bg-dark-800"
                         }`}
@@ -1245,7 +1268,7 @@ export default function ExamParticipationArea({
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-extrabold transition ${
                             isSelected
                               ? "border-primary-500 bg-primary-600 text-white"
-                              : isLocked
+                              : isQuestionLocked
                                 ? "border-ink/20 bg-dark-800 text-neutral-500"
                                 : "border-ink/20 bg-dark-850 text-neutral-400"
                           }`}
@@ -1267,7 +1290,7 @@ export default function ExamParticipationArea({
                 </div>
 
                 <p className="mt-2.5 text-xs font-medium text-neutral-500">
-                  {isLocked ? "Answer saved — locked permanently." : "Select one option — it will lock immediately and cannot be changed."}
+                  {isQuestionLocked ? "Answer saved — locked permanently." : "Select one option — it will lock immediately and cannot be changed."}
                 </p>
               </li>
             );

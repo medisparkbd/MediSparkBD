@@ -14,6 +14,7 @@ type ScriptQuestion = {
   correctIndex: number;
   obtained: number;
   explanation: string | null;
+  questionImage?: string | null;
 };
 
 type ResultScript = {
@@ -163,6 +164,14 @@ export default function ExamResultClient({
                     {status}
                   </span>
                 </div>
+                {item.questionImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.questionImage}
+                    alt={`Question ${index + 1} image`}
+                    className="mt-3 max-h-72 w-full rounded-xl border border-ink/10 object-contain bg-dark-950"
+                  />
+                ) : null}
                 <div className="mt-3 space-y-2">
                   {item.options.map((option, optionIndex) => {
                     const chosen = item.chosenIndex === optionIndex;
@@ -170,12 +179,12 @@ export default function ExamResultClient({
                     return (
                       <div
                         key={optionIndex}
-                        className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-semibold ${
+                        className={`result-option flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-semibold ${
                           correct
-                            ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
+                            ? "result-option--correct border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
                             : chosen
-                              ? "border-red-500/50 bg-red-500/10 text-red-200"
-                              : "border-ink/10 bg-dark-850 text-neutral-400"
+                              ? "result-option--chosen border-red-500/50 bg-red-500/10 text-red-200"
+                              : "border-ink/10 bg-dark-850 text-neutral-300"
                         }`}
                       >
                         <span
@@ -193,16 +202,16 @@ export default function ExamResultClient({
                   })}
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] font-semibold">
-                  <span className="text-slate-500">
+                  <span className="text-neutral-400">
                     Marks: <span className="text-heading">{item.marks}</span>
-                    <span className="ml-2 text-neutral-500">
+                    <span className="ml-2 text-neutral-400">
                       Obtained: <span className={isCorrect ? "text-emerald-400" : "text-neutral-400"}>{isCorrect ? `+${item.marks}` : "0"}</span>
                     </span>
                   </span>
-                  <span className="text-slate-500">
-                    Your Answer: <span className="text-heading">{item.chosenIndex == null ? "—" : String.fromCharCode(65 + item.chosenIndex)}</span>
+                  <span className="text-neutral-400">
+                    Your Answer: <span className="text-heading">{item.chosenIndex == null ? "Not Answered" : String.fromCharCode(65 + item.chosenIndex)}</span>
                   </span>
-                  <span className="text-slate-500">
+                  <span className="text-neutral-400">
                     Correct: <span className="text-heading">{String.fromCharCode(65 + item.correctIndex)}</span>
                   </span>
                 </div>
