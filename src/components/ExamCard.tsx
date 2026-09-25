@@ -5,7 +5,19 @@ import {
   type PublicExam,
 } from "@/lib/public-exams";
 
-function formatStartDate(iso: string | null): string {
+/**
+ * Exam Card — dark/red premium theme, three states driven ONLY by the
+ * exam's time-based status (dynamic exam data, never hardcoded):
+ *
+ *   Upcoming → "Upcoming Exam" + "Coming Soon" (disabled, cannot start)
+ *   Live     → "Exam is Live"  + "Start Exam"  (starts the live attempt)
+ *   Practice → "Practice Exam" + "Start Exam"  (unranked practice attempt)
+ *
+ * Same premium appearance on desktop / laptop / tablet / mobile — the card
+ * responsively fits its grid column without a separate mobile design.
+ */
+
+function formatDayMonth(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -16,21 +28,7 @@ function formatStartDate(iso: string | null): string {
   });
 }
 
-function formatStartTime(iso: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date
-    .toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "UTC",
-    })
-    .toUpperCase();
-}
-
-function formatEndTime(iso: string | null): string {
+function formatClock(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -48,140 +46,149 @@ function shouldShowTimeRow(exam: PublicExam): boolean {
   return Boolean(exam.scheduledAt) || Boolean(exam.endsAt);
 }
 
-function TimeRow({ exam }: { exam: PublicExam }) {
+function ExamWindow({ exam }: { exam: PublicExam }) {
   if (!shouldShowTimeRow(exam)) return null;
-
-  const hasStart = Boolean(exam.scheduledAt);
-  const hasEnd = Boolean(exam.endsAt);
-
+  const pill =
+    "flex-1 rounded-xl border border-red-500/25 bg-black/40 px-3 py-2 text-center shadow-inner shadow-black/40";
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-ink/10 bg-ink/5 p-3">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-          Start Time
-        </p>
-        <p className="mt-1 text-sm font-bold text-heading">
-          {hasStart
-            ? `${formatStartTime(exam.scheduledAt)}, ${formatStartDate(
-                exam.scheduledAt,
-              )}`
-            : "—"}
-        </p>
-      </div>
-      <div className="border-l border-ink/10 pl-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-          End Time
-        </p>
-        <p className="mt-1 text-sm font-bold text-heading">
-          {hasEnd
-            ? `${formatEndTime(exam.endsAt)}, ${formatStartDate(exam.endsAt)}`
-            : "—"}
-        </p>
+    <div className="mt-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-red-200/60">
+        Exam Participation Time
+      </p>
+      <div className="mt-2 flex items-stretch gap-2">
+        <div className={pill}>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-red-300/70">
+            Start
+          </p>
+          <p className="mt-0.5 text-[13px] font-extrabold leading-tight text-white">
+            {formatDayMonth(exam.scheduledAt)}
+          </p>
+          <p className="text-[11px] font-bold leading-tight text-red-100/90">
+            {formatClock(exam.scheduledAt)}
+          </p>
+        </div>
+        <div className="flex items-center" aria-hidden="true">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-red-500/40 bg-red-600/20 text-sm font-extrabold text-red-300 shadow-md shadow-red-950/50">
+            &rarr;
+          </span>
+        </div>
+        <div className={pill}>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-red-300/70">
+            End
+          </p>
+          <p className="mt-0.5 text-[13px] font-extrabold leading-tight text-white">
+            {formatDayMonth(exam.endsAt)}
+          </p>
+          <p className="text-[11px] font-bold leading-tight text-red-100/90">
+            {formatClock(exam.endsAt)}
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-const statusMeta: Record<
-  ExamStatus,
-  { label: string; badge: string; dot: string }
+type CardPhase = "upcoming" | "live" | "practice" | "closed" | "idle";
+
+function phaseOf(status: ExamStatus): CardPhase {
+  if (status === "Upcoming") return "upcoming";
+  if (status === "Live" || status === "Available") return "live";
+  if (status === "Practice" || status === "Archived") return "practice";
+  if (status === "Completed" || status === "Expired") return "closed";
+  return "idle";
+}
+
+const phaseMeta: Record<
+  CardPhase,
+  {
+    badge: string;
+    dot: string;
+    label: string;
+    action: string;
+    accentBar: string;
+    ring: string;
+  }
 > = {
-  Live: {
-    label: "Exam is Live Now",
-    badge:
-      "bg-emerald-600 text-white shadow-md shadow-emerald-600/50 ring-1 ring-emerald-400/60",
-    dot: "bg-white animate-pulse",
-  },
-  Available: {
-    label: "Exam is Live Now",
-    badge:
-      "bg-emerald-600 text-white shadow-md shadow-emerald-600/50 ring-1 ring-emerald-400/60",
-    dot: "bg-white animate-pulse",
-  },
-  Upcoming: {
-    label: "Upcoming Exam",
-    badge:
-      "bg-primary-500/10 text-primary-300 border border-primary-500/30",
-    dot: "bg-primary-400",
-  },
-  Completed: {
-    label: "Exam is Closed",
-    badge: "bg-red-500/10 text-red-400 border border-red-500/30",
-    dot: "bg-red-400",
-  },
-  Expired: {
-    label: "Exam is Closed",
-    badge: "bg-red-500/10 text-red-400 border border-red-500/30",
-    dot: "bg-red-400",
-  },
-  Practice: {
-    label: "Practice",
-    badge:
-      "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
-    dot: "bg-white",
-  },
-  Archived: {
-    label: "Archived",
-    badge:
-      "bg-amber-500/10 text-amber-400 border border-amber-500/30",
+  upcoming: {
+    badge: "Upcoming Exam",
     dot: "bg-amber-400",
+    label:
+      "border-amber-400/40 bg-amber-500/10 text-amber-300 shadow-md shadow-amber-950/40",
+    action: "Coming Soon",
+    accentBar: "from-amber-500/80 via-amber-500/20 to-transparent",
+    ring: "border-red-500/25 hover:border-red-400/50 shadow-red-950/50",
   },
-  Inactive: {
-    label: "Inactive",
-    badge: "bg-dark-800 text-neutral-500 border border-ink/10",
-    dot: "bg-neutral-600",
+  live: {
+    badge: "Exam is Live",
+    dot: "bg-emerald-400 animate-pulse",
+    label:
+      "bg-red-600 text-white shadow-lg shadow-red-950/60 ring-1 ring-red-400/70",
+    action: "Start Exam",
+    accentBar: "from-red-500 via-red-500/40 to-transparent",
+    ring: "border-red-500/60 hover:border-red-400 shadow-red-900/60 ring-red-600/40",
   },
-  Unpublished: {
-    label: "Draft",
-    badge:
-      "bg-yellow-500/10 text-yellow-300 border border-yellow-500/30",
-    dot: "bg-yellow-400",
+  practice: {
+    badge: "Practice Exam",
+    dot: "bg-violet-300",
+    label:
+      "border-violet-400/50 bg-violet-600/20 text-violet-200 shadow-md shadow-violet-950/50",
+    action: "Start Exam",
+    accentBar: "from-violet-500/80 via-red-500/30 to-transparent",
+    ring: "border-violet-500/40 hover:border-violet-400/70 shadow-violet-950/50",
   },
-};
-
-const actionMeta: Record<
-  ExamStatus,
-  { label: string; disabled: boolean }
-> = {
-  Live: {
-    label: "Start Exam",
-    disabled: false,
+  closed: {
+    badge: "Exam is Closed",
+    dot: "bg-red-400",
+    label: "border-red-500/30 bg-red-500/10 text-red-400",
+    action: "Exam is Closed",
+    accentBar: "from-red-900/60 via-red-900/10 to-transparent",
+    ring: "border-red-500/20 shadow-black/40",
   },
-  Available: {
-    label: "Start Exam",
-    disabled: false,
-  },
-  Upcoming: {
-    label: "Coming Soon",
-    disabled: true,
-  },
-  Completed: {
-    label: "Exam is Closed",
-    disabled: true,
-  },
-  Expired: {
-    label: "Exam is Closed",
-    disabled: true,
-  },
-  Practice: {
-    label: "Practice Again",
-    disabled: false,
-  },
-  Archived: {
-    label: "Practice",
-    disabled: false,
-  },
-  Inactive: {
-    label: "Not Available",
-    disabled: true,
-  },
-  Unpublished: {
-    label: "Not Available",
-    disabled: true,
+  idle: {
+    badge: "Not Available",
+    dot: "bg-neutral-500",
+    label: "border border-ink/10 bg-dark-800 text-neutral-500",
+    action: "Not Available",
+    accentBar: "from-neutral-700/40 via-neutral-700/10 to-transparent",
+    ring: "border-ink/10 shadow-black/30",
   },
 };
 
+function ClockIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 
+function MarksIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M9 12l2 2 4-4" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
 
 export default function ExamCard({
   exam,
@@ -194,118 +201,132 @@ export default function ExamCard({
   manage?: React.ReactNode;
   hasCompleted?: boolean;
 }) {
-  const status = statusMeta[exam.status];
-  const action = actionMeta[exam.status];
-  const isLive = exam.status === "Live" || exam.status === "Available";
-  const isAvailable = exam.status === "Available";
-  const isPractice = exam.status === "Practice";
-  const isArchived = exam.status === "Archived";
-  const isUpcoming = exam.status === "Upcoming";
-  const isClosed = exam.status === "Completed" || exam.status === "Expired";
-  const isInactive = exam.status === "Inactive";
-  const isUnpublished = exam.status === "Unpublished";
-  const canStart = !hasCompleted && (isLive || isAvailable || isPractice || isArchived);
+  const phase = phaseOf(exam.status);
+  const meta = phaseMeta[phase];
+  const isUpcoming = phase === "upcoming";
+  const isPractice = phase === "practice";
+  const isClosed = phase === "closed";
+  // Post-live Practice stays startable even with a prior live attempt — each
+  // new attempt is an unranked practice attempt with its own result.
+  const isPostLivePractice = isPractice && exam.examMode === "live";
+  const showResultLink = hasCompleted && !isPostLivePractice;
+  const canStart =
+    !showResultLink &&
+    !isUpcoming &&
+    !isClosed &&
+    phase !== "idle";
   const href = detailsHref ?? `/exam/${exam.id}`;
-  const effectiveStatus: ExamStatus = hasCompleted ? "Completed" : exam.status;
 
-  const cardClasses = canStart
-    ? isPractice
-      ? "border-violet-600/60 ring-1 ring-violet-600/40 shadow-xl shadow-violet-900/40 hover:border-violet-500 hover:shadow-violet-800/50"
-      : "border-primary-600/60 ring-1 ring-primary-600/40 shadow-xl shadow-primary-900/40 hover:border-primary-500 hover:shadow-primary-800/50"
-    : exam.status === "Upcoming"
-      ? "border-primary-500/30 shadow-lg shadow-black/20 hover:border-primary-600/50"
-      : "border-ink/10 shadow-lg shadow-black/20 hover:border-primary-600/50";
-
-  const buttonClasses =
-    "w-full rounded-xl px-4 py-3 text-sm font-bold touch-manipulation select-none transform-gpu will-change-transform transition-colors duration-75 ease-out active:scale-[0.97]";
+  const buttonBase =
+    "w-full rounded-xl px-4 py-3 text-sm font-extrabold touch-manipulation select-none transform-gpu will-change-transform transition-all duration-150 ease-out active:scale-[0.97]";
 
   return (
     <article
-      className={`group flex flex-col overflow-hidden rounded-2xl bg-dark-900 transform-gpu transition duration-150 ease-out hover:-translate-y-1 active:scale-[0.99] ${cardClasses}`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-gradient-to-b from-[#1a0b10] via-[#120710] to-[#0b0508] shadow-xl transition duration-150 ease-out hover:-translate-y-1 active:scale-[0.99] ${meta.ring} ring-1 hover:shadow-2xl`}
     >
-      <div className="flex flex-1 flex-col p-5">
-        <h3
-          className={`text-lg font-bold leading-snug transition-colors duration-150 ease-out ${
-            isLive
-              ? "text-heading group-hover:text-primary-400"
-              : "text-heading group-hover:text-primary-400"
-          }`}
-        >
+      {/* Top accent bar + glow */}
+      <div
+        className={`h-1 w-full bg-gradient-to-r ${meta.accentBar}`}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 h-44 w-72 -translate-x-1/2 rounded-full bg-red-600/15 blur-3xl transition duration-300 group-hover:bg-red-600/25"
+        aria-hidden="true"
+      />
+
+      <div className="relative flex flex-1 flex-col p-5">
+        <h3 className="text-[17px] font-extrabold leading-snug text-white transition-colors duration-150 group-hover:text-red-200">
           {exam.name}
         </h3>
 
+        {/* Status badge */}
         <div className="mt-3 w-full">
           <span
-            className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wider ${status.badge}`}
+            className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.12em] ${meta.label}`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-            {status.label}
+            <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+            {meta.badge}
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-ink/10 bg-ink/5 p-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-              Total Marks
-            </p>
-            <p className="mt-1 text-sm font-bold text-heading">
-              {exam.totalMarks || "—"}
-            </p>
+        {/* Marks + Duration */}
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-red-500/20 bg-black/30 p-3 shadow-inner shadow-black/40">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/30 bg-red-600/15 text-red-300">
+              <MarksIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-red-200/60">
+                Total Marks
+              </p>
+              <p className="truncate text-sm font-extrabold text-white">
+                {exam.totalMarks || "—"}
+              </p>
+            </div>
           </div>
-          <div className="border-l border-ink/10 pl-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-              Duration
-            </p>
-            <p className="mt-1 text-sm font-bold text-heading">
-              {exam.durationMinutes} min
-            </p>
+          <div className="flex items-center gap-2 border-l border-red-500/20 pl-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/30 bg-red-600/15 text-red-300">
+              <ClockIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-red-200/60">
+                Duration
+              </p>
+              <p className="truncate text-sm font-extrabold text-white">
+                {exam.durationMinutes} min
+              </p>
+            </div>
           </div>
         </div>
 
-        <TimeRow exam={exam} />
+        {/* Divider */}
+        <div
+          className="mx-1 mt-3 h-px bg-gradient-to-r from-transparent via-red-500/40 to-transparent"
+          aria-hidden="true"
+        />
 
+        {/* Participation window: date/time pills with arrow */}
+        <ExamWindow exam={exam} />
+
+        {isPostLivePractice && (
+          <p className="mt-3 rounded-lg border border-violet-400/25 bg-violet-600/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-violet-200/90">
+            Live window ended — practice attempts won&apos;t affect the
+            leaderboard.
+          </p>
+        )}
+
+        {/* Bottom action button */}
         <div className="mt-auto pt-5">
-          {hasCompleted ? (
+          {showResultLink ? (
             <Link
               href={`/exam/${exam.id}/result`}
-              className={`${buttonClasses} flex items-center justify-center gap-2 border border-emerald-600/50 bg-emerald-600/10 text-emerald-300 hover:bg-emerald-600/20`}
+              className={`${buttonBase} flex items-center justify-center gap-2 border border-emerald-500/50 bg-emerald-600/15 text-emerald-200 hover:bg-emerald-600/25`}
             >
               View Result
               <span aria-hidden="true">&rarr;</span>
             </Link>
-          ) : action.disabled ? (
+          ) : isUpcoming || isClosed || phase === "idle" ? (
             <div
-              className={`${buttonClasses} flex items-center justify-center gap-2 ${
-                isUpcoming
-                  ? "border border-primary-600/50 bg-primary-600/10 text-primary-300 cursor-not-allowed"
-                  : isClosed
-                    ? "border border-red-500/50 bg-red-500/10 text-red-400 cursor-not-allowed"
-                    : "border border-ink/10 bg-dark-850 text-neutral-500 cursor-not-allowed"
-              }`}
+              className={`${buttonBase} flex cursor-not-allowed items-center justify-center gap-2 border border-red-500/30 bg-red-600/10 text-red-300/80`}
+              aria-disabled="true"
             >
-              {action.label}
+              {meta.action}
+              {isUpcoming && <span aria-hidden="true">&rarr;</span>}
             </div>
           ) : canStart && !detailsHref ? (
             <StartExamButton
               exam={exam}
-              disabled={isInactive || isUnpublished}
-              className={`${buttonClasses} flex items-center justify-center gap-2 bg-primary-600 text-white shadow-md shadow-primary-900/50 hover:bg-primary-500`}
+              className={`${buttonBase} flex items-center justify-center gap-2 bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg shadow-red-950/60 ring-1 ring-red-400/50 hover:from-red-400 hover:to-red-600`}
             >
-              {action.label}
+              {meta.action}
               <span aria-hidden="true">&rarr;</span>
             </StartExamButton>
           ) : (
             <Link
               href={href}
-              className={`${buttonClasses} flex items-center justify-center gap-2 ${
-                effectiveStatus === "Upcoming"
-                  ? "border border-primary-600/50 bg-primary-600/10 text-primary-300 hover:bg-primary-600/20"
-                  : isInactive || isUnpublished
-                    ? "border border-ink/10 bg-dark-850 text-neutral-500 cursor-not-allowed"
-                    : "border border-ink/10 bg-dark-850 text-neutral-300 hover:border-ink/20 hover:text-heading"
-              }`}
+              className={`${buttonBase} flex items-center justify-center gap-2 bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg shadow-red-950/60 ring-1 ring-red-400/50 hover:from-red-400 hover:to-red-600`}
             >
-              {action.label}
+              {meta.action}
               <span aria-hidden="true">&rarr;</span>
             </Link>
           )}

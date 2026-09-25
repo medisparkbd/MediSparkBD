@@ -59,9 +59,10 @@ export async function GET(
       );
     }
 
-    // Lifecycle gates (server time): Public Live Upcoming/Closed/Hidden block
-    // start; Public Practice always startable; Course Upcoming/Closed block,
-    // Archived allows Practice Again.
+    // Lifecycle gates (server time): Public Live Upcoming blocks start;
+    // post-live Practice phase allows start (attempts recorded as unranked
+    // practice); admin-closed/hidden still block. Public Practice always
+    // startable; Course Upcoming blocks, Archived allows Practice Again.
     let isEnrolled = false;
     try {
       const { isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
@@ -95,7 +96,8 @@ export async function GET(
         }
       }
     } else {
-      // Public: Practice always startable; Live follows Upcoming→Live→Closed→Hidden.
+      // Public: Practice (static or post-live) always startable; Live follows
+      // Upcoming → Live → Practice Exam. Only admin-closed/hidden block start.
       if (examMeta.examMode === "practice") {
         // Always allow start while published — no time gate.
       } else {

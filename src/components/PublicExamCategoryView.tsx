@@ -36,6 +36,12 @@ const LIVE_SECTIONS: {
     text: "text-emerald-400",
   },
   {
+    phase: "practice",
+    heading: "Practice Exam",
+    dot: "bg-violet-500",
+    text: "text-violet-300",
+  },
+  {
     phase: "closed",
     heading: "Exam is Closed",
     dot: "bg-red-500",
@@ -76,7 +82,7 @@ export default function PublicExamCategoryView({
   const [tab, setTab] = useState<ModeTab>("live");
   const [batch, setBatch] = useState("All Batches");
   const [subject, setSubject] = useState<string | null>(null);
-  // Frozen at mount (+1m refresh) so the Upcoming → Live → Closed grouping
+  // Frozen at mount (+1m refresh) so the Upcoming → Live → Practice grouping
   // stays stable across re-renders. Remounted per category via `key`.
   const [nowMs, setNowMs] = useState(() => Date.now());
   const { user } = useAuth();
@@ -124,13 +130,15 @@ export default function PublicExamCategoryView({
     [exams, batch],
   );
 
-  // Live Exam tab: ONLY live-mode exams with the Upcoming → Live → Closed
-  // lifecycle. Closed exams older than 12h are hidden (never moved here
-  // from Practice, never shown in Practice either).
+  // Live Exam tab: ONLY live-mode exams with the Upcoming → Live →
+  // Practice Exam lifecycle (automatic after End Time; unranked attempts).
+  // Admin-closed exams show under Exam is Closed; post-live practice never
+  // moves to the Practice tab and never hides.
   const liveGroups = useMemo(() => {
     const groups: Record<PublicLivePhase, PublicExam[]> = {
       upcoming: [],
       live: [],
+      practice: [],
       closed: [],
       hidden: [],
     };
@@ -142,7 +150,10 @@ export default function PublicExamCategoryView({
   }, [batchFiltered, nowMs]);
 
   const liveTotal =
-    liveGroups.upcoming.length + liveGroups.live.length + liveGroups.closed.length;
+    liveGroups.upcoming.length +
+    liveGroups.live.length +
+    liveGroups.practice.length +
+    liveGroups.closed.length;
 
   // Practice Exam tab: continuously available practice-mode exams.
   const practiceExams = useMemo(

@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import MediSparkLoader from "@/components/MediSparkLoader";
 
 // ---------- Context ----------
 type GlobalLoadingContextValue = {
@@ -237,78 +236,6 @@ function GlobalTopBar({ isLoading, progress }: { isLoading: boolean; progress: n
           100% { background-position: -200% 0; }
         }
       `}</style>
-    </div>
-  );
-}
-
-// ---------- First-load full-screen loader ----------
-// Lightweight, uses unified MediSparkLoader visual identity. Never stuck permanently.
-export function FirstLoadOverlay() {
-  const [visible, setVisible] = useState(true);
-  const [fading, setFading] = useState(false);
-
-  useEffect(() => {
-    // Hide once hydration + first paint are done. Minimum show for brand moment.
-    const minShow = 420;
-    const started = Date.now();
-
-    const hide = () => {
-      const elapsed = Date.now() - started;
-      const delay = Math.max(0, minShow - elapsed);
-      window.setTimeout(() => {
-        setFading(true);
-        window.setTimeout(() => setVisible(false), 420);
-      }, delay);
-    };
-
-    if (document.readyState === "complete") hide();
-    else window.addEventListener("load", hide, { once: true });
-
-    // Fallback — never block forever (slow network / slow device)
-    const fallback = window.setTimeout(hide, 2500);
-    // Also hide on error to avoid infinite screen if load event never fires
-    const onError = () => hide();
-    window.addEventListener("error", onError, { once: true });
-    return () => {
-      window.clearTimeout(fallback);
-      window.removeEventListener("load", hide);
-      window.removeEventListener("error", onError);
-    };
-  }, []);
-
-  // Prevent background scroll while visible
-  useEffect(() => {
-    if (!visible) return;
-    const prev = document.documentElement.style.overflow;
-    if (!fading) document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prev;
-    };
-  }, [visible, fading]);
-
-  if (!visible) return null;
-
-  return (
-    <div
-      aria-live="polite"
-      aria-busy="true"
-      aria-label="Loading MediSpark"
-      className={`fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-dark-950 px-6 ${fading ? "pointer-events-none" : ""}`}
-      style={{
-        opacity: fading ? 0 : 1,
-        transition: "opacity 420ms ease, visibility 420ms ease",
-        visibility: fading ? "hidden" : "visible",
-        pointerEvents: fading ? "none" : undefined,
-      }}
-    >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -top-24 left-1/2 h-[420px] w-[680px] -translate-x-1/2 rounded-full bg-primary-600/10 blur-[70px]" />
-        <div className="absolute bottom-[-80px] right-[-60px] h-[360px] w-[360px] rounded-full bg-primary-900/25 blur-[60px]" />
-      </div>
-      {/* Reuse unified loader - large + branding + animated dots */}
-      <div className="relative">
-        <MediSparkLoader size="large" label={undefined} withBranding showDots />
-      </div>
     </div>
   );
 }

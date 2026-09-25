@@ -14,6 +14,7 @@ import {
   type VariantRow,
 } from "@/lib/exam-variants";
 import type { RowDataPacket } from "mysql2/promise";
+import { normalizeStoredAnswerIndex } from "@/lib/paste-mcq-parser";
 
 // Student-facing exam taking. MediSpark exam rules enforced here:
 //  - answers are stored server-side and locked after the first selection
@@ -37,6 +38,8 @@ export type TakingExam = {
   startedAt: string | null;
   /** Course lifecycle phase — null for non-course / public exams */
   phase?: "upcoming" | "live" | "closed" | "archived" | "practice" | "no-window" | null;
+  /** True when a public live-mode exam is past its End Time (post-live Practice phase). Attempts are unranked practice attempts. */
+  isPostLivePractice?: boolean;
   /** True when this is a Flow 4 Exam Batch exam */
   isFlow4?: boolean;
 };
@@ -143,24 +146,18 @@ type ResultDetail = {
 /** Best score achieved by any student on this exam (null when no results). */
 async function highestMarkFor(examId: string): Promise<number | null> {
   try {
-    // For enrolled exams, highest live mark is frozen — practice scores must NOT
-    // become the new highest for the Live leaderboard (spec §7).
-    let isEnrolled = false;
+    // Practice attempts are unranked and must never become the leaderboard
+    // highest: only official (scheduled) attempts count. Legacy rows without
+    // attempt_type are treated as scheduled.
     try {
-      const { isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
-      isEnrolled = await isEnrolledExam(examId);
+      const liveRows = await query<{ best: string | number | null }[]>(
+        `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
+        [examId],
+      );
+      const best = liveRows[0]?.best;
+      if (best !== null && best !== undefined) return Number(best);
     } catch {}
-    if (isEnrolled) {
-      try {
-        const liveRows = await query<{ best: string | number | null }[]>(
-          `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
-          [examId],
-        );
-        const best = liveRows[0]?.best;
-        if (best !== null && best !== undefined) return Number(best);
-      } catch {}
-      // Fallback to all when column missing
-    }
+    // Fallback to all when the attempt_type column is missing (legacy DB).
     const rows = await query<{ best: string | number | null }[]>(
       `SELECT MAX(score) AS best FROM exam_results WHERE exam_id = ?`,
       [examId],
@@ -332,6 +329,21 @@ function isLivePublished(exam: Exam): boolean {
   return exam.status === "published";
 }
 
+/**
+ * True when a public live-mode exam is past its configured End Time, i.e. in
+ * the automatic post-live Practice Exam phase (Upcoming → Live → Practice).
+ * Attempts started in this phase are recorded with attempt_type='practice':
+ * fully completable with their own result, but never ranked.
+ */
+async function isPostLivePracticeExam(exam: Exam): Promise<boolean> {
+  try {
+    const { isPublicPostLivePractice } = await import("@/lib/exam-lifecycle");
+    return isPublicPostLivePractice(exam);
+  } catch {
+    return false;
+  }
+}
+
 let attemptTablesReady: Promise<void> | null = null;
 function ensureAttemptTables(): Promise<void> {
   if (!attemptTablesReady) {
@@ -431,9 +443,14 @@ async function startExamAttempt(
       }
     }
     if (!isPracticeMode || (examForCheck?.kind === "enrolled")) {
-      const hasCompleted = await hasPriorExamAttempt(examId, uid);
-      if (hasCompleted) {
-        throw new Error("You have already appeared in this exam. View your result.");
+      // Post-live Practice phase: retakes are allowed — every attempt after
+      // the live window is recorded as an unranked practice attempt.
+      const isPostLivePractice = await isPostLivePracticeExam(examForCheck).catch(() => false);
+      if (!isPostLivePractice) {
+        const hasCompleted = await hasPriorExamAttempt(examId, uid);
+        if (hasCompleted) {
+          throw new Error("You have already appeared in this exam. View your result.");
+        }
       }
     }
   } catch (e) {
@@ -628,27 +645,34 @@ function gradeAnswers(
   const details: ResultDetail[] = [];
 
   for (const row of rows) {
-    const chosen = merged[String(row.id)];
+    // Per-question lookup by permanent ID (String-coerced: stored snapshots
+    // may key IDs as "123" while rows carry 123). Values are normalized —
+    // numbers, numeric strings and A/B/C/D letters all resolve; anything
+    // else stays unknown (null), never defaulted to 0/"A".
+    const chosen = normalizeStoredAnswerIndex(merged[String(row.id)]);
+    // Correct answer is normalized the same way (never confused with the
+    // user's answer; malformed stays null and can never match).
+    const correctIdx = normalizeStoredAnswerIndex(row.correct_index);
     const marks = Number(row.marks) || 1;
-    if (typeof chosen !== "number") {
+    if (chosen === null) {
       skippedCount += 1;
       details.push({
         questionId: row.id,
         chosenIndex: null,
-        correctIndex: row.correct_index,
+        correctIndex: correctIdx,
         marks,
         obtained: 0,
       });
       continue;
     }
-    if (chosen === row.correct_index) {
+    if (correctIdx !== null && chosen === correctIdx) {
       score += marks;
       rawMarks += marks;
       correctCount += 1;
       details.push({
         questionId: row.id,
         chosenIndex: chosen,
-        correctIndex: row.correct_index,
+        correctIndex: correctIdx,
         marks,
         obtained: marks,
       });
@@ -658,7 +682,7 @@ function gradeAnswers(
       details.push({
         questionId: row.id,
         chosenIndex: chosen,
-        correctIndex: row.correct_index,
+        correctIndex: correctIdx,
         marks,
         obtained: -negativePerWrong,
       });
@@ -699,15 +723,20 @@ async function finalizeAttempt(
   const exams = await fetchExams();
   const found = exams.find((exam) => exam.id === examId);
   if (!found) return null;
-  // One-attempt for all exams: if already has completed result, return existing and don't create duplicate
-  try {
-    const hasCompleted = await hasPriorExamAttempt(examId, uid);
-    if (hasCompleted) {
-      const existing = await latestOutcome(examId, uid);
-      if (existing) return existing;
+  // One-attempt for live-window exams: a prior completed result is returned
+  // as-is. Post-live Practice phase is exempt — each practice attempt is
+  // graded and stored as its own (unranked) result.
+  const isPostLivePracticeFinalize = await isPostLivePracticeExam(found).catch(() => false);
+  if (!isPostLivePracticeFinalize) {
+    try {
+      const hasCompleted = await hasPriorExamAttempt(examId, uid);
+      if (hasCompleted) {
+        const existing = await latestOutcome(examId, uid);
+        if (existing) return existing;
+      }
+    } catch {
+      // best-effort
     }
-  } catch {
-    // best-effort
   }
 
   const stored = await fetchStoredAnswers(examId, uid);
@@ -829,6 +858,11 @@ async function finalizeAttempt(
     if (isEnrolled) {
       const phase = getEnrolledExamPhase(found);
       if (isEnrolledPracticePhase(phase)) attemptType = "practice";
+    } else if (await isPostLivePracticeExam(found).catch(() => false)) {
+      // Public live-mode exam submitted after its End Time → unranked
+      // practice attempt: it keeps its own result but gets merit_position
+      // NULL and never shifts the frozen Live leaderboard.
+      attemptType = "practice";
     }
   } catch {
     // Fallback to live on error — never block submission.
@@ -1044,13 +1078,17 @@ async function latestOutcome(
   let skippedCount = 0;
   let rawMarks = 0;
   for (const question of questions) {
-    const chosen = answers[String(question.id)];
+    // String-keyed per-question lookup ("123" and 123 resolve identically);
+    // numeric strings / letters normalize, malformed stays unknown (null).
+    const chosen = normalizeStoredAnswerIndex(answers[String(question.id)]);
     // `.has()` (not `??`): an explicit stored unknown (NULL) must survive —
     // `null ?? fallback` would wrongly fall through to the base value.
-    const correctIndex = correctById.has(Number(question.id))
-      ? (correctById.get(Number(question.id)) ?? null)
-      : (question.correct_index ?? null);
-    if (typeof chosen !== "number") skippedCount += 1;
+    const correctIndex = normalizeStoredAnswerIndex(
+      correctById.has(Number(question.id))
+        ? (correctById.get(Number(question.id)) ?? null)
+        : (question.correct_index ?? null),
+    );
+    if (chosen === null) skippedCount += 1;
     else if (correctIndex !== null && chosen === correctIndex) {
       correctCount += 1;
       rawMarks += Number(question.marks) || 1;
@@ -1205,7 +1243,7 @@ export async function getExamForTaking(
         options: parsed.map(String),
         marks: Number(row.marks) || 1,
         // Preserve an explicit unknown (NULL) — never coerce it to 0/A.
-        correctIndex: row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
+        correctIndex: normalizeStoredAnswerIndex(row.correct_index),
         explanation: row.explanation ?? null,
         questionImage: (row.question_image as string | null) ?? null,
         fromVariant: false,
@@ -1318,8 +1356,11 @@ export async function getExamForTaking(
   }
 
   // Enrolled exam phase for labeling (Live vs Practice after End Time). Computed server-side.
+  // Public post-live Practice phase likewise computed server-side so the
+  // client can allow practice retakes after the live window ends.
   let phase: TakingExam["phase"] = null;
   let isEnrolled = false;
+  let isPostLivePractice = false;
   try {
     const { getEnrolledExamPhase, isEnrolledExam } = await import("@/lib/enrolled-exam-lifecycle");
     isEnrolled = await isEnrolledExam(examId);
@@ -1327,6 +1368,11 @@ export async function getExamForTaking(
     else phase = null;
   } catch {
     phase = null;
+  }
+  try {
+    isPostLivePractice = await isPostLivePracticeExam(found).catch(() => false);
+  } catch {
+    isPostLivePractice = false;
   }
   return {
     exam: {
@@ -1341,6 +1387,7 @@ export async function getExamForTaking(
       negativeMarks: negativePerWrongFor(found),
       startedAt,
       phase,
+      isPostLivePractice,
       isFlow4: isEnrolled,
     },
     questions,
@@ -1433,15 +1480,18 @@ export async function submitExamAttempt(
 
   await ensureAttemptTables();
 
-  // One-attempt for all exams: if already has completed result, return existing and don't create duplicate
-  try {
-    const hasCompleted = await hasPriorExamAttempt(examId, uid);
-    if (hasCompleted) {
-      const existing = await latestOutcome(examId, uid);
-      if (existing) return existing;
+  // One-attempt for live-window exams: a prior completed result is returned
+  // as-is. Post-live Practice phase is exempt (see finalizeAttempt).
+  if (!(await isPostLivePracticeExam(found).catch(() => false))) {
+    try {
+      const hasCompleted = await hasPriorExamAttempt(examId, uid);
+      if (hasCompleted) {
+        const existing = await latestOutcome(examId, uid);
+        if (existing) return existing;
+      }
+    } catch {
+      // best-effort
     }
-  } catch {
-    // best-effort
   }
 
   // Already submitted (double-submit / auto-submit race / terminated by
@@ -1775,8 +1825,7 @@ export async function getExamResultScript(
         question: String(row.question ?? ""),
         options: Array.isArray(parsed) ? parsed.map(String) : [],
         marks: baseMarks,
-        correctIndex:
-          row.correct_index === null || row.correct_index === undefined ? null : Number(row.correct_index) || 0,
+        correctIndex: normalizeStoredAnswerIndex(row.correct_index),
         explanation: row.explanation ?? null,
         questionImage: (row.question_image as string | null) ?? null,
       };
@@ -1800,13 +1849,16 @@ export async function getExamResultScript(
     const meta = byId.get(detail.questionId);
     if (!meta) continue;
     seen.add(detail.questionId);
+    // Each question resolves its OWN stored answer (current question's ID —
+    // never answers[0] or a shared global). Legacy rows may carry numeric
+    // strings/letters, so values are normalized; unknown stays null.
     questions.push({
       questionId: detail.questionId,
       question: meta.question,
       options: meta.options,
       marks: meta.marks,
-      chosenIndex: detail.chosenIndex,
-      correctIndex: detail.correctIndex,
+      chosenIndex: normalizeStoredAnswerIndex(detail.chosenIndex),
+      correctIndex: normalizeStoredAnswerIndex(detail.correctIndex),
       obtained: Number(detail.obtained) || 0,
       explanation: meta.explanation,
       questionImage: meta.questionImage,
@@ -1815,12 +1867,14 @@ export async function getExamResultScript(
   for (const [key, meta] of byId.entries()) {
     if (seen.has(key)) continue;
     const raw = fallbackAnswers[String(key)];
-    const chosen = typeof raw === "number" ? raw : null;
+    const chosen = normalizeStoredAnswerIndex(raw);
     // Prefer the correctIndex stored at grading time (detail); only fall back
     // to meta.correctIndex when no detail exists for this question (legacy path).
-    const correctIndex = correctByDetailId.has(key)
-      ? correctByDetailId.get(key) ?? null
-      : meta.correctIndex;
+    const correctIndex = normalizeStoredAnswerIndex(
+      correctByDetailId.has(key)
+        ? (correctByDetailId.get(key) ?? null)
+        : meta.correctIndex,
+    );
     questions.push({
       questionId: key,
       question: meta.question,

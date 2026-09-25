@@ -26,12 +26,29 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
   const body = (await request.json().catch(() => null)) as AnswerBody | null;
+  // IDs may arrive as strings ("123") or numbers (123) depending on the
+  // client/serialization — coerce both. optionIndex must be a non-negative
+  // integer; anything else is rejected (never defaulted to 0/"A").
+  const questionId =
+    typeof body?.questionId === "number"
+      ? body.questionId
+      : typeof body?.questionId === "string" && body.questionId.trim() !== ""
+        ? Number(body.questionId)
+        : NaN;
+  const optionIndex =
+    typeof body?.optionIndex === "number"
+      ? body.optionIndex
+      : typeof body?.optionIndex === "string" && body.optionIndex.trim() !== ""
+        ? Number(body.optionIndex)
+        : NaN;
   if (
     !body ||
     typeof body.token !== "string" ||
     !body.token ||
-    typeof body.questionId !== "number" ||
-    typeof body.optionIndex !== "number"
+    !Number.isInteger(questionId) ||
+    questionId <= 0 ||
+    !Number.isInteger(optionIndex) ||
+    optionIndex < 0
   ) {
     return NextResponse.json(
       { error: "Missing answer details." },
@@ -49,7 +66,7 @@ export async function POST(
       [id],
     );
     const orderedIds = questionRows.map((r) => Number(r.id));
-    if (!orderedIds.includes(body.questionId)) {
+    if (!orderedIds.includes(questionId)) {
       return NextResponse.json(
         { error: "Invalid question for this exam." },
         { status: 400 },
@@ -64,8 +81,8 @@ export async function POST(
     user.uid,
     user.name || user.email || "Student",
     body.token,
-    body.questionId,
-    body.optionIndex,
+    questionId,
+    optionIndex,
   );
   if (!result.accepted && !result.terminated) {
     return NextResponse.json(

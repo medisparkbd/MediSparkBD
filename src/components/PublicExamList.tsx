@@ -108,11 +108,12 @@ export default function PublicExamList({
     return map;
   }, [filtered, categoryId]);
 
-  // Public category page: Live Exam (Upcoming + Live + Closed≤12h) and
-  // Practice Exam sections. Closed maps to Expired ("Exam is Closed", red).
+  // Public category page: Live Exam (Upcoming + Live + post-live Practice)
+  // and Practice Exam sections. Admin-closed exams map to Expired
+  // ("Exam is Closed").
   const visibleSections = detailsBase
     ? examSections
-    : examSections.filter((s) => s.key === "Live" || s.key === "Upcoming" || s.key === "Expired" || s.key === "Practice");
+    : examSections.filter((s) => s.key === "Live" || s.key === "Upcoming" || s.key === "Practice");
 
   const selectClass =
     "rounded-lg border border-ink/10 bg-dark-850 px-3.5 py-2.5 text-sm font-semibold text-heading transition-colors duration-75 ease-out focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 touch-manipulation";
@@ -210,7 +211,7 @@ export default function PublicExamList({
         {examCategories.map((category) => {
           const groups = grouped.get(category.key) ?? emptyGroups();
           const categoryTotal =
-            groups.Live.length + groups.Upcoming.length + groups.Completed.length;
+            groups.Live.length + groups.Upcoming.length + groups.Practice.length;
 
           return (
             <div key={category.key}>

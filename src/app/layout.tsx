@@ -20,7 +20,7 @@ import {
 } from "@/lib/theme-settings";
 import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
-import { GlobalLoadingProvider, FirstLoadOverlay } from "@/components/GlobalLoading";
+import { GlobalLoadingProvider } from "@/components/GlobalLoading";
 import "./globals.css";
 
 // Branding/settings change rarely — cache layout data for 60s so every page
@@ -128,7 +128,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
       </head>
       <body className="flex min-h-full flex-col bg-dark-950 text-neutral-300">
-        <FirstLoadOverlay />
         <Suspense fallback={null}>
           <GlobalLoadingProvider>
             <ThemeProvider>

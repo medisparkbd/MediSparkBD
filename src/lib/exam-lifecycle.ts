@@ -6,9 +6,15 @@ import type { Exam } from "@/lib/exams-admin";
  * stored Start/End date-time with the server clock — never a frontend-only
  * timer — so refresh / restart / late-open all resolve correctly.
  *
- * Public Live Exam:  Upcoming → Live → Closed (12 hours visible) → Hidden
+ * Public Live Exam:  Upcoming → Live → Practice Exam (after End Time)
  * Public Practice:   always Available (never time-gated)
  * Course Exam:       Draft → Upcoming → Live → Archived
+ *
+ * Post-live practice is automatic (server time): once the configured live
+ * window ends, the exam becomes a Practice Exam — students can still Start
+ * Exam and submit, but those attempts are recorded as practice and are
+ * never ranked (see updateMeritPositions / attempt_type='practice').
+ * Admin-closed exams keep the Closed → Hidden flow (explicit admin intent).
  */
 
 export const PUBLIC_LIVE_CLOSED_VISIBLE_MS = 12 * 60 * 60 * 1000;
@@ -43,7 +49,7 @@ export function getPublicLiveState(
 ): PublicLiveState {
   if (exam.status === "draft") return "draft";
   if (isPublicPracticeExam(exam)) return "practice";
-  // Stored admin-closed behaves as Closed (never moves to Practice).
+  // Stored admin-closed behaves as Closed (never auto-moves to Practice).
   const startMs = toMs(exam.scheduledAt);
   const endMs = toMs(exam.endsAt);
   if (exam.status === "closed") {
@@ -51,24 +57,33 @@ export function getPublicLiveState(
     return "closed";
   }
   if (startMs !== null && nowMs < startMs) return "upcoming";
+  // Past the configured end time → automatic Practice Exam phase: still
+  // startable/completable, but attempts are unranked practice attempts.
   if (endMs !== null && nowMs >= endMs) {
-    if (nowMs - endMs > PUBLIC_LIVE_CLOSED_VISIBLE_MS) return "hidden";
-    return "closed";
+    return "practice";
   }
   return "live";
 }
 
-/** True when a Public Live Exam must disappear from the Main Website list (12h after End). */
+/** True when a Public Live Exam must disappear from the Main Website list (admin-closed + 12h after End). Post-live practice exams are never hidden. */
 export function isPublicLiveHidden(exam: ExamTime, nowMs: number = Date.now()): boolean {
   if (!isPublicLiveExam(exam)) return false;
   return getPublicLiveState(exam, nowMs) === "hidden";
 }
 
-/** True when a Public Live Exam card stays visible on the website (Upcoming/Live/Closed≤12h). */
+/** True when a Public Live Exam card stays visible on the website (Upcoming/Live/post-live Practice/admin-closed≤12h). */
 export function isPublicLiveVisible(exam: ExamTime, nowMs: number = Date.now()): boolean {
   if (!isPublicLiveExam(exam)) return false;
   const state = getPublicLiveState(exam, nowMs);
-  return state === "upcoming" || state === "live" || state === "closed";
+  return state === "upcoming" || state === "live" || state === "practice" || state === "closed";
+}
+
+/** True when a public live-mode exam is in its automatic post-live Practice phase (past End Time, not admin-closed). Practice attempts are unranked. */
+export function isPublicPostLivePractice(exam: ExamTime, nowMs: number = Date.now()): boolean {
+  if (!isPublicLiveExam(exam)) return false;
+  if (exam.status === "closed" || exam.status === "draft") return false;
+  const endMs = toMs(exam.endsAt);
+  return endMs !== null && nowMs >= endMs;
 }
 
 export function getCourseState(exam: ExamTime, nowMs: number = Date.now()): CourseState {

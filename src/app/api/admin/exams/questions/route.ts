@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     try {
       const { fetchVariantMap } = await import("@/lib/exam-variants");
       const { parseJsonColumn } = await import("@/lib/mysql");
+      const { normalizeStoredAnswerIndex } = await import("@/lib/paste-mcq-parser");
       const examId = String(params.get("examId") ?? "");
       const variants = await fetchVariantMap(examId);
       const merged = questions.map((q, index) => {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
           question: v.question,
           options: Array.isArray(opts) ? opts.map(String) : q.options,
           // Preserve an explicit unknown (NULL) — never coerce it to 0/A here.
-          correctIndex: v.correct_index === null || v.correct_index === undefined ? null : Number(v.correct_index) || 0,
+          correctIndex: normalizeStoredAnswerIndex(v.correct_index),
           explanation: v.explanation ?? null,
           marks: Number(v.marks) || q.marks,
           questionImage: v.question_image ?? null,

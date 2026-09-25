@@ -4,9 +4,11 @@
 //
 //   Public Exam → Category → [ Live Exam | Practice Exam ] (default: Live)
 //
-// Live Exam lifecycle (unchanged): Upcoming → Live → Closed → 1 day after
-// closing → Hidden from the Main Website (Admin Panel keeps access).
-// Practice Exams stay continuously available while published/active.
+// Live Exam lifecycle: Upcoming → Live → Practice Exam (automatic after the
+// configured End Time; attempts are unranked practice attempts).
+// Admin-closed exams keep Closed → Hidden from the Main Website (Admin Panel
+// keeps access). Practice Exams stay continuously available while
+// published/active.
 
 import type { ExamCategory } from "@/lib/public-exams";
 import {
@@ -17,7 +19,7 @@ import {
 /** A Closed live exam stays visible on the Main Website for exactly 1 day. */
 export const PUBLIC_CLOSED_VISIBLE_MS = PUBLIC_LIVE_CLOSED_VISIBLE_MS;
 
-export type PublicLivePhase = "upcoming" | "live" | "closed" | "hidden";
+export type PublicLivePhase = "upcoming" | "live" | "practice" | "closed" | "hidden";
 
 export type PhaseInput = {
   /** Display status (e.g. deriveStatus output: Upcoming/Live/Completed/Expired). */
@@ -32,9 +34,9 @@ export type PhaseInput = {
 /**
  * Live lifecycle phase for a PUBLIC live-mode exam — delegates to the
  * canonical `getPublicLiveState` in `@/lib/exam-lifecycle` (single source
- * of truth): Upcoming → Live → Closed → 1 day after closing → Hidden from
- * the Main Website (Admin Panel keeps the exam, nothing is deleted or
- * moved to Practice).
+ * of truth): Upcoming → Live → Practice Exam (automatic after End Time;
+ * attempts are unranked) → admin-closed exams go Closed → Hidden from the
+ * Main Website (Admin Panel keeps the exam, nothing is deleted).
  */
 export function getPublicLivePhase(
   exam: PhaseInput,
@@ -59,6 +61,7 @@ export function getPublicLivePhase(
   );
   if (state === "upcoming") return "upcoming";
   if (state === "live") return "live";
+  if (state === "practice") return "practice";
   if (state === "closed") return "closed";
   return "hidden";
 }

@@ -21,12 +21,16 @@ export async function POST(
     return NextResponse.json({ error: "Missing answers." }, { status: 400 });
   }
 
-  // Keep only numeric selections.
+  // Keep only valid selections: question IDs as numeric-string keys, and
+  // non-negative integer option indexes. Values may arrive as numbers,
+  // numeric strings or A/B/C/D letters — all are normalized; malformed
+  // entries are dropped (never defaulted to 0/"A").
+  const { normalizeStoredAnswerIndex } = await import("@/lib/paste-mcq-parser");
   const answers: Record<string, number> = {};
   for (const [key, value] of Object.entries(body.answers)) {
-    if (/^\d+$/.test(key) && Number.isInteger(value)) {
-      answers[key] = value as number;
-    }
+    if (!/^\d+$/.test(key)) continue;
+    const normalized = normalizeStoredAnswerIndex(value);
+    if (normalized !== null) answers[key] = normalized;
   }
 
   const { id } = await context.params;

@@ -121,6 +121,37 @@ export function strictAnswerIndex(
   return n;
 }
 
+/**
+ * Lenient stored-answer normalization for READ boundaries (grading, answer
+ * sheet, result script). Stored snapshots may carry the selection as a
+ * number (0-based option index), a numeric string ("2" — JSON or form
+ * encoding), or a canonical letter ("B" / "ক"). Question IDs may likewise
+ * arrive as strings ("123") or numbers (123) — callers must always key
+ * lookups with String(id).
+ *
+ * Returns a non-negative integer index, or null when the value is
+ * missing/malformed. It NEVER falls back to 0/"A": unknown stays unknown
+ * and renders as unanswered ("—" / "Not Answered").
+ */
+export function normalizeStoredAnswerIndex(value: unknown): number | null {
+  if (typeof value === "boolean" || value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    // Canonical letter first (A–D / ক–ঘ, with or without brackets/dots).
+    const asLetter = answerLetterToIndex(trimmed);
+    if (asLetter !== null) return asLetter;
+    const n = Number(trimmed);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+  return null;
+}
+
 // ── question header detection ──────────────────────────────────────────────
 function stripQuestionHeader(line: string): { stripped: string; header: string } | null {
   const raw = line;

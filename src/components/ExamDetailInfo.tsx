@@ -26,11 +26,11 @@ const statusStyles: Record<ExamStatus, { label: string; badge: string }> = {
     badge: "bg-red-500/10 text-red-400 border border-red-500/30",
   },
   Practice: {
-    label: "Practice",
+    label: "Practice Exam",
     badge: "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
   },
   Archived: {
-    label: "Practice",
+    label: "Practice Exam",
     badge: "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
   },
   Inactive: {

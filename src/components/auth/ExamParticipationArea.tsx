@@ -15,6 +15,8 @@ import { answerIndexToLetter } from "@/lib/paste-mcq-parser";
 type TakingExam = ExamRulesData & {
   id: string;
   subject: string;
+  /** True when the live window has ended — attempts are unranked practice; retakes allowed. */
+  isPostLivePractice?: boolean;
 };
 
 type TakingQuestion = {
@@ -363,10 +365,13 @@ export default function ExamParticipationArea({
         }
         setExam(data.exam);
         setQuestions(data.questions ?? []);
-        // Strict one-attempt: check if already has completed attempt for this public exam
+        // Strict one-attempt: check if already has completed attempt for this public exam.
+        // Post-live Practice phase is exempt — past the End Time every attempt
+        // is an unranked practice attempt, so prior live attempts never block
+        // starting practice.
         try {
           const priorData = (await priorRes.json().catch(() => ({}))) as { hasPriorAttempt?: boolean };
-          if (!cancelled && priorRes.ok && priorData.hasPriorAttempt) {
+          if (!cancelled && priorRes.ok && priorData.hasPriorAttempt && !data.exam.isPostLivePractice) {
             // Already appeared — fetch existing result and show View Result instead of Start Exam
             setAlreadyAttempted(true);
             try {
@@ -1076,6 +1081,16 @@ export default function ExamParticipationArea({
           </span>
         </div>
         <p className="mt-1 text-sm text-neutral-400">{exam.name}</p>
+
+        {/* Post-live Practice phase — clearly distinguished from the Live Exam. */}
+        {exam.isPostLivePractice && (
+          <div className="mt-4 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
+            <p className="text-sm font-extrabold text-violet-300">Practice Exam — the live window has ended</p>
+            <p className="mt-1 text-xs leading-relaxed text-violet-200/80">
+              You can still take this exam as practice and see your own result, but this attempt will not affect the leaderboard, merit position, or live ranking.
+            </p>
+          </div>
+        )}
 
         <div className="mt-4">
           <ExamRulesList exam={exam} />

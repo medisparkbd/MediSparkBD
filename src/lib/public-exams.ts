@@ -232,11 +232,13 @@ export function deriveStatus(exam: Exam): ExamStatus {
   if (startsAt !== null && !Number.isNaN(startsAt) && startsAt > now) {
     return "Upcoming";
   }
-  // Past the end time (when set) → Closed (Expired badge). A Public Live
-  // Exam NEVER moves to Practice; hiding after 12h is handled by
-  // isPublicLiveHidden() at the listing layer, not here.
+  // Past the configured end time (when set) → automatic Practice Exam phase
+  // (Upcoming → Live → Practice Exam). No admin action required; students can
+  // still Start Exam, but those attempts are recorded as practice and are
+  // never ranked. A Public Live Exam NEVER hides — hiding after 12h applies
+  // only to admin-closed exams (isPublicLiveHidden at the listing layer).
   if (endsAt !== null && !Number.isNaN(endsAt) && endsAt <= now) {
-    return "Expired";
+    return "Practice";
   }
   // Within the window or no window set → Live (students can start).
   return "Live";

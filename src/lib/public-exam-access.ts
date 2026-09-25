@@ -58,7 +58,9 @@ export async function checkPublicExamAccess(
   if (exam.examMode === "practice") {
     // Fall through to auth + attempt checks below.
   } else {
-    // Public Live: Upcoming → Live → Closed (12h) → Hidden, server-time based.
+    // Public Live: Upcoming → Live → Practice Exam (automatic after End
+    // Time; still startable, attempts unranked). Admin-closed exams stay
+    // Closed → Hidden, server-time based.
     const { getPublicLiveState } = await import("@/lib/exam-lifecycle");
     const state = getPublicLiveState(exam);
     if (state === "draft" || state === "upcoming") {
@@ -90,7 +92,18 @@ export async function checkPublicExamAccess(
 
   // Strict One Attempt Per Public LIVE Exam only. Public Practice exams are
   // retakable per attempt rules (dynamic merit) — skip the one-attempt block.
-  if (exam.examMode !== "practice") {
+  // Post-live Practice phase (live window ended) is likewise retakable:
+  // every attempt there is an unranked practice attempt.
+  let skipOneAttempt = exam.examMode === "practice";
+  if (!skipOneAttempt) {
+    try {
+      const { isPublicPostLivePractice } = await import("@/lib/exam-lifecycle");
+      skipOneAttempt = isPublicPostLivePractice(exam);
+    } catch {
+      skipOneAttempt = false;
+    }
+  }
+  if (!skipOneAttempt) {
     try {
       const countRows = await query<{ n: number }[]>(
         `SELECT COUNT(*) AS n FROM exam_results WHERE exam_id = ? AND student_uid = ?`,

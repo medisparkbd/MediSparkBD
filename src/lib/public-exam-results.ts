@@ -1,4 +1,5 @@
 import { parseJsonColumn, query } from "@/lib/mysql";
+import { normalizeStoredAnswerIndex } from "@/lib/paste-mcq-parser";
 
 /**
  * Admin → Result Control → Public Exam Result.
@@ -130,21 +131,43 @@ export async function fetchPublicExamResultSummaries(): Promise<
   PublicExamResultSummary[]
 > {
   try {
-    const rows = await query<SummaryRow[]>(
-      `SELECT e.id AS exam_id, e.title,
-              e.category_id, cat.name AS category_name,
-              e.total_marks, e.duration_minutes, e.scheduled_at,
-              MAX(r.submitted_at) AS last_submitted,
-              COUNT(r.id) AS participants,
-              MAX(r.score) AS highest, MIN(r.score) AS lowest,
-              AVG(r.score) AS average
-         FROM exam_results r
-         JOIN exams e ON e.id = r.exam_id AND e.kind = 'public'
-         LEFT JOIN course_categories cat ON cat.id = e.category_id
-        GROUP BY e.id, e.title, e.category_id, cat.name,
-                 e.total_marks, e.duration_minutes, e.scheduled_at
-        ORDER BY MAX(r.submitted_at) DESC`,
-    );
+    // Practice attempts never count toward result summaries (best-effort;
+    // legacy DBs without attempt_type fall back to all rows).
+    let rows: SummaryRow[];
+    try {
+      rows = await query<SummaryRow[]>(
+        `SELECT e.id AS exam_id, e.title,
+                e.category_id, cat.name AS category_name,
+                e.total_marks, e.duration_minutes, e.scheduled_at,
+                MAX(r.submitted_at) AS last_submitted,
+                COUNT(r.id) AS participants,
+                MAX(r.score) AS highest, MIN(r.score) AS lowest,
+                AVG(r.score) AS average
+           FROM exam_results r
+           JOIN exams e ON e.id = r.exam_id AND e.kind = 'public'
+           LEFT JOIN course_categories cat ON cat.id = e.category_id
+          WHERE (r.attempt_type = 'scheduled' OR r.attempt_type IS NULL)
+          GROUP BY e.id, e.title, e.category_id, cat.name,
+                   e.total_marks, e.duration_minutes, e.scheduled_at
+          ORDER BY MAX(r.submitted_at) DESC`,
+      );
+    } catch {
+      rows = await query<SummaryRow[]>(
+        `SELECT e.id AS exam_id, e.title,
+                e.category_id, cat.name AS category_name,
+                e.total_marks, e.duration_minutes, e.scheduled_at,
+                MAX(r.submitted_at) AS last_submitted,
+                COUNT(r.id) AS participants,
+                MAX(r.score) AS highest, MIN(r.score) AS lowest,
+                AVG(r.score) AS average
+           FROM exam_results r
+           JOIN exams e ON e.id = r.exam_id AND e.kind = 'public'
+           LEFT JOIN course_categories cat ON cat.id = e.category_id
+         GROUP BY e.id, e.title, e.category_id, cat.name,
+                  e.total_marks, e.duration_minutes, e.scheduled_at
+         ORDER BY MAX(r.submitted_at) DESC`,
+      );
+    }
     return rows.map((row) => ({
       examId: row.exam_id,
       title: row.title,
@@ -260,6 +283,9 @@ export async function fetchPublicExamRankedResults(
     const meta = await fetchPublicExamMeta(examId);
     if (!meta) return [];
     // Try to include auto_submitted when the column exists (best-effort).
+    // Practice attempts (attempt_type='practice', i.e. post-live practice)
+    // are EXCLUDED everywhere here: they must never appear on or affect the
+    // leaderboard/ranking. Legacy DBs without the column fall back to all rows.
     let rows: (ResultDetailRow & { auto_submitted?: number | null })[] = [];
     try {
       rows = await query<(ResultDetailRow & { auto_submitted?: number | null })[]>(
@@ -267,14 +293,15 @@ export async function fetchPublicExamRankedResults(
                 r.score, r.total_marks, r.answers,
                 r.negative_deduction, r.timer_penalty, r.is_second_timer,
                 r.time_taken_seconds, r.submitted_at, r.auto_submitted
-           FROM exam_results r
-          WHERE r.exam_id = ?
-          ORDER BY r.merit_position IS NULL ASC,
-                   r.merit_position ASC,
-                   r.score DESC,
-                   COALESCE(r.time_taken_seconds, 2147483647) ASC,
-                   r.submitted_at ASC
-          LIMIT 1000`,
+            FROM exam_results r
+           WHERE r.exam_id = ?
+             AND (r.attempt_type = 'scheduled' OR r.attempt_type IS NULL)
+           ORDER BY r.merit_position IS NULL ASC,
+                    r.merit_position ASC,
+                    r.score DESC,
+                    COALESCE(r.time_taken_seconds, 2147483647) ASC,
+                    r.submitted_at ASC
+           LIMIT 1000`,
         [examId],
       );
     } catch {
@@ -283,14 +310,14 @@ export async function fetchPublicExamRankedResults(
                 r.score, r.total_marks, r.answers,
                 r.negative_deduction, r.timer_penalty, r.is_second_timer,
                 r.time_taken_seconds, r.submitted_at
-           FROM exam_results r
-          WHERE r.exam_id = ?
-          ORDER BY r.merit_position IS NULL ASC,
-                   r.merit_position ASC,
-                   r.score DESC,
-                   COALESCE(r.time_taken_seconds, 2147483647) ASC,
-                   r.submitted_at ASC
-          LIMIT 1000`,
+            FROM exam_results r
+           WHERE r.exam_id = ?
+           ORDER BY r.merit_position IS NULL ASC,
+                    r.merit_position ASC,
+                    r.score DESC,
+                    COALESCE(r.time_taken_seconds, 2147483647) ASC,
+                    r.submitted_at ASC
+           LIMIT 1000`,
         [examId],
       );
     }
@@ -304,8 +331,7 @@ export async function fetchPublicExamRankedResults(
         [examId],
       );
       for (const q of qRows) {
-        const ci = q.correct_index;
-        questionMeta.set(Number(q.id), ci === null || ci === undefined ? null : Number(ci) || 0);
+        questionMeta.set(Number(q.id), normalizeStoredAnswerIndex(q.correct_index));
       }
     } catch {
       // No questions → counts stay 0
@@ -354,9 +380,11 @@ export async function fetchPublicExamRankedResults(
         const ans = parseJsonColumn<Record<string, number>>(row.answers) ?? {};
         if (questionMeta.size > 0) {
           for (const [qid, correctIdx] of questionMeta.entries()) {
-            const chosen = ans[String(qid)];
-            if (typeof chosen !== "number") unanswered += 1;
-            else if (chosen === correctIdx) correct += 1;
+            // Per-question lookup by String(qid); values normalized so
+            // numeric strings/letters resolve and malformed stays unknown.
+            const chosen = normalizeStoredAnswerIndex(ans[String(qid)]);
+            if (chosen === null) unanswered += 1;
+            else if (correctIdx !== null && chosen === correctIdx) correct += 1;
             else wrong += 1;
           }
           // rawMarks is not stored per-row efficiently; leave null and let detail compute.
@@ -502,12 +530,14 @@ export async function fetchPublicExamStudentResult(
 
     const questions: AnswerSheetQuestion[] = questionRows.map((row, index) => {
       const options = parseJsonColumn<string[]>(row.options) ?? [];
-      const chosen = answers[String(row.id)];
+      // Current question's own answer only — never a shared/global value.
+      const chosen = normalizeStoredAnswerIndex(answers[String(row.id)]);
+      const correctIdx = normalizeStoredAnswerIndex(row.correct_index);
       const marks = toNumber(row.marks) || 1;
       const status: AnswerSheetQuestion["status"] =
-        typeof chosen !== "number"
+        chosen === null
           ? "unanswered"
-          : chosen === row.correct_index
+          : correctIdx !== null && chosen === correctIdx
             ? "correct"
             : "wrong";
       if (status === "correct") {
@@ -520,8 +550,8 @@ export async function fetchPublicExamStudentResult(
         order: index + 1,
         question: row.question,
         options,
-        studentAnswer: typeof chosen === "number" ? chosen : null,
-        correctAnswer: row.correct_index,
+        studentAnswer: chosen,
+        correctAnswer: correctIdx,
         status,
         marks,
         // Per Spec §17: do not display negative beside each question; wrong → 0 per-question, negative accounted globally.
@@ -580,22 +610,48 @@ export async function fetchPublicExamResultStats(examId: string): Promise<{
   averageTimeSeconds: number | null;
 } | null> {
   try {
-    // Base stats that always exist
-    const baseRows = await query<
-      {
+    // Base stats that always exist — practice attempts excluded (best-effort;
+    // legacy DBs without attempt_type fall back to all rows).
+    let baseRows: {
         participants: string | number;
         highest: string | number | null;
         lowest: string | number | null;
         average: string | number | null;
         avgTime: string | number | null;
-      }[]
-    >(
-      `SELECT COUNT(*) AS participants,
-              MAX(score) AS highest, MIN(score) AS lowest, AVG(score) AS average,
-              AVG(time_taken_seconds) AS avgTime
-         FROM exam_results WHERE exam_id = ?`,
-      [examId],
-    );
+      }[];
+    try {
+      baseRows = await query<
+        {
+          participants: string | number;
+          highest: string | number | null;
+          lowest: string | number | null;
+          average: string | number | null;
+          avgTime: string | number | null;
+        }[]
+      >(
+        `SELECT COUNT(*) AS participants,
+                MAX(score) AS highest, MIN(score) AS lowest, AVG(score) AS average,
+                AVG(time_taken_seconds) AS avgTime
+           FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
+        [examId],
+      );
+    } catch {
+      baseRows = await query<
+        {
+          participants: string | number;
+          highest: string | number | null;
+          lowest: string | number | null;
+          average: string | number | null;
+          avgTime: string | number | null;
+        }[]
+      >(
+        `SELECT COUNT(*) AS participants,
+                MAX(score) AS highest, MIN(score) AS lowest, AVG(score) AS average,
+                AVG(time_taken_seconds) AS avgTime
+           FROM exam_results WHERE exam_id = ?`,
+        [examId],
+      );
+    }
     const row = baseRows[0];
     if (!row || toNumber(row.participants) === 0) return null;
 
@@ -603,12 +659,22 @@ export async function fetchPublicExamResultStats(examId: string): Promise<{
     let firstTimers = 0;
     let secondTimers = 0;
     try {
-      const timerRows = await query<{ firstTimers: string | number; secondTimers: string | number }[]>(
-        `SELECT SUM(CASE WHEN is_second_timer = 0 OR is_second_timer IS NULL THEN 1 ELSE 0 END) AS firstTimers,
-                SUM(CASE WHEN is_second_timer = 1 THEN 1 ELSE 0 END) AS secondTimers
-           FROM exam_results WHERE exam_id = ?`,
-        [examId],
-      );
+      let timerRows: { firstTimers: string | number; secondTimers: string | number }[];
+      try {
+        timerRows = await query<{ firstTimers: string | number; secondTimers: string | number }[]>(
+          `SELECT SUM(CASE WHEN is_second_timer = 0 OR is_second_timer IS NULL THEN 1 ELSE 0 END) AS firstTimers,
+                  SUM(CASE WHEN is_second_timer = 1 THEN 1 ELSE 0 END) AS secondTimers
+             FROM exam_results WHERE exam_id = ? AND (attempt_type = 'scheduled' OR attempt_type IS NULL)`,
+          [examId],
+        );
+      } catch {
+        timerRows = await query<{ firstTimers: string | number; secondTimers: string | number }[]>(
+          `SELECT SUM(CASE WHEN is_second_timer = 0 OR is_second_timer IS NULL THEN 1 ELSE 0 END) AS firstTimers,
+                  SUM(CASE WHEN is_second_timer = 1 THEN 1 ELSE 0 END) AS secondTimers
+             FROM exam_results WHERE exam_id = ?`,
+          [examId],
+        );
+      }
       firstTimers = toNumber(timerRows[0]?.firstTimers ?? 0);
       secondTimers = toNumber(timerRows[0]?.secondTimers ?? 0);
     } catch {
