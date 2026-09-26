@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
       static: 180,
     },
   },
+  // Public finance page: also served at the legacy /finance.php URL.
+  rewrites: async () => [{ source: "/finance.php", destination: "/finance" }],
   headers: async () => [
     {
       source: "/:path*",
