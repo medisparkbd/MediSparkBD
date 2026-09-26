@@ -1,5 +1,6 @@
 import { exec, query, ensureColumn } from "@/lib/mysql";
 import { removeFile, isLocalUpload } from "@/lib/storage";
+import { nextUnifiedPosition } from "@/lib/chapter-content-order";
 let tablesReady = false;
 let taxonomyTablesReady = false;
 let assignmentTableReady = false;
@@ -1303,24 +1304,42 @@ export async function saveClass(
   if (!title) throw new Error("Class title is required.");
   if (!chapterId) throw new Error("A chapter must be selected.");
   const id = asString(input.id) || `cls-${Date.now()}`;
-  await exec(
-    `INSERT INTO course_classes (id, chapter_id, title, video_url, note_url, duration_minutes, is_free, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE chapter_id = VALUES(chapter_id), title = VALUES(title),
-       video_url = VALUES(video_url), note_url = VALUES(note_url),
-       duration_minutes = VALUES(duration_minutes), is_free = VALUES(is_free),
-       is_active = VALUES(is_active)`,
-    [
-      id,
-      chapterId,
-      title,
-      asString(input.videoUrl) || null,
-      asString(input.noteUrl) || null,
-      Math.max(0, Number(input.durationMinutes) || 0),
-      input.isFree ? 1 : 0,
-      input.isActive === false ? 0 : 1,
-    ],
+  const videoUrl = asString(input.videoUrl) || null;
+  const noteUrl = asString(input.noteUrl) || null;
+  const durationMinutes = Math.max(0, Number(input.durationMinutes) || 0);
+  const isFree = input.isFree ? 1 : 0;
+  const isActive = input.isActive === false ? 0 : 1;
+  const existing = await query<{ id: string }[]>(
+    `SELECT id FROM course_classes WHERE id = ? LIMIT 1`,
+    [id],
   );
+  if (existing.length === 0) {
+    // New classes append at the END of the chapter's unified
+    // Class · Exam · Materials sequence so the admin-arranged manual order
+    // is never disturbed by an add.
+    const next = await nextUnifiedPosition(chapterId).catch(() => 1);
+    try {
+      await exec(
+        `INSERT INTO course_classes (id, chapter_id, title, video_url, note_url, duration_minutes, is_free, is_active, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, chapterId, title, videoUrl, noteUrl, durationMinutes, isFree, isActive, next],
+      );
+    } catch {
+      // Legacy database without the ordering column — keep the legacy insert.
+      await exec(
+        `INSERT INTO course_classes (id, chapter_id, title, video_url, note_url, duration_minutes, is_free, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, chapterId, title, videoUrl, noteUrl, durationMinutes, isFree, isActive],
+      );
+    }
+  } else {
+    // Edits never disturb the manually arranged display order.
+    await exec(
+      `UPDATE course_classes SET chapter_id = ?, title = ?, video_url = ?, note_url = ?,
+        duration_minutes = ?, is_free = ?, is_active = ? WHERE id = ?`,
+      [chapterId, title, videoUrl, noteUrl, durationMinutes, isFree, isActive, id],
+    );
+  }
   return fetchClasses();
 }
 

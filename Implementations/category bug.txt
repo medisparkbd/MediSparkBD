@@ -1,0 +1,32 @@
+Update the existing Special Medical Exam Batch course category.
+
+Required Change
+
+- Change ONLY the course category of Special Medical Exam Batch.
+- Set its category to Medical Admission Courses.
+- Remove it from HSC Academic Courses.
+
+IMPORTANT — DO NOT CHANGE ANYTHING ELSE
+
+- Do NOT modify, delete, recreate, or migrate the course.
+- Do NOT change the Course ID.
+- Do NOT change any existing course details, documents, materials, classes, exams, questions, results, images, settings, fees, coupons, or content.
+- Do NOT change, remove, reset, or recreate any Enrollment List.
+- Preserve all existing enrolled students and enrollment records exactly as they are.
+- Preserve all existing student-course relationships exactly as they are.
+- Do NOT modify enrollment status, enrollment date, payment data, or student data.
+- Do NOT create duplicate course/category records.
+- Do NOT change the design, layout, UI, or functionality of any other section.
+
+Data Integrity
+
+Use the existing course record and update only its category/category ID relationship in the database.
+
+After saving:
+
+- Special Medical Exam Batch must appear under Medical Admission Courses.
+- It must no longer appear under HSC Academic Courses.
+- All existing enrollment lists and course data must remain exactly unchanged.
+- Verify after refresh that only the category has changed.
+
+Scope: CATEGORY CHANGE ONLY. Nothing else.

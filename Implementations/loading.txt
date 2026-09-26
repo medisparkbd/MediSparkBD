@@ -1,0 +1,284 @@
+Loader UI Update:
+বর্তমান loading screen-এর circular progress indicator-এর মাঝখানে যে MediSpark logo/image আছে, সেটা সম্পূর্ণ remove করো। তার জায়গায় dynamic loading percentage দেখাও।
+Requirements:
+Center-এর logo/image আর থাকবে না।
+Circular progress ring-এর actual progress অনুযায়ী center-এ percentage দেখাবে: 0%, 1%, 2% ... 100%.
+Percentage dynamically update হবে এবং progress ring-এর সাথে perfectly synchronized থাকবে।
+Percentage text center aligned থাকবে এবং বড়, পরিষ্কার ও readable হবে।
+Existing circular progress ring-এর animation/design বজায় রাখো।
+Existing Loading... text এবং নিচের loading dots থাকলে সেগুলো unchanged রাখো।
+Fake/static 50% বা fixed percentage ব্যবহার করবে না; actual loading/progress state থেকেই percentage calculate করতে হবে।
+Loading সম্পূর্ণ হলে 100% দেখাবে এবং existing loader completion behavior অনুযায়ী screen transition করবে।
+Mobile ও desktop উভয় responsive layout-এ percentage perfectly centered থাকতে হবে।
+Existing MediSpark branding, colors, animation এবং অন্যান্য UI কোনোভাবেই অপ্রয়োজনে পরিবর্তন করবে না।
+যদি বর্তমানে loader শুধু animation-based হয় এবং real progress value না থাকে, তাহলে existing loading lifecycle-এর সাথে একটি progress state তৈরি করে সেটিকে ring animation-এর সাথে synchronize করো।
+কোনো existing functionality break করা যাবে না।
+
+Update the existing Course Control / Enrollment system to add a course-level Q&A access control.
+
+1. Add Q&A Control to Every Course
+
+Every course should have an individual:
+
+Q&A Access: ON / OFF
+
+toggle.
+
+This setting must be available for both:
+
+- Free Courses
+- Paid Courses
+
+Do not make Q&A access dependent only on whether the course is free or paid.
+
+---
+
+2. Q&A ON
+
+If a course has:
+
+Q&A Access = ON
+
+then students enrolled in that specific course can use the Q&A facility.
+
+This should work for:
+
+- Free-course students
+- Paid-course students
+
+Only students enrolled in that particular course should get access.
+
+---
+
+3. Q&A OFF
+
+If a course has:
+
+Q&A Access = OFF
+
+students enrolled in that course must not be able to use the Q&A facility.
+
+The Q&A section should either:
+
+- remain hidden for those students, or
+- show the existing appropriate restricted-access message.
+
+Do not affect Q&A access for students enrolled in other courses.
+
+---
+
+4. Course-specific Access
+
+Q&A permission must be checked against the student's actual enrolled course.
+
+Example:
+
+Free Course A
+
+- Q&A = ON
+
+→ Students enrolled in Free Course A can use Q&A.
+
+Free Course B
+
+- Q&A = OFF
+
+→ Students enrolled in Free Course B cannot use Q&A.
+
+Paid Course A
+
+- Q&A = ON
+
+→ Paid students can use Q&A.
+
+Paid Course B
+
+- Q&A = OFF
+
+→ Paid students cannot use Q&A.
+
+---
+
+5. Multiple Course Enrollment
+
+If a student is enrolled in multiple courses:
+
+- If at least one enrolled course has Q&A = ON, show Q&A access according to that course's available Q&A scope.
+- Do not grant access merely because the student has another unrelated course.
+
+The system must correctly identify which course the Q&A interaction belongs to.
+
+---
+
+6. Admin Control
+
+Add the Q&A toggle to the existing Course Control course-management interface.
+
+For each course, Admin should be able to:
+
+Q&A Access → ON / OFF
+
+Changing this setting should immediately control Q&A eligibility for students of that course.
+
+Do not create a separate duplicate course database.
+
+Use the existing course data.
+
+---
+
+7. Important
+
+Do not remove or break the existing Q&A system.
+
+Keep:
+
+- Existing Q&A subjects
+- Questions
+- Answers
+- Student interaction
+- Admin/Moderator Q&A control
+- Existing Q&A UI
+
+Only add course-wise eligibility/access control.
+
+Final Rule
+
+Course Q&A ON → Enrolled students of that course can use Q&A.
+
+Course Q&A OFF → Enrolled students of that course cannot use Q&A.
+
+This must work independently for every course, regardless of whether the course is Free or Paid.
+
+Update the existing Admin Panel → Material PDF Generator.
+
+IMPORTANT: The Main Material PDF Generator page must contain ONLY TWO main cards:
+
+MCQ PDF Generator
+
+CQ PDF Generator
+
+Do NOT create a separate “PDF Setup” card or third main card.
+
+Implement the MCQ PDF Generator as follows:
+
+MCQ Generator Interface
+
+Material Name input
+
+Large textarea/editor for pasting MCQs
+
+“Detect & Format” button
+
+Use the existing MCQ detection/parsing system if already available.
+
+Detect: 
+
+Question number
+
+Question text
+
+Options
+
+Correct answer, if available
+
+Topic, if available
+
+Arrange MCQs topic-wise when topic information is available.
+
+Preserve the original question content accurately.
+
+Do not unnecessarily modify the user's question text.
+
+Editable A4 Preview After “Detect & Format”, generate an editable A4 document preview.
+
+Everything visible in the preview must remain editable:
+
+Material title/name
+
+Topic name
+
+Question number
+
+Question text
+
+Options
+
+Answer
+
+Other generated text elements
+
+The preview should behave like a real document editor rather than a static image.
+
+Image Controls Allow the admin to:
+
+Upload/add images
+
+Move images
+
+Resize images
+
+Bring image to front
+
+Send image to back
+
+Delete image
+
+Replace image
+
+Images must remain correctly positioned in the final PDF.
+
+Logo Allow logo upload inside the PDF editor. When a logo is uploaded:
+
+Detect/remove unwanted background where possible.
+
+Use the resulting transparent logo in the PDF.
+
+Allow the admin to resize and reposition it.
+
+Watermark Watermark controls must be available inside the MCQ PDF workflow. Allow the admin to:
+
+Enable/disable watermark
+
+Change watermark text/logo
+
+Adjust opacity
+
+Adjust size
+
+Adjust position
+
+Apply watermark consistently across PDF pages
+
+Final PDF Add a “Generate PDF” button.
+
+The final PDF must be generated from the edited A4 preview. Any modification made in the preview must be reflected in the final PDF:
+
+Text edits
+
+Question number edits
+
+Topic edits
+
+Answer edits
+
+Image position/size
+
+Logo
+
+Watermark
+
+Page layout
+
+Do not generate the PDF from the original pasted text after editing. The final PDF must use the current edited document state.
+
+Responsive UI The generator and editor must work properly on:
+
+Desktop
+
+Tablet
+
+Mobile
+
+Keep the existing MediSpark Admin Panel visual language and components.
+
+Do not break any existing Material PDF Generator functionality that is already working. Only improve/reorganize the MCQ PDF Generator according to this specification.

@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AccessLoading } from "@/components/auth/AccessGuard";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import { useContentDnd } from "@/components/admin/useContentDnd";
 
 type Content = { id: string; title: string; contentType: string; videoUrl: string | null; fileUrl: string | null; durationMinutes: number };
 
@@ -55,6 +56,18 @@ export default function ChapterContentsPage({
     await load();
     return true;
   }
+
+  // Drag-and-drop (mouse + touch) + ↑ / ↓ persist the same sort_order —
+  // refresh and the student view keep the saved sequence.
+  const contentDnd = useContentDnd<Content>({
+    items: contents ?? [],
+    keyOf: (c) => c.id,
+    disabled: busy || contents === null,
+    onPreview: (next) => setContents(next),
+    onCommit: (next) => {
+      void post({ action: "reorder-contents", orderedIds: next.map((x) => x.id) }, "Reordered.");
+    },
+  });
 
   async function handleSave() {
     if (!form.title.trim()) { toast.showToast("error", "Title is required."); return; }
@@ -116,13 +129,30 @@ export default function ChapterContentsPage({
       {/* List */}
       <div className="mt-6">
         <h3 className="text-sm font-bold text-[#0b1e3a] admin-dark:text-white">Contents — {contents.length}</h3>
+        <p className="mt-1 text-xs text-slate-500 admin-dark:text-slate-400">Drag the handle or use ↑ ↓ — the order saves to the database{busy ? " · Saving…" : ""}.</p>
         {contents.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed border-ink/15 px-4 py-8 text-center text-sm text-slate-500 admin-dark:text-slate-400">No content yet. Add Class 1, Notes etc. above.</p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {contents.map((c, idx) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[#dbeafe] bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-4">
+          <ul ref={contentDnd.listRef} className="mt-3 space-y-2">
+            {contents.map((c, idx) => {
+              const handle = contentDnd.handleProps(idx);
+              const isDragging = contentDnd.dragIndex === idx;
+              return (
+              <li key={c.id} ref={contentDnd.rowRef(c.id)} className={`flex flex-wrap items-center gap-3 rounded-xl border border-[#dbeafe] bg-white admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-4${isDragging ? " z-10 border-primary-500/70 shadow-xl shadow-primary-900/20" : ""}`} style={isDragging ? { transition: "none" } : undefined}>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600/15 text-xs font-black text-primary-700 admin-dark:text-primary-400">{String(idx + 1).padStart(2, "0")}</span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Drag ${c.title} to reorder`}
+                  title="Drag to reorder"
+                  onPointerDown={(e) => handle.onPointerDown(e, idx)}
+                  onPointerMove={handle.onPointerMove}
+                  onPointerUp={handle.onPointerUp}
+                  onPointerCancel={handle.onPointerCancel}
+                  className="flex h-9 w-8 cursor-grab touch-none items-center justify-center rounded-lg text-base font-black text-slate-400 hover:bg-[#f1f5f9] hover:text-primary-600 active:cursor-grabbing admin-dark:text-slate-500"
+                >
+                  ⠿
+                </span>
                 <span className="flex-1 min-w-0">
                   <span className="block truncate text-sm font-bold text-[#0b1e3a] admin-dark:text-white">{c.title}</span>
                   <span className="text-xs text-slate-500 admin-dark:text-slate-400">{c.contentType} {c.durationMinutes > 0 ? `· ${c.durationMinutes} min` : ""}</span>
@@ -134,7 +164,8 @@ export default function ChapterContentsPage({
                   <button type="button" disabled={busy || idx === contents.length - 1} onClick={async () => { const ids = [...contents]; [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]; await post({ action: "reorder-contents", orderedIds: ids.map((x) => x.id) }, "Reordered."); }} className="flex h-7 w-7 items-center justify-center rounded-lg border border-ink/15 bg-white text-slate-600 disabled:opacity-30">↓</button>
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

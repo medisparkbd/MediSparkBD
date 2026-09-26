@@ -1,0 +1,23 @@
+First-time loading behavior completely remove করো।
+
+বর্তমানে অ্যাপের first-time load-এর সময় একটি loading screen দেখায়, যেখানে:
+
+- Logo দেখায়
+- Logo-এর নিচে loading-related text দেখায়
+- “Together” / “Together we achieve dream" …” ধরনের text/tagline দেখায়
+
+আমি চাই first-time loading-এর সময় এই loading screen একদমই না আসুক।
+
+Requirements:
+
+1. App প্রথমবার load হলেও কোনো separate loading screen দেখাবে না।
+2. Logo, loading text, “Together” বা অন্য কোনো loading-related লেখা দেখাবে না।
+3. সরাসরি মূল application UI/page render হবে।
+4. Existing loading functionality অন্য জায়গায় থাকলে সেটা নষ্ট করবে না।
+5. শুধু first-time/initial page load-এর loading screen behavior remove/disable করতে হবে।
+6. কোনো unnecessary UI, animation, delay বা blank screen add করবে না।
+7. Existing design এবং functionality অপরিবর্তিত রাখবে।
+8. Codebase inspect করে কোন component/state/conditional rendering থেকে এই first-time loading screen আসছে সেটা identify করে cleanভাবে fix করো।
+9. Fix করার পর নিশ্চিত করো যে refresh/reload বা নতুন session-এও initial loading screen আর render না হয়।
+
+শেষে কোন file এবং কোন logic পরিবর্তন করেছো সংক্ষেপে জানাও।

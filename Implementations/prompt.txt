@@ -1,0 +1,782 @@
+Update the existing Exam Card UI using the uploaded reference image as the exact and strict design reference.
+
+1. DESIGN — EXACT COPY OF THE REFERENCE
+
+The Exam Card must look exactly like the provided reference image.
+
+Do not redesign it.
+
+Do not simplify it.
+
+Do not add new visual elements.
+
+Do not remove existing visual elements.
+
+Do not change the visual hierarchy.
+
+Match the reference image as closely as possible, including:
+
+- Overall card shape
+- Card dimensions/proportions
+- Rounded corners
+- Dark/red premium theme
+- Border
+- Glow effects
+- Shadows
+- Internal spacing
+- Padding
+- Typography hierarchy
+- Font sizing
+- Font weight
+- Icon placement
+- Icon size
+- Status badge
+- Status indicator
+- Marks section
+- Time section
+- Divider
+- Exam participation time section
+- Date/time pills
+- Arrow between start and end time
+- Bottom action button
+- Button shape
+- Button size
+- Button position
+- Button typography
+- Button icon
+- All alignment and spacing
+
+The uploaded image is the source of truth for the visual design.
+
+Do not introduce a different card style.
+
+---
+
+2. DYNAMIC EXAM DATA
+
+Keep the existing exam data/functionality.
+
+The card should dynamically display the actual:
+
+- Exam Name
+- Total Marks
+- Exam Duration
+- Start Date & Time
+- End Date & Time
+
+Do not hardcode the example values from the reference image.
+
+The reference image is only for the design.
+
+---
+
+3. EXAM CARD STATUS FLOW
+
+The card has exactly 3 states:
+
+STATE 1 — UPCOMING
+
+When the current time is before the exam start time:
+
+Status badge:
+
+Upcoming Exam
+
+Bottom button:
+
+Coming Soon →
+
+The button must not allow the student to start the exam.
+
+The exam remains visible as an upcoming exam.
+
+---
+
+STATE 2 — LIVE
+
+When the current time is between the configured start time and end time:
+
+Status badge:
+
+Exam is Live
+
+Bottom button:
+
+Start Exam →
+
+The student can click Start Exam and participate in the exam.
+
+The existing exam-start functionality should be triggered.
+
+---
+
+STATE 3 — PRACTICE EXAM
+
+When the configured live exam period has ended:
+
+The exam automatically changes from Live to:
+
+Practice Exam
+
+Bottom button:
+
+Start Exam →
+
+The student can still click Start Exam and take the exam as a practice attempt.
+
+However:
+
+Practice Exam attempts must NOT be counted in the leaderboard/ranking.
+
+They must not affect:
+
+- Merit Position
+- Leaderboard ranking
+- Competitive ranking
+- Live exam ranking
+
+The student can still complete the practice exam normally and see their own result according to the existing result system.
+
+---
+
+4. STATUS FLOW
+
+The automatic status flow must be:
+
+Upcoming Exam → Exam is Live → Practice Exam
+
+Based on the actual configured exam start/end time.
+
+Do not require Admin to manually change these statuses.
+
+---
+
+5. IMPORTANT — PRACTICE EXAM
+
+Once the live exam period ends:
+
+- The exam becomes a Practice Exam.
+- Students can still access it.
+- Students can click Start Exam.
+- Students can complete the exam.
+- Their answers/results can be recorded normally.
+- But the attempt must NOT enter the leaderboard.
+- It must NOT generate a competitive merit/rank position.
+- It must NOT affect the original live exam leaderboard.
+
+Clearly distinguish the Practice Exam state from the original Live Exam state.
+
+---
+
+6. EXISTING FUNCTIONALITY
+
+Do not change unrelated exam functionality.
+
+Keep the existing:
+
+- Exam data source
+- Exam questions
+- Exam configuration
+- Start Exam flow
+- Existing authentication/access rules
+- Existing Public Exam / Course Exam distinction
+- Existing result system
+
+Only update the Exam Card design and its 3-state card behavior described above.
+
+---
+
+7. RESPONSIVE DESIGN
+
+The same reference design should remain visually consistent across:
+
+- Desktop
+- Laptop
+- iPad
+- Tablet
+- Mobile
+
+Maintain the same premium card appearance while responsively fitting the available screen width.
+
+Do not create a separate unrelated mobile card design.
+
+---
+
+FINAL REQUIREMENT
+
+The final Exam Card must visually match the uploaded reference image as closely as possible, while dynamically changing only the status/action according to the exam state:
+
+Upcoming → “Upcoming Exam” + “Coming Soon”
+
+Live → “Exam is Live” + “Start Exam”
+
+After Live Period → “Practice Exam” + “Start Exam”
+
+And:
+
+Practice Exam attempts must never appear on or affect the leaderboard/ranking.ng IDs:
+
+"123"
+
+while another part uses numeric IDs:
+
+123
+
+Inspect this carefully.
+
+For EVERY question:
+
+1. Get the actual question ID.
+2. Find the stored user answer for THAT exact question ID.
+3. Convert it to A/B/C/D only if necessary.
+4. Display the result.
+
+Do NOT reuse the previous question's answer.
+
+============================================================
+CHECK ARRAY INDEX BUG
+============================================================
+
+Inspect code such as:
+
+answers[0]
+
+answers[index]
+
+answers[questionIndex]
+
+answers.find(...)
+
+answers.map(...)
+
+Especially look for code where:
+
+index
+
+is always 0,
+
+or where the same answer object is reused for every question.
+
+Also inspect React rendering.
+
+A dangerous pattern could be:
+
+const selectedAnswer = answers[0];
+
+inside a `.map()` over questions.
+
+It must instead resolve the answer for the current question.
+
+============================================================
+CHECK OBJECT REFERENCE BUG
+============================================================
+
+Make sure the same answer object/reference is not being assigned
+to every question.
+
+For example, avoid logic conceptually equivalent to:
+
+const answer = {
+    questionId: question.id,
+    selected: "A"
+};
+
+and then reusing that same object for every question.
+
+Each question must resolve its own answer.
+
+============================================================
+CHECK FRONTEND ANSWER STATE
+============================================================
+
+Inspect the state used while the student is taking the exam.
+
+When the user selects:
+
+Q1 → B
+
+the state must contain something equivalent to:
+
+{
+  Q1_ID: "B"
+}
+
+When Q2 → C:
+
+{
+  Q1_ID: "B",
+  Q2_ID: "C"
+}
+
+When Q3 → D:
+
+{
+  Q1_ID: "B",
+  Q2_ID: "C",
+  Q3_ID: "D"
+}
+
+It must NOT become:
+
+{
+  answer: "A"
+}
+
+or a structure that loses the question ID.
+
+============================================================
+CHECK ANSWER SAVE API
+============================================================
+
+Inspect the API request sent when an answer is selected/saved.
+
+Verify the request contains BOTH:
+
+1. question identifier
+2. selected answer identifier/value
+
+Conceptually:
+
+{
+    questionId: "...",
+    selectedAnswer: "B"
+}
+
+or the equivalent format used by the project.
+
+Do not change the API contract unnecessarily.
+
+If the frontend sends the correct answer but backend stores A,
+fix the backend.
+
+If backend stores the correct answer but Answer Sheet displays A,
+fix Answer Sheet parsing.
+
+============================================================
+CHECK DATABASE / SUBMISSION DATA
+============================================================
+
+Inspect the actual stored submission data.
+
+Determine whether the database contains:
+
+question_id
+selected_answer
+
+or equivalent fields.
+
+For a sample submission, verify that different answers are actually
+stored differently.
+
+Example expected stored data:
+
+question_id = 101 → B
+question_id = 102 → C
+question_id = 103 → D
+question_id = 104 → A
+
+If the database already contains correct values, DO NOT modify the
+database schema unnecessarily.
+
+Fix the Answer Sheet retrieval/parsing layer.
+
+If the database itself stores A for every question, trace backward
+to the submission/save endpoint and fix the source.
+
+============================================================
+CHECK API RESPONSE
+============================================================
+
+Inspect the API response used by Answer Sheet.
+
+It should provide enough information to associate:
+
+question → user's selected answer
+
+For example:
+
+[
+  {
+    "questionId": 101,
+    "userAnswer": "B"
+  },
+  {
+    "questionId": 102,
+    "userAnswer": "C"
+  },
+  {
+    "questionId": 103,
+    "userAnswer": "D"
+  }
+]
+
+The exact schema can differ.
+
+Do not assume this exact JSON format.
+
+============================================================
+ANSWER SHEET RENDERING
+============================================================
+
+When rendering each question:
+
+DO NOT use one global answer value.
+
+Conceptually:
+
+questions.map(question => {
+    const userAnswer = getAnswerForQuestion(question.id);
+
+    return renderAnswer(question, userAnswer);
+});
+
+The lookup MUST use the current question.
+
+For example:
+
+Q1 → lookup(Q1.id)
+Q2 → lookup(Q2.id)
+Q3 → lookup(Q3.id)
+
+NOT:
+
+Q1 → answers[0]
+Q2 → answers[0]
+Q3 → answers[0]
+
+============================================================
+NO FALSE FALLBACK TO A
+============================================================
+
+This is critical.
+
+There must be NO logic where missing/invalid data automatically
+becomes A.
+
+Remove/fix patterns such as:
+
+answer || "A"
+
+answer ?? "A"
+
+defaultAnswer = "A"
+
+selectedAnswer = answer || "A"
+
+If an answer cannot be found:
+
+display:
+
+Not Answered
+
+or the project's existing unanswered label.
+
+Only display A when the actual stored answer is A.
+
+============================================================
+CORRECT ANSWER VS USER ANSWER
+============================================================
+
+Make sure these two values are NOT confused:
+
+correctAnswer
+userAnswer
+
+Example:
+
+User selected C
+Correct answer B
+
+Answer Sheet must show:
+
+Your Answer: C
+Correct Answer: B
+
+It must NOT replace userAnswer with correctAnswer.
+
+Also make sure the correct answer does not overwrite the user's
+selected answer during result processing.
+
+============================================================
+CHECK ANSWER NORMALIZATION
+============================================================
+
+If the application receives answers in different formats, create
+a single reliable normalization function.
+
+Conceptually:
+
+normalizeAnswer(value, question)
+
+should return:
+
+A
+B
+C
+D
+or null
+
+But determine the actual input format from the existing application.
+
+Examples that may need handling:
+
+"A"
+"B"
+"C"
+"D"
+
+0
+1
+2
+3
+
+1
+2
+3
+4
+
+option ID
+
+option text
+
+Do NOT support unnecessary formats if the application doesn't use
+them.
+
+The important thing is that the actual existing storage format is
+correctly interpreted.
+
+============================================================
+DO NOT BREAK CORRECT ANSWER DETECTION
+============================================================
+
+The existing correct-answer logic must continue working.
+
+After the fix, test:
+
+User Answer = A
+Correct = A
+→ Correct
+
+User Answer = B
+Correct = A
+→ Incorrect
+
+User Answer = C
+Correct = C
+→ Correct
+
+User Answer = D
+Correct = B
+→ Incorrect
+
+User Answer = null
+→ Unanswered
+
+============================================================
+TEST WITH A KNOWN SAMPLE
+============================================================
+
+Create/use a test submission with deliberately different answers:
+
+Q1 = B
+Q2 = D
+Q3 = A
+Q4 = C
+Q5 = B
+Q6 = D
+
+Expected Answer Sheet:
+
+1 → B
+2 → D
+3 → A
+4 → C
+5 → B
+6 → D
+
+If the Answer Sheet shows:
+
+A
+A
+A
+A
+A
+A
+
+the fix is NOT complete.
+
+============================================================
+IMPORTANT — DO NOT ONLY PATCH THE DISPLAY
+============================================================
+
+Do NOT simply make the UI display a different letter based on
+question index.
+
+For example, DO NOT implement:
+
+question 1 → A
+question 2 → B
+question 3 → C
+question 4 → D
+
+That would only hide the real bug.
+
+The displayed answer must come from the ACTUAL USER SUBMISSION.
+
+============================================================
+REGRESSION CHECK
+============================================================
+
+After fixing Answer Sheet:
+
+1. Start a new exam.
+2. Select different answers for different questions.
+3. Navigate between questions.
+4. Verify each answer remains attached to the correct question.
+5. Submit.
+6. Open Answer Sheet.
+7. Verify every answer exactly matches the user's selection.
+8. Verify unanswered questions remain unanswered.
+9. Verify correct-answer detection still works.
+10. Verify explanations remain associated with the correct question.
+
+Also verify that the previous bug is still fixed:
+
+Answering Q1 must NOT lock all other questions.
+
+============================================================
+FILES TO INSPECT
+============================================================
+
+Find the actual relevant files dynamically.
+
+Likely areas may include:
+
+- Exam page/component
+- Question component
+- Option component
+- Answer selection handler
+- Exam submission handler
+- Result page
+- Answer Sheet component
+- Result API
+- Exam submission API
+- Database query/repository
+- Answer normalization/helper
+- Type/interface/schema definitions
+
+Do NOT assume filenames.
+
+============================================================
+IMPLEMENTATION APPROACH
+============================================================
+
+1. Inspect project.
+2. Trace answer from selection → storage → result → Answer Sheet.
+3. Identify exact point where all answers become A.
+4. Fix root cause.
+5. Remove incorrect A fallback.
+6. Ensure question-specific answer lookup.
+7. Preserve existing UI.
+8. Preserve existing exam behavior.
+9. Run lint/typecheck/build if available.
+10. Test with mixed answers A/B/C/D.
+
+============================================================
+FINAL REPORT
+============================================================
+
+After completing the fix, report:
+
+1. Exact root cause
+2. Whether the problem was frontend, backend, database, API,
+   mapping, or Answer Sheet parsing
+3. Files changed
+4. How question-specific answer lookup now works
+5. How A/B/C/D mapping works
+6. How unanswered questions are handled
+7. Test case used
+8. Build/lint/test result
+
+Do not claim success without actually tracing the answer data flow.ve
+
+TEST 3:
+Select an answer for Question 2.
+
+Expected:
+Q1 → locked
+Q2 → locked
+Q3 → active
+
+TEST 4:
+Navigate to Question 3.
+
+Expected:
+All Question 3 options are selectable.
+
+TEST 5:
+Submit the exam.
+
+Expected result page:
+
+ Question text visible
+ A/B/C/D option text visible
+ Selected answer visible
+ Correct answer visible
+ Marks visible
+ Explanation visible when available
+ No blur on question/options
+ No invisible/transparent option text
+
+TEST 6:
+Result with unanswered question.
+
+Expected:
+
+Question text → visible
+All options → visible
+Your Answer → Not Answered
+Correct Answer → visible
+
+TEST 7:
+Result with incorrect answer.
+
+Expected:
+
+Question text → visible
+All options → visible
+User answer → visible
+Correct answer → visible
+Marks → visible
+Explanation → visible if available
+
+==================================================
+IMPLEMENTATION REQUIREMENT
+
+Before changing code:
+
+1. Inspect the project structure.
+2. Find the exam-taking component/page.
+3. Find the answer selection handler.
+4. Find the state controlling locked/answered questions.
+5. Find the result/review component.
+6. Find the CSS/Tailwind styles affecting question/options.
+7. Find the API/database response used by the result page.
+
+Then implement the minimum clean changes necessary.
+
+After implementation:
+
+ run the project's existing lint/type-check/build commands if available
+ fix any resulting errors
+ verify there are no console/runtime errors
+ verify that the answer lock is question-specific
+ verify result questions/options are readable
+
+Finally, provide a concise summary of:
+1. Root cause of Bug 1
+2. Root cause of Bug 2
+3. Files changed
+4. What was changed
+5. Tests/build performed
+

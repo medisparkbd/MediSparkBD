@@ -20,6 +20,10 @@ export default function CourseCard({ course }: { course: Course }) {
   const showCoupon = course.couponEnabled && discounted;
   const categoryLabel = course.category;
   const batchLabel = batchLabelText(course);
+  // Admin-managed Course Features (stored with the course, in admin order).
+  const features = Array.isArray(course.features)
+    ? course.features.filter((f) => typeof f === "string" && f.trim().length > 0)
+    : [];
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-dark-900 shadow-lg shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-primary-600/60 hover:shadow-primary-900/30">
@@ -51,25 +55,20 @@ export default function CourseCard({ course }: { course: Course }) {
           {course.name}
         </h3>
 
-        {/* Total Class | Total Exam — side by side */}
-        {(course.totalClasses !== undefined || course.totalExams !== undefined) && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 text-center">
-              <p className="text-sm font-extrabold text-heading">
-                {course.totalClasses ?? "—"}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">
-                Total Class
-              </p>
-            </div>
-            <div className="rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 text-center">
-              <p className="text-sm font-extrabold text-heading">
-                {course.totalExams ?? "—"}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">
-                Total Exam
-              </p>
-            </div>
+        {/* Course Features — dynamic floating pills (admin-managed order).
+            One line per pill, content-sized width, ~2 per row on wide cards. */}
+        {features.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {features.map((feature, index) => (
+              <span
+                key={`${index}-${feature}`}
+                className="w-auto max-w-full whitespace-nowrap rounded-full border border-ink/10 bg-dark-800 px-3.5 py-2 text-xs font-extrabold text-heading shadow-lg shadow-black/30"
+              >
+                <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+                  {feature}
+                </span>
+              </span>
+            ))}
           </div>
         )}
 

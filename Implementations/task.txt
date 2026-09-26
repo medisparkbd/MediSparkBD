@@ -1,0 +1,134 @@
+Update the existing Course Control / Enrollment system to add a course-level Q&A access control.
+
+1. Add Q&A Control to Every Course
+
+Every course should have an individual:
+
+Q&A Access: ON / OFF
+
+toggle.
+
+This setting must be available for both:
+
+- Free Courses
+- Paid Courses
+
+Do not make Q&A access dependent only on whether the course is free or paid.
+
+---
+
+2. Q&A ON
+
+If a course has:
+
+Q&A Access = ON
+
+then students enrolled in that specific course can use the Q&A facility.
+
+This should work for:
+
+- Free-course students
+- Paid-course students
+
+Only students enrolled in that particular course should get access.
+
+---
+
+3. Q&A OFF
+
+If a course has:
+
+Q&A Access = OFF
+
+students enrolled in that course must not be able to use the Q&A facility.
+
+The Q&A section should either:
+
+- remain hidden for those students, or
+- show the existing appropriate restricted-access message.
+
+Do not affect Q&A access for students enrolled in other courses.
+
+---
+
+4. Course-specific Access
+
+Q&A permission must be checked against the student's actual enrolled course.
+
+Example:
+
+Free Course A
+
+- Q&A = ON
+
+→ Students enrolled in Free Course A can use Q&A.
+
+Free Course B
+
+- Q&A = OFF
+
+→ Students enrolled in Free Course B cannot use Q&A.
+
+Paid Course A
+
+- Q&A = ON
+
+→ Paid students can use Q&A.
+
+Paid Course B
+
+- Q&A = OFF
+
+→ Paid students cannot use Q&A.
+
+---
+
+5. Multiple Course Enrollment
+
+If a student is enrolled in multiple courses:
+
+- If at least one enrolled course has Q&A = ON, show Q&A access according to that course's available Q&A scope.
+- Do not grant access merely because the student has another unrelated course.
+
+The system must correctly identify which course the Q&A interaction belongs to.
+
+---
+
+6. Admin Control
+
+Add the Q&A toggle to the existing Course Control course-management interface.
+
+For each course, Admin should be able to:
+
+Q&A Access → ON / OFF
+
+Changing this setting should immediately control Q&A eligibility for students of that course.
+
+Do not create a separate duplicate course database.
+
+Use the existing course data.
+
+---
+
+7. Important
+
+Do not remove or break the existing Q&A system.
+
+Keep:
+
+- Existing Q&A subjects
+- Questions
+- Answers
+- Student interaction
+- Admin/Moderator Q&A control
+- Existing Q&A UI
+
+Only add course-wise eligibility/access control.
+
+Final Rule
+
+Course Q&A ON → Enrolled students of that course can use Q&A.
+
+Course Q&A OFF → Enrolled students of that course cannot use Q&A.
+
+This must work independently for every course, regardless of whether the course is Free or Paid.

@@ -1,4 +1,5 @@
 import { exec, query, ensureColumn } from "@/lib/mysql";
+import { nextUnifiedPosition } from "@/lib/chapter-content-order";
 
 // ── Papers (১ম / ২য় পত্র) & Materials — Admin-managed content ────────────
 // Papers sit between a subject and its chapters (course_chapters.paper_id).
@@ -272,6 +273,7 @@ export async function saveMaterial(
   if (!fileUrl) throw new Error("Material file/URL is required.");
   if (input.id !== undefined && input.id !== null && input.id !== "") {
     // Try with question_count; fallback if column missing.
+    // Edits never disturb the manually arranged display order.
     try {
       await exec(
         `UPDATE course_materials SET title = ?, material_type = ?, file_url = ?, chapter_id = ?, question_count = ?
@@ -300,18 +302,31 @@ export async function saveMaterial(
     }
     return fetchMaterials(chapterId);
   }
+  // New materials append at the END of the chapter's unified
+  // Class · Exam · Materials sequence so the admin-arranged manual order
+  // is never disturbed by an add.
+  const next = await nextUnifiedPosition(chapterId).catch(() => 1);
   try {
     await exec(
-      `INSERT INTO course_materials (chapter_id, title, material_type, file_url, question_count)
-       VALUES (?, ?, ?, ?, ?)`,
-      [chapterId, title, asMaterialType(input.materialType), fileUrl, questionCount],
+      `INSERT INTO course_materials (chapter_id, title, material_type, file_url, question_count, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [chapterId, title, asMaterialType(input.materialType), fileUrl, questionCount, next],
     );
   } catch {
-    await exec(
-      `INSERT INTO course_materials (chapter_id, title, material_type, file_url)
-       VALUES (?, ?, ?, ?)`,
-      [chapterId, title, asMaterialType(input.materialType), fileUrl],
-    );
+    try {
+      await exec(
+        `INSERT INTO course_materials (chapter_id, title, material_type, file_url, sort_order)
+         VALUES (?, ?, ?, ?, ?)`,
+        [chapterId, title, asMaterialType(input.materialType), fileUrl, next],
+      );
+    } catch {
+      // Legacy database without the ordering column — keep the legacy insert.
+      await exec(
+        `INSERT INTO course_materials (chapter_id, title, material_type, file_url)
+         VALUES (?, ?, ?, ?)`,
+        [chapterId, title, asMaterialType(input.materialType), fileUrl],
+      );
+    }
   }
   return fetchMaterials(chapterId);
 }

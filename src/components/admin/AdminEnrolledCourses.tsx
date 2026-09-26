@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toVideoEmbed } from "@/lib/video-embed";
+import ChapterContentOrderManager from "@/components/admin/ChapterContentOrderManager";
 import type {
   ChapterItem,
   CourseLearningData,
@@ -696,6 +697,25 @@ export function AdminChapterView({
       <div className="flex">
         <AdminManageButton href={manageHrefFor(kind)} label={`Manage ${kindLabel}`} />
       </div>
+
+      {/* Manual cross-type order — one merged Class · Exam · Materials
+          sequence persisted to the database (sort_order). Students see the
+          same sequence; the per-type list below stays unchanged. */}
+      <section className="rounded-2xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 shadow-lg shadow-black/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4 admin-dark:border-zinc-800">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-extrabold text-[#0b1e3a] admin-dark:text-white">
+              Content Order
+            </h2>
+            <span className="rounded-full bg-primary-600/10 px-2.5 py-0.5 text-xs font-semibold text-primary-600 admin-dark:text-primary-300">
+              Class · Exam · Materials
+            </span>
+          </div>
+        </header>
+        <div className="px-5 py-4">
+          <ChapterContentOrderManager chapterId={chapterId} />
+        </div>
+      </section>
 
       {items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-10 text-center admin-dark:border-[#1e3a65] admin-dark:bg-[#112544]/60">
