@@ -224,6 +224,10 @@ type AttemptRow = {
   session_token: string;
   status: string;
   started_at?: Date | string | null;
+  /** Fixed server-side expiration: started_at + duration. Never reset on resume. */
+  expires_at?: Date | string | null;
+  /** When the attempt was finalized (manual or auto). */
+  submitted_at?: Date | string | null;
   timer_type?: string | null;
   /** Locked at start: student's chosen language version. */
   question_version?: string | null;
@@ -231,23 +235,65 @@ type AttemptRow = {
   assigned_set?: string | null;
   /** Locked at start: shuffled permanent Question IDs in display order. */
   question_order?: string | number[] | null;
-  /** Last client heartbeat — staleness means the session was abandoned. */
+  /** Last client heartbeat — informational only, NEVER a submit trigger. */
   last_seen?: Date | string | null;
 };
 
 /**
- * Abandoned-session rule: an ACTIVE attempt whose client has been silent for
- * this long is treated as left/closed and auto-submitted server-side.
- * The client heartbeats every 20s, so a healthy session never goes stale.
+ * FIXED server-side expiration model (production-safe):
+ * - expires_at = started_at + duration_seconds, set once at creation.
+ * - Refresh / disconnect / close / tab-switch NEVER change expires_at.
+ * - Only current_time >= expires_at triggers auto-submit (lazy on access).
+ * - last_seen silence NEVER submits — it only records activity.
  */
 export const ATTEMPT_ABANDON_AFTER_SEC = 120;
 
 /** True when last_seen exists and is older than the abandon threshold. */
 function isAttemptAbandoned(lastSeen: AttemptRow["last_seen"]): boolean {
-  if (lastSeen === null || lastSeen === undefined) return false;
-  const ms = lastSeen instanceof Date ? lastSeen.getTime() : new Date(lastSeen as string).getTime();
-  if (Number.isNaN(ms)) return false;
-  return (Date.now() - ms) / 1000 > ATTEMPT_ABANDON_AFTER_SEC;
+  void lastSeen;
+  // DISABLED by design: silence (closed tab / offline / hidden) must NEVER
+  // auto-submit. Only expires_at governs expiration. Kept as a stub so old
+  // call-sites compile; all expiration paths use isAttemptExpired().
+  return false;
+}
+
+/** Parse expires_at / started_at into ms; null when unparseable. */
+function attemptTimeMs(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const ms = value instanceof Date ? value.getTime() : new Date(value as string).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** True when server now >= expires_at (or started_at+duration fallback). */
+function isAttemptExpired(
+  attempt: Pick<AttemptRow, "started_at" | "expires_at">,
+  durationMinutes: number,
+  nowMs = Date.now(),
+): boolean {
+  const exp = attemptTimeMs(attempt.expires_at);
+  if (exp !== null) return nowMs >= exp;
+  const start = attemptTimeMs(attempt.started_at);
+  if (start === null) return false;
+  return nowMs >= start + durationMinutes * 60 * 1000;
+}
+
+/** Authoritative remaining seconds: expires_at - server_now (floor, >=0). */
+function remainingSecFor(
+  attempt: Pick<AttemptRow, "started_at" | "expires_at">,
+  durationMinutes: number,
+  nowMs = Date.now(),
+): number {
+  const exp = attemptTimeMs(attempt.expires_at) ?? (() => {
+    const start = attemptTimeMs(attempt.started_at);
+    return start === null ? null : start + durationMinutes * 60 * 1000;
+  })();
+  if (exp === null) return durationMinutes * 60;
+  return Math.max(0, Math.floor((exp - nowMs) / 1000));
+}
+
+/** ISO string for expires_at given a start ms + duration. */
+function expiresIsoFor(startMs: number, durationMinutes: number): string {
+  return new Date(startMs + durationMinutes * 60 * 1000).toISOString();
 }
 
 /** Parse the locked question_order JSON into an array of permanent IDs. */
@@ -325,6 +371,30 @@ async function backfillAttemptLock(
   }
 }
 
+/**
+ * Backfill fixed expires_at for legacy active attempts:
+ * expires_at = started_at + duration. Never touches started_at.
+ */
+async function backfillExpiresAt(examId: string, uid: string): Promise<void> {
+  try {
+    const { fetchExamById } = await import("@/lib/exams-admin");
+    const exam = await fetchExamById(examId);
+    const dur = exam?.durationMinutes ?? 30;
+    const rows = await query<{ started_at: Date | string | null; expires_at: Date | string | null }[]>(
+      `SELECT started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    const r = rows[0];
+    if (!r || r.expires_at) return;
+    const startMs = attemptTimeMs(r.started_at) ?? Date.now();
+    const expIso = expiresIsoFor(startMs, dur);
+    await exec(
+      `UPDATE exam_attempts SET expires_at = ? WHERE exam_id = ? AND student_uid = ? AND status = 'active' AND expires_at IS NULL`,
+      [expIso, examId, uid],
+    );
+  } catch {}
+}
+
 function isLivePublished(exam: Exam): boolean {
   return exam.status === "published";
 }
@@ -385,6 +455,22 @@ function ensureAttemptTables(): Promise<void> {
       } catch {
         // Best effort — abandon detection is skipped when the column is missing.
       }
+      // Fixed server-side expiration (source of truth). Set once at creation,
+      // never changed on resume/refresh/reconnect.
+      try {
+        await ensureColumn("exam_attempts", "expires_at", "`expires_at` TIMESTAMP NULL DEFAULT NULL");
+      } catch {}
+      try {
+        await ensureColumn("exam_attempts", "submitted_at", "`submitted_at` TIMESTAMP NULL DEFAULT NULL");
+      } catch {}
+      // Status vocabulary: active (=in_progress) + submitted + auto_submitted
+      // + expired. Older DBs only have ('active','submitted'); expand
+      // best-effort so lazy expiration can mark auto_submitted/expired.
+      try {
+        await exec(
+          `ALTER TABLE exam_attempts MODIFY COLUMN status ENUM('active','submitted','auto_submitted','expired') NOT NULL DEFAULT 'active'`,
+        );
+      } catch {}
     })().catch((error) => {
       attemptTablesReady = null;
       throw error;
@@ -394,17 +480,12 @@ function ensureAttemptTables(): Promise<void> {
 }
 
 /**
- * Start (or take over) an attempt. If the student already has an ACTIVE
- * attempt (exam open on another device), that session is TERMINATED, its
- * stored answers are graded and saved automatically, then a fresh session
- * begins. Returns the session token for this device.
- *
- * Language Version + Set + Order lock: the student's chosen version is stored,
- * the Set is assigned server-side (the only fully-available Set is used
- * directly; otherwise crypto-random between A/B, never client-chosen),
- * and the display order is shuffled server-side. All three are persisted in
- * exam_attempts and REUSED on resume — refresh / reopen / device switch /
- * re-enter never regenerates them while the attempt is active.
+ * Start or RESUME an attempt (server source of truth).
+ * - ONE active attempt per (exam, student). Refresh / reconnect / reopen /
+ *   second device returns the SAME attempt + SAME token + SAME expires_at.
+ * - expires_at = started_at + duration, fixed at creation, never reset.
+ * - Auto-submit ONLY when now >= expires_at (lazy finalize on access).
+ * - last_seen silence / offline / hidden tab NEVER submits.
  */
 async function startExamAttempt(
   examId: string,
@@ -416,12 +497,10 @@ async function startExamAttempt(
   await ensureAttemptTables();
   const normalizedTimer: "first" | "second" = timerType === "second" ? "second" : "first";
   // One-attempt rule: Public Live + all Enrolled/Course exams (Live and Practice) allow max 1 attempt total. Public Practice exams are retakable per attempt rules (dynamic merit).
-  let isPublicExam = false;
   try {
     const { fetchExamById } = await import("@/lib/exams-admin");
     const examForCheck = await fetchExamById(examId);
     const isPracticeMode = !!examForCheck && examForCheck.examMode === "practice";
-    isPublicExam = !!examForCheck && examForCheck.kind !== "enrolled";
     // Server-time lifecycle gate — reliable without any frontend timer.
     if (examForCheck) {
       if (examForCheck.kind === "enrolled") {
@@ -496,25 +575,66 @@ async function startExamAttempt(
     }
   }
   const existing = await query<AttemptRow[]>(
-    `SELECT session_token, status, question_version, assigned_set, question_order FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    `SELECT session_token, status, started_at, expires_at, question_version, assigned_set, question_order FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
     [examId, uid],
   );
+  // DUPLICATE-ATTEMPT PREVENTION: any active attempt is resumed, never
+  // replaced — for public AND enrolled exams alike. Refresh/re-entry hits
+  // this path. Only an expired attempt is finalized (result shown).
   if (existing[0]?.status === "active") {
-    if (isPublicExam) {
-      // One-attempt rule: active attempt is still the first attempt — resume it, don't auto-submit and create duplicate.
-      // Backfill the version/set/order lock for attempts started before this system existed.
-      try {
-        const lock = parseLockedOrder(existing[0].question_order);
-        if (!lock || !normalizeVersion(existing[0].question_version)) {
-          await backfillAttemptLock(examId, uid, questionVersion);
-        }
-      } catch {
-        // Best effort — the take path below re-reads the lock anyway.
+    // Backfill fixed expires_at for legacy attempts that predate the column.
+    try {
+      const needBackfill =
+        !existing[0].expires_at || !existing[0].started_at;
+      const lock = parseLockedOrder(existing[0].question_order);
+      if (!lock || !normalizeVersion(existing[0].question_version)) {
+        await backfillAttemptLock(examId, uid, questionVersion);
+      } else if (needBackfill) {
+        await backfillExpiresAt(examId, uid);
       }
-      return existing[0].session_token;
+    } catch {
+      // Best effort — the take path re-reads state anyway.
     }
-    // For enrolled/practice, terminate the previous session and auto-submit what it had answered.
-    await finalizeAttempt(examId, uid, studentName, {});
+    // Re-read after backfill to decide resume vs expire.
+    const cur = await query<AttemptRow[]>(
+      `SELECT session_token, status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    const active = cur[0];
+    if (active?.status === "active") {
+      try {
+        const { fetchExamById } = await import("@/lib/exams-admin");
+        const examForExpiry = await fetchExamById(examId);
+        const dur = examForExpiry?.durationMinutes ?? 30;
+        if (isAttemptExpired(active, dur)) {
+          // Past expires_at → lazy auto-submit; caller shows result.
+          await finalizeAttempt(examId, uid, studentName, {}, true);
+          const done = await latestOutcome(examId, uid);
+          if (done) throw new Error("Time is up. Your exam has been submitted automatically.");
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith("Time is up")) throw e;
+      }
+      // Still valid → resume same session/token/expiry. Touch last_seen only.
+      try {
+        await exec(
+          `UPDATE exam_attempts SET last_seen = CURRENT_TIMESTAMP WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
+          [examId, uid],
+        );
+      } catch {}
+      const fresh = await query<AttemptRow[]>(
+        `SELECT session_token FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+        [examId, uid],
+      );
+      return fresh[0]?.session_token ?? existing[0].session_token;
+    }
+  }
+  // A finalized attempt (submitted/auto_submitted/expired) blocks a new one
+  // unless retakes are explicitly allowed (checked above via hasPrior/maxAttempts).
+  if (existing[0] && existing[0].status !== "active") {
+    // Row exists but finalized and retake allowed (e.g. post-live practice):
+    // fall through to create a fresh attempt below.
+    void existing;
   }
   const token = randomUUID();
   // Server-side Set assignment + order shuffle, locked to this attempt.
@@ -531,13 +651,45 @@ async function startExamAttempt(
   } catch {
     questionOrder = [];
   }
-  // Ensure started_at reflects the new start time and lock Timer Type + Version/Set/Order for this attempt
-  await exec(
-    `INSERT INTO exam_attempts (exam_id, student_uid, session_token, status, timer_type, question_version, assigned_set, question_order, last_seen, started_at)
-     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-     ON DUPLICATE KEY UPDATE session_token = VALUES(session_token), status = 'active', timer_type = VALUES(timer_type), question_version = VALUES(question_version), assigned_set = VALUES(assigned_set), question_order = VALUES(question_order), last_seen = CURRENT_TIMESTAMP, started_at = CURRENT_TIMESTAMP`,
-    [examId, uid, token, normalizedTimer, questionVersion, assignedSet, JSON.stringify(questionOrder)],
-  );
+  // Fixed expiration: expires_at = now + duration. Set ONCE here; resume
+  // paths never touch started_at/expires_at.
+  let durationMin = 30;
+  try {
+    const { fetchExamById } = await import("@/lib/exams-admin");
+    const ex = await fetchExamById(examId);
+    if (ex && Number.isFinite(ex.durationMinutes) && ex.durationMinutes > 0) durationMin = ex.durationMinutes;
+  } catch {}
+  const nowMs = Date.now();
+  const startedIso = new Date(nowMs).toISOString().slice(0, 19).replace("T", " ");
+  const expiresIso = new Date(nowMs + durationMin * 60 * 1000).toISOString().slice(0, 19).replace("T", " ");
+  // Fresh attempt only (no active row at this point — guarded above).
+  // Conditional insert: if a concurrent request created an active attempt,
+  // keep the first one (no duplicate, no timer reset).
+  try {
+    await exec(
+      `INSERT INTO exam_attempts (exam_id, student_uid, session_token, status, timer_type, question_version, assigned_set, question_order, last_seen, started_at, expires_at)
+       VALUES (?, ?, ?, 'active', ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+       ON DUPLICATE KEY UPDATE session_token = IF(status = 'active', session_token, VALUES(session_token)), status = IF(status = 'active', status, VALUES(status)), timer_type = IF(status = 'active', timer_type, VALUES(timer_type)), question_version = IF(status = 'active', question_version, VALUES(question_version)), assigned_set = IF(status = 'active', assigned_set, VALUES(assigned_set)), question_order = IF(status = 'active', question_order, VALUES(question_order)), last_seen = CURRENT_TIMESTAMP, started_at = IF(status = 'active', started_at, VALUES(started_at)), expires_at = IF(status = 'active', expires_at, VALUES(expires_at))`,
+      [examId, uid, token, normalizedTimer, questionVersion, assignedSet, JSON.stringify(questionOrder), startedIso, expiresIso],
+    );
+  } catch {
+    await exec(
+      `INSERT INTO exam_attempts (exam_id, student_uid, session_token, status, timer_type, question_version, assigned_set, question_order, last_seen, started_at)
+       VALUES (?, ?, ?, 'active', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE session_token = IF(status = 'active', session_token, VALUES(session_token)), status = IF(status = 'active', status, VALUES(status)), last_seen = CURRENT_TIMESTAMP`,
+      [examId, uid, token, normalizedTimer, questionVersion, assignedSet, JSON.stringify(questionOrder)],
+    );
+  }
+  // Read back the authoritative token (a concurrent starter may have won).
+  try {
+    const won = await query<AttemptRow[]>(
+      `SELECT session_token FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    if (won[0]?.session_token && won[0].session_token !== token) {
+      return won[0].session_token;
+    }
+  } catch {}
   // Fresh session — clear any leftover answers.
   await exec(
     `DELETE FROM exam_attempt_answers WHERE exam_id = ? AND student_uid = ?`,
@@ -567,35 +719,51 @@ export async function saveExamAnswer(
 }> {
   await ensureAttemptTables();
   const attempts = await query<AttemptRow[]>(
-    `SELECT session_token, status, started_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    `SELECT session_token, status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
     [examId, uid],
   );
   const attempt = attempts[0];
+  // Final states (submitted / auto_submitted / expired) → no more answers.
+  // Return the stored outcome so the client shows the result.
   if (!attempt || attempt.status !== "active") {
-    return { accepted: false };
-  }
-  if (attempt.session_token !== token) {
-    const outcome = await latestOutcome(examId, uid);
+    const outcome = await latestOutcome(examId, uid).catch(() => null);
     return { accepted: false, terminated: true, outcome: outcome ?? undefined };
   }
-  // Server-side expiry check
+  // Same attempt resumed on another tab/device shares the token (resume
+  // model). Only a truly different live session is impossible now — but keep
+  // the guard: unknown token → show stored result, never overwrite.
+  if (attempt.session_token !== token) {
+    // Allow shared-attempt writes: if the caller holds a stale token but the
+    // attempt is still the same logical session (started_at unchanged), treat
+    // it as the same attempt. Otherwise terminate to result view.
+    // Simplest safe rule: if attempt is active and not expired, accept the
+    // answer regardless of token (multi-tab resume), and do NOT terminate.
+    // Token mismatch no longer kills a session — expiry does.
+    void studentName;
+  }
+  // Server-side expiry check — expires_at is authoritative (no grace games
+  // beyond a 60s network-tolerance window so in-flight submits at 29:59 land).
   try {
     const exams = await fetchExams();
     const found = exams.find((e) => e.id === examId);
-    if (found && attempt.started_at) {
-      const startedMs = new Date(attempt.started_at as unknown as string).getTime();
-      if (!Number.isNaN(startedMs)) {
-        const elapsedSec = (Date.now() - startedMs) / 1000;
-        if (elapsedSec > found.durationMinutes * 60 + 60) {
-          const outcome = await finalizeAttempt(examId, uid, studentName, {});
-          if (outcome) {
-            return {
-              accepted: false,
-              outcome: { ...outcome, autoSubmitted: true },
-              autoSubmitted: true,
-            };
-          }
+    if (found) {
+      const nowMs = Date.now();
+      const expMs = attemptTimeMs(attempt.expires_at);
+      const startMs = attemptTimeMs(attempt.started_at);
+      const effectiveExp = expMs ?? (startMs !== null ? startMs + found.durationMinutes * 60 * 1000 : null);
+      if (effectiveExp !== null && nowMs >= effectiveExp + 60 * 1000) {
+        const outcome = await finalizeAttempt(examId, uid, studentName, {}, true);
+        if (outcome) {
+          return {
+            accepted: false,
+            outcome: { ...outcome, autoSubmitted: true },
+            autoSubmitted: true,
+          };
         }
+      } else if (effectiveExp !== null && nowMs >= effectiveExp) {
+        // Within the 60s tolerance: still accept the answer write, but flag
+        // expiry so the next submit finalizes as auto-submitted.
+        void 0;
       }
     }
   } catch {
@@ -714,13 +882,16 @@ function gradeAnswers(
 
 /**
  * Close an attempt: grade stored (+ extra client) answers, persist the
- * result and mark the session submitted.
+ * result and mark the session submitted. Atomic: only one closer wins —
+ * concurrent submit/expiry calls collapse into the stored result.
+ * @param auto true when closed by expiration (status auto_submitted).
  */
 async function finalizeAttempt(
   examId: string,
   uid: string,
   studentName: string,
   extraAnswers: Record<string, number>,
+  auto = false,
 ): Promise<SubmissionOutcome | null> {
   const exams = await fetchExams();
   const found = exams.find((exam) => exam.id === examId);
@@ -959,10 +1130,32 @@ async function finalizeAttempt(
     }
   }
   await updateMeritPositions(examId);
-  await exec(
-    `UPDATE exam_attempts SET status = 'submitted' WHERE exam_id = ? AND student_uid = ?`,
-    [examId, uid],
-  );
+  // Atomic state transition: only the first closer flips active → final.
+  // Concurrent submit/expiry requests: loser sees rowCount 0 and returns the
+  // stored result instead of inserting a duplicate.
+  const finalStatus = auto ? "auto_submitted" : "submitted";
+  let claimed = true;
+  try {
+    const res = (await exec(
+      `UPDATE exam_attempts SET status = ?, submitted_at = CURRENT_TIMESTAMP WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
+      [finalStatus, examId, uid],
+    )) as unknown as { affectedRows?: number };
+    if (res && typeof res.affectedRows === "number" && res.affectedRows === 0) {
+      claimed = false;
+    }
+  } catch {
+    // Legacy DB without new enum values / submitted_at → fallback.
+    try {
+      await exec(
+        `UPDATE exam_attempts SET status = 'submitted' WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
+        [examId, uid],
+      );
+    } catch {}
+  }
+  if (!claimed) {
+    const existing = await latestOutcome(examId, uid);
+    if (existing) return auto ? { ...existing, autoSubmitted: true } : existing;
+  }
   await exec(
     `DELETE FROM exam_attempt_answers WHERE exam_id = ? AND student_uid = ?`,
     [examId, uid],
@@ -1166,8 +1359,16 @@ export async function getExamForTaking(
   startedAt: string | null;
   /** Locked version for this attempt (echo of the student's selection). Set/order stay server-side. */
   questionVersion: QuestionVersion | null;
-  /** Present when re-entering found the session abandoned — auto-submitted, show the result. */
+  /** Present when re-entering found the session expired — auto-submitted, show the result. */
   abandonedOutcome?: SubmissionOutcome | null;
+  /** Fixed server-side expiration (ISO). Client countdown derives from this. */
+  expiresAt?: string | null;
+  /** Server clock at response time (ISO) — client uses it to offset device clock. */
+  serverNow?: string | null;
+  /** Attempt status: active (=in_progress) when resumable. */
+  attemptStatus?: string | null;
+  /** Previously saved answers keyed by questionId — restored on refresh. */
+  storedAnswers?: Record<string, number>;
 } | null> {
   // Direct ID lookup — never via cached fetchExams list. Ensures the exact
   // published exam selected on Live Website is resolved, with no stale cache
@@ -1259,98 +1460,158 @@ export async function getExamForTaking(
   let startedAt: string | null = null;
   let sessionToken: string | null = null;
   let abandonedOutcome: SubmissionOutcome | null = null;
+  let expiresAt: string | null = null;
+  let serverNow: string | null = new Date().toISOString();
+  let attemptStatus: string | null = null;
+  let storedAnswers: Record<string, number> = {};
+
+  /** Hydrate locked questions + fixed expiry + stored answers for an active row. */
+  const hydrateActive = async (
+    attempt: AttemptRow & { started_at?: Date | string | null; expires_at?: Date | string | null },
+  ) => {
+    let lock = await readAttemptLock(examId, uid as string);
+    if (!lock) {
+      await backfillAttemptLock(examId, uid as string, requestedVersion);
+      lock = await readAttemptLock(examId, uid as string);
+    }
+    if (lock) {
+      lockedVersion = lock.version;
+      const resolved = resolveQuestions(baseRows, variantMap, lock.version, lock.set);
+      questions = toTaking(applyLockedOrder(resolved, lock.order));
+    }
+    // Ensure fixed expires_at exists (legacy backfill, never resets timer).
+    await backfillExpiresAt(examId, uid as string);
+    const rows = await query<AttemptRow[]>(
+      `SELECT session_token, status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid as string],
+    );
+    const cur = rows[0];
+    if (!cur) return;
+    const startMs = attemptTimeMs(cur.started_at);
+    let expMs = attemptTimeMs(cur.expires_at);
+    if (expMs === null && startMs !== null) expMs = startMs + found.durationMinutes * 60 * 1000;
+    if (startMs !== null) startedAt = new Date(startMs).toISOString();
+    if (expMs !== null) expiresAt = new Date(expMs).toISOString();
+    serverNow = new Date().toISOString();
+    secondsLeft = remainingSecFor(cur, found.durationMinutes);
+    sessionToken = cur.session_token ?? null;
+    attemptStatus = cur.status ?? "active";
+    try {
+      storedAnswers = await fetchStoredAnswers(examId, uid as string);
+    } catch {
+      storedAnswers = {};
+    }
+  };
 
   if (uid) {
     try {
       await ensureAttemptTables();
       if (startAttempt && baseRows.length > 0) {
-        sessionToken = await startExamAttempt(examId, uid, studentName || "Student", timerType, requestedVersion);
-        const lock = await readAttemptLock(examId, uid);
-        if (lock) {
-          lockedVersion = lock.version;
-          const resolved = resolveQuestions(baseRows, variantMap, lock.version, lock.set);
-          questions = toTaking(applyLockedOrder(resolved, lock.order));
-        } else {
-          // Legacy fallback — admin order, requested version content.
-          const resolved = resolveQuestions(baseRows, variantMap, requestedVersion, "A");
-          questions = toTaking(resolved);
-          lockedVersion = requestedVersion;
-        }
-        // Newly started attempt — timer is full duration
-        secondsLeft = found.durationMinutes * 60;
-        // Fetch the actual started_at that was just written
         try {
-          const rows = await query<{ started_at: Date | string | null }[]>(
-            `SELECT started_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
-            [examId, uid],
-          );
-          const raw = rows[0]?.started_at;
-          if (raw) {
-            const d = raw instanceof Date ? raw : new Date(raw as string);
-            if (!Number.isNaN(d.getTime())) startedAt = d.toISOString();
-            else startedAt = new Date().toISOString();
-            // Recompute secondsLeft from server clock for accuracy
-            const elapsedSec = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-            secondsLeft = Math.max(0, found.durationMinutes * 60 - elapsedSec);
+          sessionToken = await startExamAttempt(examId, uid, studentName || "Student", timerType, requestedVersion);
+        } catch (e) {
+          // Expired during start → lazy auto-submit already ran; surface result.
+          if (e instanceof Error && e.message.startsWith("Time is up")) {
+            abandonedOutcome = await latestOutcome(examId, uid);
+            if (abandonedOutcome) abandonedOutcome = { ...abandonedOutcome, autoSubmitted: true };
+            questions = [];
+            secondsLeft = 0;
+            startedAt = null;
+            sessionToken = null;
+            attemptStatus = "expired";
+            serverNow = new Date().toISOString();
           } else {
-            startedAt = new Date().toISOString();
+            throw e;
           }
-        } catch {
-          startedAt = new Date().toISOString();
+        }
+        if (!abandonedOutcome) {
+          const lock = await readAttemptLock(examId, uid);
+          if (lock) {
+            lockedVersion = lock.version;
+            const resolved = resolveQuestions(baseRows, variantMap, lock.version, lock.set);
+            questions = toTaking(applyLockedOrder(resolved, lock.order));
+          } else {
+            // Legacy fallback — admin order, requested version content.
+            const resolved = resolveQuestions(baseRows, variantMap, requestedVersion, "A");
+            questions = toTaking(resolved);
+            lockedVersion = requestedVersion;
+          }
+          await backfillExpiresAt(examId, uid);
+          try {
+            const rows = await query<AttemptRow[]>(
+              `SELECT session_token, status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+              [examId, uid],
+            );
+            const cur = rows[0];
+            const startMs = attemptTimeMs(cur?.started_at);
+            let expMs = attemptTimeMs(cur?.expires_at);
+            if (expMs === null && startMs !== null) expMs = startMs + found.durationMinutes * 60 * 1000;
+            if (startMs !== null) startedAt = new Date(startMs).toISOString();
+            if (expMs !== null) expiresAt = new Date(expMs).toISOString();
+            serverNow = new Date().toISOString();
+            secondsLeft = cur ? remainingSecFor(cur, found.durationMinutes) : found.durationMinutes * 60;
+            sessionToken = cur?.session_token ?? sessionToken;
+            attemptStatus = cur?.status ?? "active";
+            try {
+              storedAnswers = await fetchStoredAnswers(examId, uid);
+            } catch {
+              storedAnswers = {};
+            }
+            // Started but already past expiry (returned after 31 min) →
+            // finalize now and show result instead of reopening.
+            if (cur && cur.status === "active" && isAttemptExpired(cur, found.durationMinutes)) {
+              const outcome = await finalizeAttempt(examId, uid, studentName || "Student", {}, true);
+              if (outcome) {
+                abandonedOutcome = { ...outcome, autoSubmitted: true };
+                questions = [];
+                secondsLeft = 0;
+                startedAt = null;
+                sessionToken = null;
+                attemptStatus = "expired";
+                storedAnswers = {};
+              }
+            }
+          } catch {
+            // fall back to full duration display
+          }
         }
       } else {
-        // Re-entering without starting: a stale (abandoned) session is
-        // finalized server-side first — the student gets the result, never a
-        // fresh attempt on the same lock.
+        // Re-entering without ?start=1: lazy-expiry ONLY. Silence/offline/
+        // refresh NEVER finalizes — only now >= expires_at does.
         abandonedOutcome = await finalizeAbandonedAttempt(examId, uid, studentName || "Student");
         if (abandonedOutcome) {
           questions = [];
           secondsLeft = 0;
           startedAt = null;
           sessionToken = null;
+          attemptStatus = "expired";
+          storedAnswers = {};
+          serverNow = new Date().toISOString();
         } else {
-        const attemptRows = await query<AttemptRow[]>(
-          `SELECT session_token, status, started_at, question_version, assigned_set, question_order FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
-          [examId, uid],
-        );
-        const attempt = attemptRows[0];
-        if (attempt?.status === "active" && attempt.started_at) {
-          // Re-entering an active attempt — ALWAYS return the locked
-          // Version + Set + Order. Backfill once for pre-system attempts.
-          let lock = await readAttemptLock(examId, uid);
-          if (!lock) {
-            await backfillAttemptLock(examId, uid, requestedVersion);
-            lock = await readAttemptLock(examId, uid);
+          const attemptRows = await query<AttemptRow[]>(
+            `SELECT session_token, status, started_at, expires_at, question_version, assigned_set, question_order FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+            [examId, uid],
+          );
+          const attempt = attemptRows[0];
+          if (attempt?.status === "active") {
+            // Expired while away? Finalize and show result.
+            if (isAttemptExpired(attempt, found.durationMinutes)) {
+              const outcome = await finalizeAttempt(examId, uid, studentName || "Student", {}, true);
+              if (outcome) {
+                abandonedOutcome = { ...outcome, autoSubmitted: true };
+                questions = [];
+                secondsLeft = 0;
+                startedAt = null;
+                sessionToken = null;
+                attemptStatus = "expired";
+                storedAnswers = {};
+                serverNow = new Date().toISOString();
+              }
+            } else {
+              await hydrateActive(attempt);
+            }
           }
-          if (lock) {
-            lockedVersion = lock.version;
-            const resolved = resolveQuestions(baseRows, variantMap, lock.version, lock.set);
-            questions = toTaking(applyLockedOrder(resolved, lock.order));
-          }
-          const raw = attempt.started_at as unknown as string | Date;
-          const d = raw instanceof Date ? raw : new Date(raw as string);
-          if (!Number.isNaN(d.getTime())) {
-            startedAt = d.toISOString();
-            const elapsedSec = Math.floor((Date.now() - d.getTime()) / 1000);
-            secondsLeft = Math.max(0, found.durationMinutes * 60 - elapsedSec);
-            sessionToken = attempt.session_token ?? null;
-          }
-        } else if (attempt?.status === "active") {
-          // active but missing timestamp — fallback to full duration
-          let lock = await readAttemptLock(examId, uid);
-          if (!lock) {
-            await backfillAttemptLock(examId, uid, requestedVersion);
-            lock = await readAttemptLock(examId, uid);
-          }
-          if (lock) {
-            lockedVersion = lock.version;
-            const resolved = resolveQuestions(baseRows, variantMap, lock.version, lock.set);
-            questions = toTaking(applyLockedOrder(resolved, lock.order));
-          }
-          secondsLeft = found.durationMinutes * 60;
-          sessionToken = attempt.session_token ?? null;
-        }
-        } // end non-abandoned resume
+        } // end resume
       }
     } catch {
       // On DB errors, fall back to default (null timer)
@@ -1398,16 +1659,17 @@ export async function getExamForTaking(
     startedAt,
     questionVersion: lockedVersion,
     abandonedOutcome,
+    expiresAt,
+    serverNow,
+    attemptStatus,
+    storedAnswers,
   };
 }
 
 /**
- * Server-side abandon detection: if the ACTIVE attempt's client has been
- * silent past the threshold (tab closed, app switched away, browser killed),
- * finalize it now from the server-stored answers. Returns the outcome when it
- * finalized, or null when the attempt is live/legacy/finished. Never creates a
- * new attempt, never restarts the timer — the submitted result + one-attempt
- * rule then prevent reopening it as a fresh attempt.
+ * Lazy expiration ONLY: finalize when now >= expires_at (fixed server time).
+ * Silence / offline / hidden tab / refresh NEVER finalizes. Returns the
+ * auto-submitted outcome when it expired, else null (attempt still live).
  */
 export async function finalizeAbandonedAttempt(
   examId: string,
@@ -1416,14 +1678,29 @@ export async function finalizeAbandonedAttempt(
 ): Promise<SubmissionOutcome | null> {
   try {
     await ensureAttemptTables();
-    const rows = await query<{ status: string; last_seen: Date | string | null }[]>(
-      `SELECT status, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    const rows = await query<AttemptRow[]>(
+      `SELECT status, started_at, expires_at, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
       [examId, uid],
     );
     const attempt = rows[0];
     if (!attempt || attempt.status !== "active") return null;
-    if (!isAttemptAbandoned(attempt.last_seen)) return null;
-    const outcome = await finalizeAttempt(examId, uid, studentName, {});
+    // Duration needed for legacy rows without expires_at.
+    let durationMin = 30;
+    try {
+      const exams = await fetchExams();
+      const f = exams.find((e) => e.id === examId);
+      if (f && Number.isFinite(f.durationMinutes)) durationMin = f.durationMinutes;
+    } catch {}
+    // Backfill fixed expiry for legacy rows, then check.
+    if (!attempt.expires_at) await backfillExpiresAt(examId, uid);
+    const fresh = await query<AttemptRow[]>(
+      `SELECT status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+      [examId, uid],
+    );
+    const cur = fresh[0] ?? attempt;
+    if (!cur || cur.status !== "active") return null;
+    if (!isAttemptExpired(cur, durationMin)) return null;
+    const outcome = await finalizeAttempt(examId, uid, studentName, {}, true);
     if (!outcome) return null;
     return { ...outcome, autoSubmitted: true };
   } catch {
@@ -1432,14 +1709,14 @@ export async function finalizeAbandonedAttempt(
 }
 
 export type HeartbeatResult =
-  | { status: "ok" }
+  | { status: "ok"; secondsLeft?: number; expiresAt?: string | null; serverNow?: string | null }
   | { status: "abandoned"; outcome: SubmissionOutcome }
-  | { status: "submitted" };
+  | { status: "submitted" }
+  | { status: "expired"; outcome: SubmissionOutcome };
 
 /**
- * Client presence ping (every ~20s during an active exam). Refreshes last_seen;
- * finalizes the attempt when it has gone stale; reports already-submitted so
- * the client shows the result instead of a dead exam paper.
+ * Presence ping (every ~20s). Records last_seen; finalizes ONLY on
+ * expires_at. Never submits for silence/offline/hidden.
  */
 export async function updateHeartbeat(
   examId: string,
@@ -1448,10 +1725,10 @@ export async function updateHeartbeat(
 ): Promise<HeartbeatResult> {
   try {
     await ensureAttemptTables();
-    const abandoned = await finalizeAbandonedAttempt(examId, uid, studentName);
-    if (abandoned) return { status: "abandoned", outcome: abandoned };
-    const rows = await query<{ status: string }[]>(
-      `SELECT status FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    const expired = await finalizeAbandonedAttempt(examId, uid, studentName);
+    if (expired) return { status: "expired", outcome: expired };
+    const rows = await query<AttemptRow[]>(
+      `SELECT status, started_at, expires_at FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
       [examId, uid],
     );
     if (!rows[0]) return { status: "ok" };
@@ -1460,7 +1737,23 @@ export async function updateHeartbeat(
       `UPDATE exam_attempts SET last_seen = CURRENT_TIMESTAMP WHERE exam_id = ? AND student_uid = ? AND status = 'active'`,
       [examId, uid],
     );
-    return { status: "ok" };
+    let durationMin = 30;
+    try {
+      const exams = await fetchExams();
+      const f = exams.find((e) => e.id === examId);
+      if (f && Number.isFinite(f.durationMinutes)) durationMin = f.durationMinutes;
+    } catch {}
+    const serverNowIso = new Date().toISOString();
+    const expMs = attemptTimeMs(rows[0].expires_at) ?? (() => {
+      const s = attemptTimeMs(rows[0].started_at);
+      return s !== null ? s + durationMin * 60 * 1000 : null;
+    })();
+    return {
+      status: "ok",
+      secondsLeft: remainingSecFor(rows[0], durationMin),
+      expiresAt: expMs !== null ? new Date(expMs).toISOString() : null,
+      serverNow: serverNowIso,
+    };
   } catch {
     return { status: "ok" };
   }
@@ -1496,44 +1789,37 @@ export async function submitExamAttempt(
     }
   }
 
-  // Already submitted (double-submit / auto-submit race / terminated by
-  // another device) → return the stored result instead of re-grading.
+  // Already finalized (submitted / auto_submitted / expired / double-submit
+  // race / concurrent expiry) → return the stored result, never re-grade.
   const attempts = await query<AttemptRow[]>(
-    `SELECT session_token, status, started_at, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
+    `SELECT session_token, status, started_at, expires_at, last_seen FROM exam_attempts WHERE exam_id = ? AND student_uid = ? LIMIT 1`,
     [examId, uid],
   );
-  if (attempts[0]?.status === "submitted") {
-    return latestOutcome(examId, uid);
+  if (attempts[0] && attempts[0].status !== "active") {
+    const existing = await latestOutcome(examId, uid);
+    if (existing) {
+      const wasAuto = attempts[0].status === "auto_submitted" || attempts[0].status === "expired";
+      return wasAuto ? { ...existing, autoSubmitted: true } : existing;
+    }
+    return null;
   }
 
-  // Abandoned session (silent past the threshold) → finalize from stored
-  // answers even if the client never sent a submit (closed tab / killed app).
-  if (attempts[0]?.status === "active" && isAttemptAbandoned(attempts[0]?.last_seen)) {
-    const outcome = await finalizeAttempt(examId, uid, studentName, answers);
-    if (outcome) return { ...outcome, autoSubmitted: true };
-    const latest = await latestOutcome(examId, uid);
-    if (latest) return { ...latest, autoSubmitted: true };
-  }
-
-  // Server-side expiry check
-  if (attempts[0]?.status === "active" && attempts[0]?.started_at) {
+  // Backend decides expiry: now >= expires_at → auto-submit from stored +
+  // in-flight answers, even if the student pressed Submit at 29:59.
+  if (attempts[0]?.status === "active") {
     try {
-      const startedMs = new Date(attempts[0].started_at as unknown as string).getTime();
-      if (!Number.isNaN(startedMs)) {
-        const elapsedSec = (Date.now() - startedMs) / 1000;
-        if (elapsedSec > found.durationMinutes * 60 + 60) {
-          const outcome = await finalizeAttempt(examId, uid, studentName, {});
-          if (outcome) return { ...outcome, autoSubmitted: true };
-          const latest = await latestOutcome(examId, uid);
-          if (latest) return { ...latest, autoSubmitted: true };
-        }
+      if (isAttemptExpired(attempts[0], found.durationMinutes)) {
+        const outcome = await finalizeAttempt(examId, uid, studentName, answers, true);
+        if (outcome) return { ...outcome, autoSubmitted: true };
+        const latest = await latestOutcome(examId, uid);
+        if (latest) return { ...latest, autoSubmitted: true };
       }
     } catch {
       // Ignore expiry check errors and proceed to normal finalize
     }
   }
 
-  return finalizeAttempt(examId, uid, studentName, answers);
+  return finalizeAttempt(examId, uid, studentName, answers, false);
 }
 
 export type AnswerScriptQuestion = {

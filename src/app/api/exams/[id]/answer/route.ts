@@ -14,8 +14,9 @@ type AnswerBody = {
 /**
  * POST /api/exams/[id]/answer — store a single selection.
  * Server-enforced: the first selection for a question wins; changes are
- * rejected. If another device took over the session, the terminated
- * session's graded outcome is returned so this tab can show it.
+ * rejected. Expiry (now >= expires_at) auto-submits; silence/offline never
+ * does. Multi-tab resume shares the attempt — token mismatch no longer kills
+ * a live session.
  */
 export async function POST(
   request: NextRequest,
@@ -84,6 +85,9 @@ export async function POST(
     questionId,
     optionIndex,
   );
+  if (result.autoSubmitted && result.outcome) {
+    return NextResponse.json(result);
+  }
   if (!result.accepted && !result.terminated) {
     return NextResponse.json(
       { error: "This answer is locked — you can select an answer only once." },

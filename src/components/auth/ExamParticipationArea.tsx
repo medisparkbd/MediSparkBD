@@ -134,8 +134,6 @@ export default function ExamParticipationArea({
   const { user, profile, authLoading, profileLoading } = useAuth();
   const {
     setLocked: setExamLocked,
-    registerExitHandler,
-    unregisterExitHandler,
   } = useExamLock();
 
   const [loading, setLoading] = useState(true);
@@ -161,19 +159,79 @@ export default function ExamParticipationArea({
   const [beginning, setBeginning] = useState(false);
   const [script, setScript] = useState<ResultScript | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
+  // Connectivity (non-blocking): offline NEVER submits; answers queue as pending_sync.
+  const [online, setOnline] = useState<boolean>(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const [reconnecting, setReconnecting] = useState(false);
   const submittedRef = useRef(false);
   const answersRef = useRef<Record<number, number>>({});
   const tokenRef = useRef<string | null>(null);
-  // Marks an attempt that began in THIS tab. Survives reload in the same tab,
-  // so a refresh/reopen can never resume it — it is submitted instead.
-  const aliveKey = `exam-alive-${examId}`;
-  const reentryRef = useRef(false);
+  // Fixed server-side expiration (ms, server clock) + device-clock offset.
+  // Countdown display derives from expiresAt - (now + offset); refresh safe.
+  const expiresAtRef = useRef<number | null>(null);
+  const serverOffsetRef = useRef(0);
   const begunRef = useRef(false);
+  const pendingKey = `exam-pending-${examId}`;
 
-  const submit = useCallback(async () => {
+  /** Apply authoritative timing from the backend (expires_at + server_now). */
+  const applyServerTiming = useCallback(
+    (expiresAtIso?: string | null, serverNowIso?: string | null, fallbackSeconds?: number | null, durationMinutes?: number) => {
+      const now = Date.now();
+      if (expiresAtIso) {
+        const expMs = new Date(expiresAtIso).getTime();
+        if (!Number.isNaN(expMs)) {
+          expiresAtRef.current = expMs;
+          const srvMs = serverNowIso ? new Date(serverNowIso).getTime() : NaN;
+          serverOffsetRef.current = Number.isNaN(srvMs) ? 0 : srvMs - now;
+          const remaining = Math.max(0, Math.round((expMs - (Date.now() + serverOffsetRef.current)) / 1000));
+          setSecondsLeft(remaining);
+          return;
+        }
+      }
+      if (typeof fallbackSeconds === "number" && Number.isFinite(fallbackSeconds)) {
+        const rem = Math.max(0, Math.floor(fallbackSeconds));
+        // No absolute expiry — anchor a display-only expiry that the server
+        // still overrules on submit/heartbeat (never authoritative).
+        expiresAtRef.current = now + serverOffsetRef.current + rem * 1000;
+        setSecondsLeft(rem);
+        return;
+      }
+      if (durationMinutes) {
+        const rem = Math.max(60, durationMinutes * 60);
+        expiresAtRef.current = now + rem * 1000;
+        setSecondsLeft(rem);
+      }
+    },
+    [],
+  );
+
+  /** Load locally queued offline answers (pending_sync). */
+  const loadPending = useCallback((): Record<string, number> => {
+    try {
+      const raw = window.localStorage.getItem(pendingKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, [pendingKey]);
+
+  const savePending = useCallback(
+    (pending: Record<string, number>) => {
+      try {
+        if (Object.keys(pending).length === 0) window.localStorage.removeItem(pendingKey);
+        else window.localStorage.setItem(pendingKey, JSON.stringify(pending));
+      } catch {}
+    },
+    [pendingKey],
+  );
+
+  const submit = useCallback(async (isAuto = false) => {
     // Duplicate guard: one submission per attempt — concurrent triggers
-    // (button, timer expiry, exit handler, visibility hide, reentry) collapse
-    // into a single POST. The backend is idempotent on top of this.
+    // (button, timer expiry, heartbeat expiry) collapse into a single POST.
+    // The backend atomically decides manual vs auto via expires_at.
     if (submittedRef.current || !user) return;
     submittedRef.current = true;
     setSubmitting(true);
@@ -202,14 +260,11 @@ export default function ExamParticipationArea({
         | SubmissionOutcome
         | { error?: string };
       if ("score" in data) {
-        // Timer, answers and attempt are untouched — the attempt is finalized
-        // server-side and the existing result/Answer Card flow takes over.
+        // Backend is authoritative: it flags autoSubmitted when now >= expires_at.
         try {
-          window.sessionStorage.removeItem(aliveKey);
-        } catch {
-          // ignore
-        }
-        setOutcome(data);
+          window.localStorage.removeItem(pendingKey);
+        } catch {}
+        setOutcome(isAuto ? { ...data, autoSubmitted: true } : data);
       } else {
         // Allow retry on failure — the exam stays exactly as it was.
         submittedRef.current = false;
@@ -221,36 +276,116 @@ export default function ExamParticipationArea({
     } finally {
       setSubmitting(false);
     }
-  }, [examId, user, aliveKey]);
+  }, [examId, user, pendingKey]);
+
+  /**
+   * Push queued offline answers (pending_sync) to the server. Runs on
+   * reconnect/resume. Stale-safe: skips questions the server already holds.
+   */
+  const syncPending = useCallback(
+    async (sessionToken?: string | null) => {
+      const token = sessionToken ?? tokenRef.current;
+      if (!token || !user || submittedRef.current) return;
+      let pending: Record<string, number> = {};
+      try {
+        const raw = window.localStorage.getItem(pendingKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Record<string, number>;
+        if (!parsed || typeof parsed !== "object") return;
+        pending = parsed;
+      } catch {
+        return;
+      }
+      const keys = Object.keys(pending);
+      if (keys.length === 0) return;
+      setReconnecting(true);
+      try {
+        const authToken = await user.getIdToken();
+        const remaining: Record<string, number> = {};
+        for (const [qid, opt] of Object.entries(pending)) {
+          // Skip what the server already stored (answersRef = server state).
+          if (answersRef.current[Number(qid)] !== undefined && answersRef.current[Number(qid)] === opt) continue;
+          try {
+            const res = await fetch(`/api/exams/${encodeURIComponent(examId)}/answer`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({ token, questionId: Number(qid), optionIndex: opt }),
+            });
+            if (!res.ok && res.status !== 409) remaining[qid] = opt;
+            // 409 = server already holds an answer (locked) — drop from queue.
+          } catch {
+            remaining[qid] = opt;
+          }
+        }
+        savePending(remaining);
+        // Merge whatever synced into live state so counts stay correct.
+        if (Object.keys(remaining).length !== keys.length) {
+          const merged = { ...answersRef.current };
+          for (const [qid, opt] of Object.entries(pending)) {
+            if (remaining[qid] === undefined) merged[Number(qid)] = opt;
+          }
+          answersRef.current = merged;
+          setAnswers(merged);
+        }
+      } finally {
+        setReconnecting(false);
+      }
+    },
+    [examId, user, pendingKey, savePending],
+  );
   // Exam Fixed Header — measured offset so it stays directly below the normal website header
   const [headerOffset, setHeaderOffset] = useState(64);
 
   /**
-   * Activate a freshly created server session — locks in the start time and
-   * starts the countdown. Only called after rules are accepted.
-   * Timer is ONE per entire exam; scrolling never affects it.
+   * Activate a server session — resume or fresh start share this path.
+   * Restores previously saved answers; the countdown anchors to the fixed
+   * server-side expires_at (never reset on refresh).
    */
   const activateSession = useCallback(
-    (sessionToken: string | null, durationMinutes: number, serverSecondsLeft?: number | null) => {
+    (
+      sessionToken: string | null,
+      durationMinutes: number,
+      serverSecondsLeft?: number | null,
+      opts?: {
+        expiresAt?: string | null;
+        serverNow?: string | null;
+        storedAnswers?: Record<string, number> | null;
+      },
+    ) => {
       tokenRef.current = sessionToken;
-      answersRef.current = {};
-      setAnswers({});
+      const restored: Record<number, number> = {};
+      if (opts?.storedAnswers && typeof opts.storedAnswers === "object") {
+        for (const [k, v] of Object.entries(opts.storedAnswers)) {
+          const qid = Number(k);
+          if (Number.isInteger(qid) && Number.isInteger(v as number)) restored[qid] = v as number;
+        }
+      }
+      // Merge offline pending_sync answers (local wins only for questions the
+      // server has not yet stored — never overwrites newer server answers).
+      try {
+        const raw = window.localStorage.getItem(pendingKey);
+        if (raw) {
+          const pending = JSON.parse(raw) as Record<string, number>;
+          if (pending && typeof pending === "object") {
+            for (const [k, v] of Object.entries(pending)) {
+              const qid = Number(k);
+              if (Number.isInteger(qid) && restored[qid] === undefined && Number.isInteger(v)) {
+                restored[qid] = v;
+              }
+            }
+          }
+        }
+      } catch {}
+      answersRef.current = restored;
+      setAnswers(restored);
       setBegun(true);
       begunRef.current = true;
-      try {
-        window.sessionStorage.setItem(aliveKey, "1");
-      } catch {
-        // ignore — refresh detection is best-effort
-      }
-      // Fresh session — clear any leftover answers from a terminated one.
-      // Prefer server-computed remaining time when available (authoritative clock).
-      const initial =
-        typeof serverSecondsLeft === "number" && Number.isFinite(serverSecondsLeft)
-          ? Math.max(0, Math.floor(serverSecondsLeft))
-          : Math.max(60, durationMinutes * 60);
-      setSecondsLeft(initial);
+      applyServerTiming(opts?.expiresAt ?? null, opts?.serverNow ?? null, serverSecondsLeft ?? null, durationMinutes);
     },
-    [],
+    [applyServerTiming, pendingKey],
   );
 
   /**
@@ -280,6 +415,9 @@ export default function ExamParticipationArea({
         questions?: TakingQuestion[];
         questionVersion?: "bangla" | "english" | null;
         abandonedOutcome?: SubmissionOutcome | null;
+        expiresAt?: string | null;
+        serverNow?: string | null;
+        storedAnswers?: Record<string, number> | null;
         error?: string;
       };
       if (!response.ok) {
@@ -302,12 +440,13 @@ export default function ExamParticipationArea({
       } else {
         setQuestionVersion(version);
       }
-      activateSession(data.sessionToken ?? null, exam.durationMinutes, data.secondsLeft ?? null);
-      // Refresh/reopen in the same tab can never resume — submit at once.
-      if (reentryRef.current) {
-        reentryRef.current = false;
-        void submit();
-      }
+      // Resume path: ?start=1 returns the EXISTING attempt (same expires_at)
+      // with stored answers — never a fresh timer.
+      activateSession(data.sessionToken ?? null, exam.durationMinutes, data.secondsLeft ?? null, {
+        expiresAt: data.expiresAt ?? null,
+        serverNow: data.serverNow ?? null,
+        storedAnswers: data.storedAnswers ?? null,
+      });
     } catch {
       setLoadError("Failed to start the exam. Check your connection.");
     } finally {
@@ -315,15 +454,11 @@ export default function ExamParticipationArea({
     }
   }, [beginning, begun, exam, examId, user, activateSession, timerType, questionVersion, versionFromUrl, submit]);
 
-  // Load the exam meta + sanitized questions first (no answers, no attempt).
+  // Load exam meta. Resume model: a plain GET (no ?start=1) returns the
+  // EXISTING active attempt (same expires_at + stored answers) when one is
+  // live — refresh/reopen reconnects to it instead of restarting.
   useEffect(() => {
     if (authLoading || profileLoading || !user) return;
-    // Same-tab refresh/reopen with a live attempt → submit, never resume.
-    try {
-      reentryRef.current = window.sessionStorage.getItem(aliveKey) === "1";
-    } catch {
-      reentryRef.current = false;
-    }
     let cancelled = false;
     (async () => {
       try {
@@ -344,6 +479,13 @@ export default function ExamParticipationArea({
         const data = (await response.json().catch(() => ({}))) as {
           exam?: TakingExam;
           questions?: TakingQuestion[];
+          sessionToken?: string | null;
+          secondsLeft?: number | null;
+          expiresAt?: string | null;
+          serverNow?: string | null;
+          attemptStatus?: string | null;
+          storedAnswers?: Record<string, number> | null;
+          questionVersion?: "bangla" | "english" | null;
           abandonedOutcome?: SubmissionOutcome | null;
           error?: string;
         };
@@ -352,8 +494,8 @@ export default function ExamParticipationArea({
           setLoadError(data.error ?? "This exam is not available right now.");
           return;
         }
-        // Re-entering found the previous session abandoned — the backend
-        // auto-submitted it; show its result instead of a new attempt.
+        // Re-entering after expiry — the backend lazy-auto-submitted it;
+        // show its result instead of reopening.
         if (data.abandonedOutcome && "score" in data.abandonedOutcome) {
           if (!cancelled) {
             submittedRef.current = true;
@@ -365,6 +507,29 @@ export default function ExamParticipationArea({
         }
         setExam(data.exam);
         setQuestions(data.questions ?? []);
+        // Resume: an active attempt already exists (refresh / reopened tab /
+        // reconnected). Restore it directly — same expires_at, same answers.
+        // Skipped when autoBegin will start-or-resume below (it hydrates too).
+        if (
+          !autoBegin &&
+          data.sessionToken &&
+          data.attemptStatus === "active" &&
+          (data.secondsLeft ?? 0) >= 0 &&
+          (data.questions?.length ?? 0) > 0
+        ) {
+          if (data.questionVersion === "bangla" || data.questionVersion === "english") {
+            setQuestionVersion(data.questionVersion);
+          }
+          activateSession(data.sessionToken, data.exam.durationMinutes, data.secondsLeft ?? null, {
+            expiresAt: data.expiresAt ?? null,
+            serverNow: data.serverNow ?? null,
+            storedAnswers: data.storedAnswers ?? null,
+          });
+          // Sync any offline pending_sync answers now that we're back.
+          void syncPending(data.sessionToken);
+          if (!cancelled) setLoading(false);
+          return;
+        }
         // Strict one-attempt: check if already has completed attempt for this public exam.
         // Post-live Practice phase is exempt — past the End Time every attempt
         // is an unranked practice attempt, so prior live attempts never block
@@ -418,7 +583,7 @@ export default function ExamParticipationArea({
             );
             const startData = (await startResponse
               .json()
-              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; questions?: TakingQuestion[]; questionVersion?: "bangla" | "english" | null; abandonedOutcome?: SubmissionOutcome | null; error?: string; alreadyAttempted?: boolean };
+              .catch(() => ({}))) as { sessionToken?: string | null; secondsLeft?: number | null; questions?: TakingQuestion[]; questionVersion?: "bangla" | "english" | null; expiresAt?: string | null; serverNow?: string | null; storedAnswers?: Record<string, number> | null; abandonedOutcome?: SubmissionOutcome | null; error?: string; alreadyAttempted?: boolean };
             if (cancelled) return;
             if (startData.abandonedOutcome && "score" in startData.abandonedOutcome) {
               submittedRef.current = true;
@@ -440,12 +605,13 @@ export default function ExamParticipationArea({
                 startData.sessionToken ?? null,
                 data.exam.durationMinutes,
                 startData.secondsLeft ?? null,
+                {
+                  expiresAt: startData.expiresAt ?? null,
+                  serverNow: startData.serverNow ?? null,
+                  storedAnswers: startData.storedAnswers ?? null,
+                },
               );
-              // Refresh/reopen in the same tab can never resume — submit at once.
-              if (!cancelled && reentryRef.current) {
-                reentryRef.current = false;
-                void submit();
-              }
+              void syncPending(startData.sessionToken ?? null);
             } else if (startResponse.status === 403 && (startData as { alreadyAttempted?: boolean }).alreadyAttempted) {
               // Backend enforced one-attempt — show View Result
               setAlreadyAttempted(true);
@@ -477,20 +643,7 @@ export default function ExamParticipationArea({
     return () => {
       cancelled = true;
     };
-  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl, submit]);
-
-  // Attempt over (result shown or session terminated elsewhere) — the tab
-  // no longer hosts a live attempt; a reload from here starts clean.
-  useEffect(() => {
-    if (outcome || terminatedNotice) {
-      try {
-        window.sessionStorage.removeItem(aliveKey);
-      } catch {
-        // ignore
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outcome, terminatedNotice]);
+  }, [authLoading, profileLoading, user, examId, autoBegin, activateSession, timerType, versionFromUrl, syncPending]);
 
   // ── Exam Navigation Lock: hide BottomNav + block navigation during active attempt ──
   // Also locked while the begin=1 flow is preparing the paper, so no exam
@@ -502,41 +655,48 @@ export default function ExamParticipationArea({
     return () => setExamLocked(false);
   }, [begun, outcome, terminatedNotice, alreadyAttempted, autoBegin, loading, setExamLocked]);
 
-  // Register auto-submit as the exit handler for the confirmation modal.
-  // Returned promise is awaited by confirmExit so submission/session
-  // cleanup completes before navigating to Home.
+  // Online / offline tracking (non-blocking banner; offline never submits).
   useEffect(() => {
-    const locked = begun && !outcome && !terminatedNotice && !alreadyAttempted;
-    if (locked) {
-      registerExitHandler(() => submit());
-    } else {
-      unregisterExitHandler();
-    }
-    return () => unregisterExitHandler();
-  }, [
-    begun,
-    outcome,
-    terminatedNotice,
-    alreadyAttempted,
-    submit,
-    registerExitHandler,
-    unregisterExitHandler,
-  ]);
+    const update = () => {
+      const isOnline = navigator.onLine;
+      setOnline(isOnline);
+      if (isOnline) void syncPending();
+    };
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, [syncPending]);
 
-  // Countdown + auto-submit when time runs out. The timer only exists once
-  // the attempt has actually begun (rules accepted).
+  // Countdown display from the FIXED server-side expires_at.
+  // remaining = expires_at - (now + serverOffset). Refresh-safe: reload
+  // re-fetches expires_at, so the timer continues from the original expiry.
+  // Auto-submit ONLY at 00:00 (actual expiry) — never on hide/offline/close.
   useEffect(() => {
-    if (secondsLeft === null || outcome || terminatedNotice) return;
-    if (secondsLeft <= 0) {
-      void submit();
+    if (!begun || outcome || terminatedNotice) return;
+    if (secondsLeft !== null && secondsLeft <= 0) {
+      void submit(true);
       return;
     }
-    const timer = setTimeout(
-      () => setSecondsLeft((value) => (value ?? 1) - 1),
-      1000,
-    );
-    return () => clearTimeout(timer);
-  }, [secondsLeft, outcome, terminatedNotice, submit]);
+    const iv = setInterval(() => {
+      if (expiresAtRef.current !== null) {
+        const remaining = Math.max(
+          0,
+          Math.round((expiresAtRef.current - (Date.now() + serverOffsetRef.current)) / 1000),
+        );
+        setSecondsLeft((prev) => (prev === remaining ? prev : remaining));
+        if (remaining <= 0) {
+          clearInterval(iv);
+          void submit(true);
+        }
+      }
+    }, 1000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [begun, outcome, terminatedNotice, submit]);
 
   // Exam Fixed Header positioning — keep it directly below the normal website header (sticky Navbar).
   // Measures the live header height so the sticky exam header sticks at the correct offset and never overlaps the Navbar.
@@ -565,67 +725,29 @@ export default function ExamParticipationArea({
     };
   }, [begun, outcome, terminatedNotice]);
 
-  // Close/leave protection for an active exam.
-  // - beforeunload ONLY warns ("If you close this tab, your exam will be
-  //   automatically submitted.") — it never submits, so cancelling the dialog
-  //   leaves the attempt fully intact (timer, answers, session untouched).
-  // - pagehide (the tab is really going away) sends the answers with
-  //   keepalive so the backend finalizes the attempt reliably.
+  // Close/leave protection: warn only — NEVER submit on close/hide.
+  // Refresh / close / tab-switch keeps the server attempt alive; the student
+  // resumes from the fixed expires_at on return. Answers are already stored
+  // per-question, so nothing is lost.
   useEffect(() => {
     const active = begun && !outcome && !terminatedNotice && !alreadyAttempted;
-    if (!active || !user) return;
-    const currentUser = user;
-    const warningText =
-      "If you close this tab, your exam will be automatically submitted.";
+    if (!active) return;
+    const warningText = "Your exam is in progress. You can safely leave — your answers are saved and the timer continues from the server.";
     function onBeforeUnload(e: BeforeUnloadEvent) {
       if (submittedRef.current) return;
       e.preventDefault();
-      // Browsers show their own generic prompt, but returnValue is required.
       e.returnValue = warningText;
       return warningText;
     }
-    function postAnswersKeepalive() {
-      try {
-        const answered = answersRef.current;
-        const body = JSON.stringify({
-          answers: Object.fromEntries(
-            Object.entries(answered).map(([key, value]) => [String(key), value]),
-          ),
-        });
-        void currentUser.getIdToken().then((authToken) => {
-          // keepalive lets the request finish even as the page unloads.
-          void fetch(`/api/exams/${encodeURIComponent(examId)}/submit`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-            },
-            body,
-            keepalive: true,
-          }).catch(() => undefined);
-        });
-      } catch {
-        // Best effort — the server-side stored answers remain authoritative.
-      }
-    }
-    function onPageHide() {
-      // Only when the page is actually unloading (leave confirmed).
-      if (submittedRef.current) return;
-      submittedRef.current = true;
-      postAnswersKeepalive();
-    }
     window.addEventListener("beforeunload", onBeforeUnload);
-    window.addEventListener("pagehide", onPageHide);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      window.removeEventListener("pagehide", onPageHide);
     };
-  }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted]);
+  }, [begun, outcome, terminatedNotice, alreadyAttempted]);
 
-  // Presence heartbeat (every 20s) while the exam is active. Keeps the
-  // server-side session alive; if the backend reports the session ended
-  // elsewhere (abandoned / submitted / taken over), the result is shown
-  // instead of a dead exam paper. Never submits from the client on hide.
+  // Presence heartbeat (every 20s) + revalidate on tab-visible.
+  // Records last_seen; surfaces expiry (now >= expires_at) as the result.
+  // Silence/offline/hidden NEVER submits — the next beat just retries.
   useEffect(() => {
     const active = begun && !outcome && !terminatedNotice && !alreadyAttempted;
     if (!active || !user) return;
@@ -661,19 +783,37 @@ export default function ExamParticipationArea({
           cache: "no-store",
         });
         const data = (await res.json().catch(() => ({}))) as {
-          status?: "ok" | "abandoned" | "submitted";
+          status?: "ok" | "abandoned" | "submitted" | "expired";
           outcome?: SubmissionOutcome;
+          secondsLeft?: number | null;
+          expiresAt?: string | null;
+          serverNow?: string | null;
         };
         if (stopped || submittedRef.current) return;
-        if (data.status === "abandoned" && data.outcome && "score" in data.outcome) {
-          // Server finalized the abandoned session — show its result card.
+        if ((data.status === "abandoned" || data.status === "expired") && data.outcome && "score" in data.outcome) {
+          // Server reached expires_at while we were away — show result.
           submittedRef.current = true;
           setOutcome({ ...data.outcome, autoSubmitted: true });
         } else if (data.status === "submitted") {
-          // Attempt ended elsewhere (keepalive won, another device, expiry).
           submittedRef.current = true;
           const shown = await pullStoredResult();
           if (!shown) submittedRef.current = false; // result not ready yet — stay on exam
+        } else if (data.status === "ok") {
+          // Re-anchor the display timer to the authoritative expiry
+          // (corrects drift after sleep/offline without resetting anything).
+          if (data.expiresAt) {
+            const expMs = new Date(data.expiresAt).getTime();
+            if (!Number.isNaN(expMs)) {
+              expiresAtRef.current = expMs;
+              const srvMs = data.serverNow ? new Date(data.serverNow).getTime() : NaN;
+              if (!Number.isNaN(srvMs)) serverOffsetRef.current = srvMs - Date.now();
+              const remaining = Math.max(0, Math.round((expMs - (Date.now() + serverOffsetRef.current)) / 1000));
+              setSecondsLeft(remaining);
+              if (remaining <= 0) void submit(true);
+            }
+          }
+          // Back online with queued answers → push them now.
+          void syncPending();
         }
       } catch {
         // Offline — stay on the exam; the next beat retries.
@@ -681,28 +821,17 @@ export default function ExamParticipationArea({
     };
     void beat();
     const iv = setInterval(() => void beat(), 20000);
-    const onVisibility = () => void beat(); // revalidate on return; stamp presence on hide
+    const onVisibility = () => {
+      // Return-to-tab: revalidate expiry + resync — NEVER submit on hide.
+      if (document.visibilityState === "visible") void beat();
+    };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       stopped = true;
       clearInterval(iv);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted]);
-
-  // Tab/app switch → immediate auto-submit. Hidden means the student left
-  // the exam (another tab, another app, minimized, screen locked) — the
-  // attempt is finalized at once from saved + local answers. Single-submit
-  // guarded (submit() collapses races); pagehide keepalive stays as backup.
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState !== "hidden") return;
-      if (!begunRef.current || submittedRef.current) return;
-      void submit();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [submit]);
+  }, [examId, user, begun, outcome, terminatedNotice, alreadyAttempted, submit, syncPending]);
 
   /** Select an answer — allowed only once per question, no changing later. */
   async function chooseOption(question: TakingQuestion, optionIndex: number) {
@@ -716,8 +845,14 @@ export default function ExamParticipationArea({
     answersRef.current = next;
     setAnswers(next);
 
-    // Server-side enforcement + storage.
+    // Server-side enforcement + storage. Offline → queue as pending_sync.
     if (tokenRef.current && user) {
+      // Mark pending immediately so a mid-request disconnect can't lose it.
+      try {
+        const pending = loadPending();
+        pending[String(question.id)] = optionIndex;
+        savePending(pending);
+      } catch {}
       try {
         const authToken = await user.getIdToken();
         const response = await fetch(
@@ -738,20 +873,43 @@ export default function ExamParticipationArea({
         const data = (await response.json().catch(() => ({}))) as {
           accepted?: boolean;
           terminated?: boolean;
+          autoSubmitted?: boolean;
           outcome?: SubmissionOutcome;
           error?: string;
         };
+        if (data.autoSubmitted && data.outcome) {
+          // Hit expires_at mid-answer — show the auto-submitted result.
+          submittedRef.current = true;
+          setOutcome({ ...data.outcome, autoSubmitted: true });
+          return;
+        }
+        if (response.ok || response.status === 409) {
+          // Stored (or already locked server-side) → clear from queue.
+          try {
+            const pending = loadPending();
+            delete pending[String(question.id)];
+            savePending(pending);
+          } catch {}
+        }
         if (data.terminated && data.outcome) {
-          // The exam was started on another device — this session was
-          // terminated and auto-submitted.
+          // Attempt already finalized elsewhere — show its result.
           submittedRef.current = true;
           setTerminatedNotice(true);
           setOutcome(data.outcome);
           return;
         }
       } catch {
-        // Offline answer is kept locally; the final submit still carries it.
+        // Offline: answer stays in answersRef + pending_sync queue; the final
+        // submit and syncPending() carry it when the connection returns.
       }
+    } else {
+      // No session token yet (shouldn't happen mid-exam) — keep locally and
+      // queue for sync.
+      try {
+        const pending = loadPending();
+        pending[String(question.id)] = optionIndex;
+        savePending(pending);
+      } catch {}
     }
   }
 
@@ -973,6 +1131,11 @@ export default function ExamParticipationArea({
             This exam was started on another device — this session was submitted automatically.
           </p>
         )}
+        {outcome.autoSubmitted && (
+          <p className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-center text-sm font-semibold text-sky-300">
+            Time is up. Your exam has been submitted automatically.
+          </p>
+        )}
 
         {/* Result Card */}
         <div className="mx-auto mt-4 max-w-2xl rounded-2xl border border-ink/10 bg-dark-900 p-5 sm:p-6">
@@ -1177,6 +1340,28 @@ export default function ExamParticipationArea({
 
   return (
     <div className="space-y-4">
+      {/* Connection status — non-blocking; offline NEVER submits. */}
+      {!online && begun && !outcome && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-center text-xs font-bold text-amber-300"
+        >
+          ⚠ Internet connection lost. Your exam has not been submitted. Reconnect to continue — your answers are saved.
+        </div>
+      )}
+      {online && reconnecting && begun && !outcome && (
+        <div
+          role="status"
+          className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-center text-xs font-bold text-sky-300"
+        >
+          Reconnecting… syncing your answers.
+        </div>
+      )}
+      {online && begun && !outcome && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-1.5 text-center text-[11px] font-bold text-emerald-300">
+          ✓ Connected — timer follows the server (refresh-safe).
+        </div>
+      )}
       {/* Exam Fixed Header — separate sticky header directly below the normal website header.
           Must remain permanently visible while scrolling: uses sticky with dynamic top (Navbar height).
           Placed OUTSIDE the scrollable question-paper container, questions scroll underneath.
@@ -1336,7 +1521,7 @@ export default function ExamParticipationArea({
               onClick={() => {
                 setSubmitError(null);
                 if (window.confirm("Are you sure you want to submit the exam?")) {
-                  void submit();
+                  void submit(false);
                 }
               }}
               className="w-full rounded-xl bg-emerald-600 px-8 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"

@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/exams/[id]/heartbeat — client presence ping during an active exam.
- * Refreshes last_seen; auto-finalizes the attempt when the session has gone
- * stale (tab closed / app switched away); reports already-submitted sessions.
+ * Records last_seen; finalizes ONLY when now >= server-side expires_at.
+ * Silence / offline / hidden tab NEVER submits.
  */
 export async function POST(
   request: NextRequest,

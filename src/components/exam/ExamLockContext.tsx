@@ -95,7 +95,7 @@ function ExamExitModal({
           Are you sure you want to exit the exam?
         </h2>
         <p className="mt-2 text-center text-sm leading-relaxed text-neutral-400">
-          If you want to exit the exam, your exam will be automatically submitted.
+          You can safely leave — your answers are saved and the exam timer keeps running on the server. Return before time expires to resume.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -110,7 +110,7 @@ function ExamExitModal({
             onClick={onExit}
             className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-extrabold text-red-300 transition hover:bg-red-500/20 active:scale-[0.98]"
           >
-            Exit &amp; Submit Exam
+            Exit (Resume Later)
           </button>
         </div>
       </div>
@@ -162,11 +162,11 @@ export function ExamLockProvider({ children }: { children: React.ReactNode }) {
       setPendingAction(null);
       if (handler) {
         try {
-          // Await the existing exam-exit process (auto-submit) so async
-          // submission/session cleanup completes before navigation.
+          // Optional exit hook (cleanup only — NEVER auto-submit here).
+          // Leaving the exam keeps the server attempt alive for resume.
           await handler();
         } catch {
-          // ignore — still exit to Home; keepalive/pagehide retries submit
+          // ignore — still exit to Home; the attempt stays resumable
         }
       }
       // End the active exam session + clear the lock trap synchronously so
@@ -293,10 +293,9 @@ export function ExamLockProvider({ children }: { children: React.ReactNode }) {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       // Modern browsers ignore custom text but require returnValue set.
-      // Warn-only: cancelling keeps the attempt intact; confirming lets the
-      // pagehide handler finalize it server-side.
+      // Warn-only: the attempt stays alive server-side for resume.
       e.returnValue =
-        "If you close this tab, your exam will be automatically submitted.";
+        "Your exam is in progress. You can safely leave — your answers are saved and you can resume before time expires.";
       return e.returnValue;
     };
     window.addEventListener("beforeunload", onBeforeUnload);
