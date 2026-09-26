@@ -242,6 +242,15 @@ export async function POST(request: NextRequest) {
     createdAt: now,
     updatedAt: now,
   };
+  // Automatic welcome notification (Notification Control → All Students).
+  // Fully non-blocking + exactly-once: never delays or breaks registration.
+  void import("@/lib/notification-events")
+    .then((events) =>
+      events
+        .notifyRegistration({ uid: user.uid, email, name: fields.fullName })
+        .catch(() => undefined),
+    )
+    .catch(() => undefined);
   return NextResponse.json({ profile }, { status: 201 });
 }
 

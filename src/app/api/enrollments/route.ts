@@ -338,6 +338,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Automatic enrollment confirmation (Notification Control → Specific
+    // Student). Only when the enrollment is immediately active — pending
+    // applications notify on admin approval instead. Fully non-blocking +
+    // exactly-once: never delays or breaks enrollment.
+    const storedStatus = rows[0]?.enrollment_status;
+    if (storedStatus === "active") {
+      void import("@/lib/notification-events")
+        .then((events) =>
+          events
+            .notifyEnrollmentConfirmed({
+              uid: user.uid,
+              email: studentEmail,
+              courseId,
+              courseName,
+            })
+            .catch(() => undefined),
+        )
+        .catch(() => undefined);
+    }
+
     return NextResponse.json({
       enrollment: mapEnrollment(rows[0]),
       ...(application ? { application } : {}),

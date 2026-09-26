@@ -306,27 +306,56 @@ export async function saveMaterial(
   // Class · Exam · Materials sequence so the admin-arranged manual order
   // is never disturbed by an add.
   const next = await nextUnifiedPosition(chapterId).catch(() => 1);
+  let insertedId: number | null = null;
+  let saved = false;
   try {
-    await exec(
+    const result = await exec(
       `INSERT INTO course_materials (chapter_id, title, material_type, file_url, question_count, sort_order)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [chapterId, title, asMaterialType(input.materialType), fileUrl, questionCount, next],
     );
+    insertedId = Number(result.insertId) || null;
+    saved = true;
   } catch {
     try {
-      await exec(
+      const result = await exec(
         `INSERT INTO course_materials (chapter_id, title, material_type, file_url, sort_order)
          VALUES (?, ?, ?, ?, ?)`,
         [chapterId, title, asMaterialType(input.materialType), fileUrl, next],
       );
+      insertedId = Number(result.insertId) || null;
+      saved = true;
     } catch {
       // Legacy database without the ordering column — keep the legacy insert.
-      await exec(
+      // Throws on failure (unchanged behavior): no notification is sent.
+      const result = await exec(
         `INSERT INTO course_materials (chapter_id, title, material_type, file_url)
          VALUES (?, ?, ?, ?)`,
         [chapterId, title, asMaterialType(input.materialType), fileUrl],
       );
+      insertedId = Number(result.insertId) || null;
+      saved = true;
     }
+  }
+  // Automatic "New Material Added" → enrolled students of THAT course only.
+  // Only after a successful insert. Material ids are auto-increment: without
+  // an insertId the ledger still dedupes on (chapter + title), so refreshes
+  // never resend. Fully non-blocking: material save already succeeded.
+  if (saved) {
+    const materialKeySnapshot = insertedId
+      ? `id-${insertedId}`
+      : `ch-${chapterId}-${title}`.slice(0, 120);
+    void import("@/lib/notification-events")
+      .then((events) =>
+        events
+          .notifyMaterialAdded({
+            materialKey: materialKeySnapshot,
+            materialName: title,
+            chapterId,
+          })
+          .catch(() => undefined),
+      )
+      .catch(() => undefined);
   }
   return fetchMaterials(chapterId);
 }

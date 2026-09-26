@@ -289,8 +289,23 @@ export async function acceptEnrollmentApplication(
   adminUid: string,
 ): Promise<ApplicationActionResult> {
   await ensureApprovalColumns();
+  // Pre-read for the automatic enrollment-confirmation notification
+  // (Notification Control → Specific Student). The ledger key makes the
+  // notify idempotent with the self-enrollment hook (same event key).
+  let notifyUid = "";
+  let notifyCourseId = "";
   try {
-    return await withTransaction(async (connection: PoolConnection) => {
+    const preview = await query<{ student_uid: string; course_id: string }[]>(
+      `SELECT student_uid, course_id FROM enrollments WHERE id = ? LIMIT 1`,
+      [id],
+    );
+    notifyUid = preview[0]?.student_uid ?? "";
+    notifyCourseId = preview[0]?.course_id ?? "";
+  } catch {
+    // Best effort — approval must never depend on notifications.
+  }
+  try {
+    const outcome = await withTransaction(async (connection: PoolConnection) => {
       const [rows] = await connection.query<ApplicationRow[]>(
         `SELECT id, enrollment_status, student_uid, course_id, course_kind
          FROM enrollments WHERE id = ? FOR UPDATE`,
@@ -335,6 +350,17 @@ export async function acceptEnrollmentApplication(
         message: "Enrollment accepted — student is now an active enrolled student.",
       };
     });
+    if (outcome.ok && notifyUid && notifyCourseId) {
+      // Approval already committed; ledger dedupes. Fully non-blocking.
+      void import("@/lib/notification-events")
+        .then((events) =>
+          events
+            .notifyEnrollmentConfirmed({ uid: notifyUid, courseId: notifyCourseId })
+            .catch(() => undefined),
+        )
+        .catch(() => undefined);
+    }
+    return outcome;
   } catch (error) {
     console.error("acceptEnrollmentApplication failed:", error);
     return { ok: false, error: "Failed to accept the application." };

@@ -5,12 +5,29 @@ let ensureJerseysTableReady = false;
 // Admin Panel → Content. Notifications broadcast + jersey catalog.
 // Media library reads the shared `uploads` table (see src/lib/storage.ts).
 
+export type NotificationAudience = "all" | "students" | "admins" | "enrolled" | "student";
+
+export type NotificationOrigin = "manual" | "automatic";
+
 export type Notification = {
   id: string;
   title: string;
   message: string;
-  audience: "all" | "students" | "admins" | "enrolled" | "student";
+  audience: NotificationAudience;
+  /** Targeted student uid (audience "student" only). */
+  targetUid: string | null;
   targetEmail: string | null;
+  /**
+   * Targeted course slug (audience "enrolled" only). When set, the
+   * notification is visible ONLY to students actively enrolled in THAT
+   * course. Legacy "enrolled" rows with NULL keep the old behavior
+   * (any active enrollment).
+   */
+  targetCourseId: string | null;
+  /** Manual (admin-composed) vs automatic (system-event generated). */
+  origin: NotificationOrigin;
+  /** Once-only ledger key for automatic notifications (NULL for manual). */
+  eventKey: string | null;
   isActive: boolean;
   createdAt: string;
   /**
@@ -37,7 +54,11 @@ type NotificationRow = {
   title: string;
   message: string;
   audience: string;
+  target_uid?: string | null;
   target_email?: string | null;
+  target_course_id?: string | null;
+  origin?: string | null;
+  event_key?: string | null;
   is_active: number | boolean;
   created_at: Date | string;
 };
@@ -82,7 +103,11 @@ function mapNotificationRow(
     title: row.title,
     message: row.message,
     audience: normalizeAudience(row.audience),
+    targetUid: row.target_uid ?? null,
     targetEmail: row.target_email ?? null,
+    targetCourseId: row.target_course_id ?? null,
+    origin: row.origin === "automatic" ? "automatic" : "manual",
+    eventKey: row.event_key ?? null,
     isActive: Boolean(row.is_active),
     createdAt: toIso(row.created_at),
     // Present (non-null) only when joined with notification_reads for a
@@ -115,6 +140,38 @@ async function ensureNotificationsTable(): Promise<void> {
   } catch {
     // Already migrated — safe to ignore.
   }
+  // Notification Control separation: course-scoped enrolled targeting,
+  // manual/automatic origin, and the once-only automatic event ledger key.
+  // Each ALTER is independent so a partial migration still converges.
+  const notificationControlColumns: Array<{ name: string; ddl: string }> = [
+    { name: "target_course_id", ddl: "ADD COLUMN target_course_id VARCHAR(191) NULL AFTER target_email" },
+    { name: "origin", ddl: "ADD COLUMN origin ENUM('manual','automatic') NOT NULL DEFAULT 'manual' AFTER target_course_id" },
+    { name: "event_key", ddl: "ADD COLUMN event_key VARCHAR(191) NULL AFTER origin" },
+  ];
+  for (const column of notificationControlColumns) {
+    try {
+      await exec(`ALTER TABLE notifications ${column.ddl}`);
+    } catch {
+      // Column already exists — safe to ignore.
+    }
+  }
+  try {
+    await exec(
+      `ALTER TABLE notifications ADD UNIQUE KEY uq_notifications_event_key (event_key)`,
+    );
+  } catch {
+    // Unique key already exists — safe to ignore. (MySQL treats NULLs as
+    // distinct, so manual rows with NULL event_key never conflict.)
+  }
+  // Once-only ledger for automatic notifications: one row per fired event.
+  // INSERT IGNORE on this table is the atomic duplicate guard — refreshes
+  // and repeated reads can never resend the same event.
+  await exec(`CREATE TABLE IF NOT EXISTS notification_events (
+    event_key VARCHAR(191) NOT NULL PRIMARY KEY,
+    notification_id VARCHAR(64) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_notification_events_notification (notification_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   // Per-student read state — persists across refreshes/devices. One row per
   // (notification, student). Never deleted except with the notification itself.
   await exec(`CREATE TABLE IF NOT EXISTS notification_reads (
@@ -125,6 +182,11 @@ async function ensureNotificationsTable(): Promise<void> {
     KEY idx_notification_reads_student (student_uid)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   ensureNotificationsTableReady = true;
+}
+
+/** Public ensure for the automatic event engine (same self-heal, no reads). */
+export async function ensureNotificationTables(): Promise<void> {
+  await ensureNotificationsTable();
 }
 
 export async function fetchNotifications(all = false): Promise<Notification[]> {
@@ -140,9 +202,32 @@ export async function fetchNotifications(all = false): Promise<Notification[]> {
 }
 
 /**
+ * Course-scoped enrolled visibility fragment.
+ *
+ * A student sees an "enrolled" notification ONLY when:
+ *  - it targets a specific course AND the student is actively enrolled in
+ *    THAT course (strict course isolation — never leaks across courses), or
+ *  - it is a legacy broadcast (target_course_id IS NULL) AND the student
+ *    has any active enrollment (backward compatible).
+ *
+ * The fragment consumes TWO `?` params (both = student uid).
+ */
+const ENROLLED_VISIBILITY = `(n.audience = 'enrolled' AND (
+          (n.target_course_id IS NOT NULL AND EXISTS (
+                SELECT 1 FROM enrollments e
+                WHERE e.student_uid = ? AND e.course_id = n.target_course_id
+                  AND e.enrollment_status = 'active'))
+          OR (n.target_course_id IS NULL AND EXISTS (
+                SELECT 1 FROM enrollments e
+                WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+        ))`;
+
+/**
  * Active notifications relevant to a specific student:
  *  - audience "all" (+ legacy "students") → everyone
- *  - audience "enrolled" → only students with an ACTIVE enrollment
+ *  - audience "enrolled" + target_course_id → only students actively
+ *    enrolled in THAT course (strict per-course isolation)
+ *  - audience "enrolled" without a course → legacy: any active enrollment
  *  - audience "student" → only the targeted student
  *
  * Each item carries its persisted per-student read state (`isRead`) from
@@ -167,13 +252,11 @@ export async function fetchStudentNotifications(
          ON r.notification_id = n.id AND r.student_uid = ?
        WHERE n.is_active = 1 AND (
          n.audience IN ('all','students')
-         OR (n.audience = 'enrolled' AND EXISTS (
-               SELECT 1 FROM enrollments e
-               WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+         OR ${ENROLLED_VISIBILITY}
          OR (n.audience = 'student' AND n.target_uid = ?)
        )
        ORDER BY n.created_at DESC LIMIT 200`,
-      [studentUid, studentUid, studentUid],
+      [studentUid, studentUid, studentUid, studentUid],
     );
     return rows.map((row) => mapNotificationRow(row));
   } catch {
@@ -213,12 +296,10 @@ export async function markAllNotificationsRead(
      SELECT n.id, ? FROM notifications n
       WHERE n.is_active = 1 AND (
         n.audience IN ('all','students')
-        OR (n.audience = 'enrolled' AND EXISTS (
-              SELECT 1 FROM enrollments e
-              WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+        OR ${ENROLLED_VISIBILITY}
         OR (n.audience = 'student' AND n.target_uid = ?)
       )`,
-    [uid, uid, uid],
+    [uid, uid, uid, uid],
   );
 }
 
@@ -236,12 +317,10 @@ export async function fetchUnreadNotificationCount(
          ON r.notification_id = n.id AND r.student_uid = ?
        WHERE n.is_active = 1 AND r.notification_id IS NULL AND (
          n.audience IN ('all','students')
-         OR (n.audience = 'enrolled' AND EXISTS (
-               SELECT 1 FROM enrollments e
-               WHERE e.student_uid = ? AND e.enrollment_status = 'active'))
+         OR ${ENROLLED_VISIBILITY}
          OR (n.audience = 'student' AND n.target_uid = ?)
        )`,
-      [uid, uid, uid],
+      [uid, uid, uid, uid],
     );
     return Number(rows[0]?.n ?? 0) || 0;
   } catch {
@@ -275,16 +354,36 @@ export async function saveNotification(
   const audience = (
     rawAudience === "student" && !targetEmail && !targetUid ? "all" : rawAudience
   ) as Notification["audience"];
+  // Course-scoped enrolled targeting (Enrolled Students manual flow).
+  // Only honored for audience "enrolled"; ignored for other audiences so
+  // scopes can never be mixed.
+  const targetCourseId =
+    audience === "enrolled" &&
+    typeof input.targetCourseId === "string" &&
+    input.targetCourseId.trim()
+      ? input.targetCourseId.trim().slice(0, 191)
+      : null;
+  // Manual vs automatic origin. The admin API never sends automatic —
+  // automatic rows are written by the system event engine only.
+  const origin: Notification["origin"] =
+    input.origin === "automatic" ? "automatic" : "manual";
+  const eventKey =
+    typeof input.eventKey === "string" && input.eventKey.trim()
+      ? input.eventKey.trim().slice(0, 191)
+      : null;
   const id =
     typeof input.id === "string" && input.id.trim()
       ? input.id.trim()
-      : `ntf-${Date.now()}`;
+      : `ntf-${Date.now()}-${Math.floor(Math.random() * 1e6)
+          .toString()
+          .padStart(6, "0")}`;
   await exec(
-    `INSERT INTO notifications (id, title, message, audience, is_active, created_by, target_uid, target_email)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO notifications (id, title, message, audience, is_active, created_by, target_uid, target_email, target_course_id, origin, event_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE title = VALUES(title), message = VALUES(message),
        audience = VALUES(audience), is_active = VALUES(is_active),
-       target_uid = VALUES(target_uid), target_email = VALUES(target_email)`,
+       target_uid = VALUES(target_uid), target_email = VALUES(target_email),
+       target_course_id = VALUES(target_course_id)`,
     [
       id,
       title,
@@ -294,9 +393,26 @@ export async function saveNotification(
       adminUid,
       targetUid,
       targetEmail,
+      targetCourseId,
+      origin,
+      eventKey,
     ],
   );
   return fetchNotifications(true);
+}
+
+/** Enable / disable a notification without touching its content. */
+export async function setNotificationActive(
+  id: string,
+  isActive: boolean,
+): Promise<void> {
+  const clean = id?.trim();
+  if (!clean) return;
+  await ensureNotificationsTable();
+  await exec(`UPDATE notifications SET is_active = ? WHERE id = ?`, [
+    isActive ? 1 : 0,
+    clean,
+  ]);
 }
 
 export async function deleteNotification(id: string): Promise<void> {

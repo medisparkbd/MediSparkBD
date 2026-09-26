@@ -1028,11 +1028,12 @@ export async function saveExam(
     totalMarks = fallbackMarks || (questionCount ? questionCount * marksPerQuestion : 0);
   }
 
-  const existing = await query<{ id: string }[]>(
-    `SELECT id FROM exams WHERE id = ? LIMIT 1`,
+  const existing = await query<{ id: string; status: string }[]>(
+    `SELECT id, status FROM exams WHERE id = ? LIMIT 1`,
     [id],
   );
   const isNew = existing.length === 0;
+  const previousStatus = isNew ? null : (existing[0]?.status ?? null);
   // ── Flow 5 exam category (additive; NULL keeps the legacy Exam flow) ──
   // Topic-wise exams must carry one subject; other formats never keep one
   // (prevents mixing categories). When the caller does not send these keys
@@ -1170,6 +1171,37 @@ export async function saveExam(
   exam.chapterId = chapterId;
   exam.scope = scope;
   invalidateExamsCache();
+  // Automatic publish notifications (Notification Control):
+  //  - PUBLIC exam newly published → all students ("New Public Exam Published")
+  //  - COURSE exam newly added/published → enrolled students of THOSE courses
+  // Fires only on creation-as-published or the draft → published transition,
+  // never on plain edits. Fully non-blocking + exactly-once.
+  const becamePublished =
+    ["draft", "published", "closed"].includes(String(input.status)) &&
+    String(input.status) === "published" &&
+    previousStatus !== "published";
+  if (becamePublished) {
+    const scopeSnapshot = scope;
+    const courseIdsSnapshot = [...courseIds];
+    const chapterSnapshot = chapterId;
+    const titleSnapshot = title;
+    void import("@/lib/notification-events")
+      .then((events) => {
+        if (scopeSnapshot === "COURSE") {
+          return events
+            .resolveCourseSlugsForExam(id, chapterSnapshot)
+            .then((slugs) =>
+              events.notifyCourseExamAdded({
+                examId: id,
+                examName: titleSnapshot,
+                courseSlugs: slugs.length > 0 ? slugs : courseIdsSnapshot,
+              }),
+            );
+        }
+        return events.notifyPublicExamPublished(id, titleSnapshot);
+      })
+      .catch(() => undefined);
+  }
   return exam;
 }
 
@@ -1820,9 +1852,50 @@ export async function setExamStatus(
   if (!["draft", "published", "closed"].includes(status)) {
     throw new Error("Invalid exam status.");
   }
+  // Previous state for the automatic publish notifications.
+  let previousStatus: string | null = null;
+  let examTitle = "";
+  let examKind = "";
+  let examChapterId: string | null = null;
+  try {
+    const before = await query<
+      { status: string; title: string; kind: string; chapter_id: string | null }[]
+    >(
+      `SELECT status, title, kind, chapter_id FROM exams WHERE id = ? LIMIT 1`,
+      [id],
+    );
+    previousStatus = before[0]?.status ?? null;
+    examTitle = before[0]?.title ?? "";
+    examKind = before[0]?.kind ?? "";
+    examChapterId = before[0]?.chapter_id ?? null;
+  } catch {
+    // Best effort — the status update below is authoritative.
+  }
   const result = await exec(`UPDATE exams SET status = ? WHERE id = ?`, [status, id]);
   if (!result.affectedRows) throw new Error("Exam not found.");
   invalidateExamsCache();
+  if (status === "published" && previousStatus !== "published") {
+    const examIdSnapshot = id;
+    const titleSnapshot = examTitle || id;
+    const kindSnapshot = examKind;
+    const chapterSnapshot = examChapterId;
+    void import("@/lib/notification-events")
+      .then((events) => {
+        if (kindSnapshot === "enrolled") {
+          return events
+            .resolveCourseSlugsForExam(examIdSnapshot, chapterSnapshot)
+            .then((slugs) =>
+              events.notifyCourseExamAdded({
+                examId: examIdSnapshot,
+                examName: titleSnapshot,
+                courseSlugs: slugs,
+              }),
+            );
+        }
+        return events.notifyPublicExamPublished(examIdSnapshot, titleSnapshot);
+      })
+      .catch(() => undefined);
+  }
 }
 
 /**

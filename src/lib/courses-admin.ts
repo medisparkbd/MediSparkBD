@@ -657,6 +657,17 @@ export async function saveCatalogCourse(
 
   const qaAccess = input.qaAccess !== undefined ? (input.qaAccess ? 1 : 0) : 1;
 
+  // Previous publish state for the automatic "New Course Published"
+  // notification (Notification Control → All Students). Fires only on the
+  // unpublished → published transition, never on plain edits.
+  let wasPublished = false;
+  try {
+    const prev = await fetchCatalogCourse(slug);
+    wasPublished = prev?.status === "published";
+  } catch {
+    // No previous row (new course) or transient read failure.
+  }
+
   await exec(
     `INSERT INTO catalog_courses
        (slug, name, category, category_id, batch_id, image_url, short_description, description,
@@ -763,6 +774,12 @@ export async function saveCatalogCourse(
     };
   }
   saved.mentorIds = await fetchCourseMentorIds(slug);
+  if (!wasPublished && saved.status === "published") {
+    // Fully non-blocking + exactly-once: publishing already succeeded.
+    void import("@/lib/notification-events")
+      .then((events) => events.notifyCoursePublished(slug).catch(() => undefined))
+      .catch(() => undefined);
+  }
   return saved;
 }
 
@@ -848,6 +865,16 @@ export async function setCatalogCourseFlags(
   }
   const saved = await fetchCatalogCourse(slug);
   if (!saved) throw new Error("Failed to update the course.");
+  if (
+    patch.status === "published" &&
+    existing.status !== "published" &&
+    saved.status === "published"
+  ) {
+    // Publish-toggle transition → automatic "New Course Published".
+    void import("@/lib/notification-events")
+      .then((events) => events.notifyCoursePublished(slug).catch(() => undefined))
+      .catch(() => undefined);
+  }
   return saved;
 }
 
@@ -1339,6 +1366,16 @@ export async function saveClass(
         duration_minutes = ?, is_free = ?, is_active = ? WHERE id = ?`,
       [chapterId, title, videoUrl, noteUrl, durationMinutes, isFree, isActive, id],
     );
+  }
+  if (existing.length === 0) {
+    // Automatic "New Class Added" → enrolled students of THAT course only.
+    void import("@/lib/notification-events")
+      .then((events) =>
+        events
+          .notifyClassAdded({ classId: id, className: title, chapterId })
+          .catch(() => undefined),
+      )
+      .catch(() => undefined);
   }
   return fetchClasses();
 }

@@ -5,6 +5,7 @@ import {
   fetchNotifications,
   saveNotification,
   deleteNotification,
+  setNotificationActive,
 } from "@/lib/content-admin";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +34,15 @@ export async function POST(request: NextRequest) {
   if (!body) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
+  // The admin console only ever creates MANUAL notifications — automatic
+  // rows are written by the system event engine, never from here.
+  const payload: Record<string, unknown> = { ...body, origin: "manual" };
+  // Course-scoped enrolled targeting: only honored for audience "enrolled".
+  if (typeof body.targetCourseId === "string" && body.targetCourseId.trim()) {
+    payload.targetCourseId = body.targetCourseId.trim();
+  }
   try {
-    const notifications = await saveNotification(body, admin.uid);
+    const notifications = await saveNotification(payload, admin.uid);
     await logAdminAction(admin, "notification.save", String(body.title ?? ""), request);
     return NextResponse.json({ notifications });
   } catch (error) {
@@ -42,6 +50,30 @@ export async function POST(request: NextRequest) {
       error instanceof Error ? error.message : "Failed to save the notification.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+}
+
+/** PATCH { id, isActive } — enable / disable without touching content. */
+export async function PATCH(request: NextRequest) {
+  const admin = await requirePermission(request, "manageContent");
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  const body = (await request.json().catch(() => null)) as {
+    id?: unknown;
+    isActive?: unknown;
+  } | null;
+  if (typeof body?.id !== "string" || !body.id) {
+    return NextResponse.json({ error: "Missing notification id." }, { status: 400 });
+  }
+  await setNotificationActive(body.id, body.isActive !== false);
+  await logAdminAction(
+    admin,
+    body.isActive !== false ? "notification.enable" : "notification.disable",
+    body.id,
+    request,
+  );
+  const notifications = await fetchNotifications(true);
+  return NextResponse.json({ notifications });
 }
 
 export async function DELETE(request: NextRequest) {

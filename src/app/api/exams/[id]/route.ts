@@ -27,6 +27,13 @@ export async function GET(
 
   const { id } = await context.params;
 
+  // Automatic "Exam Is Live Now" sweep (Notification Control → Enrolled
+  // Students). Fires at most once per (exam, course) via the event ledger —
+  // viewing an exam can never resend. Fully non-blocking: never delays the exam.
+  void import("@/lib/notification-events")
+    .then((events) => events.sweepLiveCourseExams().catch(() => undefined))
+    .catch(() => undefined);
+
   // The attempt (timer + answer storage) begins only with ?start=1 — i.e.
   // after the student accepts the exam rules on the client.
   const startAttempt = request.nextUrl.searchParams.get("start") === "1";
