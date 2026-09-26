@@ -189,6 +189,7 @@ export const adminCategories: AdminCategory[] = [
     permission: "manageSystem",
     subsections: [
       { label: "System Status", href: "/admin/system/status" },
+      { label: "Internal Rules", href: "/admin/rules" },
       { label: "Storage", href: "/admin/system/storage" },
       { label: "Cache", href: "/admin/system/cache" },
       { label: "Backup", href: "/admin/system/backup" },

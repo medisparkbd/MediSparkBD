@@ -170,6 +170,9 @@ export const ADMIN_CONTROL_PERMISSIONS: Record<
   "/admin/dashboard": ["manageSystem", "manageContent"],
   // System pages: system managers keep access; admins always pass.
   "/admin/system": ["manageSystem", "manageAdmins"],
+  // Internal Rules (admin-only source of truth): system operators and admin
+  // managers. Teacher has neither permission → denied; non-admins fail closed.
+  "/admin/rules": ["manageSystem", "manageAdmins"],
   // Admin/role management: Admin only.
   "/admin/administration": ["manageAdmins"],
 };
