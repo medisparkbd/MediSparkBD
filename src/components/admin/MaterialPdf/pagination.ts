@@ -127,6 +127,14 @@ export function estimateQuestionHeight(q: PdfMaterialQuestion, spacing: LineSpac
 export type PaginatedPage = {
   pageNumber: number;
   questions: PdfMaterialQuestion[];
+  /**
+   * Explicit column assignment — the preview renders these two stacks
+   * side-by-side (plain flex + a real divider element) instead of CSS
+   * multicol, because the PDF capture (html2canvas) neither renders
+   * `column-rule` nor honors `break-inside: avoid` across CSS columns.
+   * Every block lives wholly in exactly one column: MCQs can never split.
+   */
+  columns: [PdfMaterialQuestion[], PdfMaterialQuestion[]];
   startQ: number;
   endQ: number;
 };
@@ -144,6 +152,8 @@ export type PaginateOptions = {
 
 export type PageBreakDecision = {
   page: number;
+  /** 0 = moved to the right column, 1 = moved to a new page. */
+  column: 0 | 1;
   /** Index of the question that triggered the break. */
   atQuestion: number;
   usedH: number;
@@ -158,6 +168,7 @@ export type PaginateDebugItem = {
   qNumber: number | null;
   height: number;
   topicHeader: boolean;
+  column: 0 | 1;
 };
 
 export type PaginateDebugPage = {
@@ -166,6 +177,9 @@ export type PaginateDebugPage = {
   usedH: number;
   remainingH: number;
   fillRatio: number;
+  /** Per-column budget and per-column used heights (never-split accounting). */
+  columnBudgetH: number;
+  colUsedH: [number, number];
   items: PaginateDebugItem[];
 };
 
@@ -219,98 +233,148 @@ export function paginateQuestionsDebug(
   };
   if (questions.length === 0) {
     return {
-      pages: [{ pageNumber: 1, questions: [], startQ: 1, endQ: 0 }],
+      pages: [{ pageNumber: 1, questions: [], columns: [[], []], startQ: 1, endQ: 0 }],
       debug: {
         ...debug,
-        pages: [{ page: 1, capacityH: 0, usedH: 0, remainingH: 0, fillRatio: 0, items: [] }],
+        pages: [{ page: 1, capacityH: 0, usedH: 0, remainingH: 0, fillRatio: 0, columnBudgetH: 0, colUsedH: [0, 0], items: [] }],
       },
     };
   }
-  const capacityFor = (answerCount: number): number => {
-    if (opts.fixedColumnHeight !== undefined) {
-      return twoColumn ? fixed * 2 : fixed;
-    }
-    const col = columnBudgetFor(answerCount, titleReserve);
+  const budgetFor = (answerCount: number): number => {
+    if (opts.fixedColumnHeight !== undefined) return fixed;
+    return columnBudgetFor(answerCount, titleReserve);
+  };
+  const pageCapacityFor = (answerCount: number): number => {
+    const col = budgetFor(answerCount);
     return twoColumn ? col * 2 : col;
   };
   const pages: PaginatedPage[] = [];
   let current: PdfMaterialQuestion[] = [];
+  let colA: PdfMaterialQuestion[] = [];
+  let colB: PdfMaterialQuestion[] = [];
   let currentItems: PaginateDebugItem[] = [];
-  let curH = 0;
+  let colH: [number, number] = [0, 0];
   let curAnswers = 0;
-  let lastTopic = "";
-  let firstOnPage = true;
+  // Per-column topic continuity for the header chip (each column's first
+  // block shows its topic header, like qi === 0 did for pages).
+  let lastTopic: [string, string] = ["", ""];
+  let col: 0 | 1 = 0;
 
-  const flushDebugPage = (pageNo: number, capacityH: number) => {
+  const pageEmpty = () => current.length === 0;
+  const pageUsed = () => colH[0] + colH[1];
+
+  const flushDebugPage = (pageNo: number) => {
+    const capacityH = pageCapacityFor(curAnswers);
+    const usedH = pageUsed();
     debug.pages.push({
       page: pageNo,
       capacityH,
-      usedH: curH,
-      remainingH: Math.max(0, capacityH - curH),
-      fillRatio: capacityH > 0 ? curH / capacityH : 0,
+      usedH,
+      remainingH: Math.max(0, capacityH - usedH),
+      fillRatio: capacityH > 0 ? usedH / capacityH : 0,
+      columnBudgetH: budgetFor(curAnswers),
+      colUsedH: [colH[0], colH[1]],
       items: currentItems,
     });
+  };
+
+  const flushPage = () => {
+    const start = pages.reduce((acc, p) => acc + p.questions.length, 0) + 1;
+    flushDebugPage(pages.length + 1);
+    pages.push({
+      pageNumber: pages.length + 1,
+      questions: current,
+      columns: [colA, colB],
+      startQ: start,
+      endQ: start + current.length - 1,
+    });
+    current = [];
+    colA = [];
+    colB = [];
+    currentItems = [];
+    colH = [0, 0];
+    curAnswers = 0;
+    lastTopic = ["", ""];
+    col = 0;
+  };
+
+  const headerFor = (q: PdfMaterialQuestion, topic: string, c: 0 | 1): boolean => {
+    if (q.isStandaloneImage || topic === "") return false;
+    const colBlocks = c === 0 ? colA : colB;
+    return colBlocks.length === 0 || topic !== lastTopic[c];
+  };
+
+  const place = (q: PdfMaterialQuestion, h: number, topic: string, c: 0 | 1, topicHeader: boolean) => {
+    current.push(q);
+    (c === 0 ? colA : colB).push(q);
+    currentItems.push({
+      id: q.id,
+      qNumber: q.isStandaloneImage ? null : (q.qNumber ?? null),
+      height: h,
+      topicHeader,
+      column: c,
+    });
+    colH[c] += h;
+    if (!q.isStandaloneImage) curAnswers += 1;
+    lastTopic[c] = topic;
   };
 
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i]!;
     const topic = topicOf(q);
     const baseH = estimateQuestionHeight(q, spacing);
-    // Topic-group header chip renders above the first question of each topic
-    // on a page (matches showTopic in the preview) — reserve its height too.
-    const headerIfStays = !q.isStandaloneImage && topic !== "" && (firstOnPage || topic !== lastTopic);
-    // On a fresh page the chip shows whenever the block has a topic (qi === 0).
-    const headerIfMoves = !q.isStandaloneImage && topic !== "";
     const nextAnswers = curAnswers + (q.isStandaloneImage ? 0 : 1);
-    const capacityH = capacityFor(nextAnswers);
-    // Never split: if overflow, move entire block to next page/column
-    if (curH + baseH + (headerIfStays ? TOPIC_HEADER_HEIGHT_PX : 0) > capacityH && current.length > 0) {
-      const h = baseH + (headerIfMoves ? TOPIC_HEADER_HEIGHT_PX : 0);
-      debug.breaks.push({
-        page: pages.length + 1,
-        atQuestion: i,
-        usedH: curH,
-        capacityH: capacityFor(curAnswers),
-        remainingH: capacityFor(curAnswers) - curH,
-        nextH: h,
-        reason: `next block (${Math.round(h)}px) exceeds remaining ${Math.round(capacityFor(curAnswers) - curH)}px`,
-      });
-      const start = pages.reduce((acc, p) => acc + p.questions.length, 0) + 1;
-      flushDebugPage(pages.length + 1, capacityFor(curAnswers));
-      pages.push({
-        pageNumber: pages.length + 1,
-        questions: current,
-        startQ: start,
-        endQ: start + current.length - 1,
-      });
-      current = [q];
-      currentItems = [{ id: q.id, qNumber: q.isStandaloneImage ? null : (q.qNumber ?? null), height: h, topicHeader: headerIfMoves }];
-      curH = h;
-      curAnswers = q.isStandaloneImage ? 0 : 1;
-      firstOnPage = false;
-    } else {
-      const h = baseH + (headerIfStays ? TOPIC_HEADER_HEIGHT_PX : 0);
-      current.push(q);
-      currentItems.push({ id: q.id, qNumber: q.isStandaloneImage ? null : (q.qNumber ?? null), height: h, topicHeader: headerIfStays });
-      curH += h;
-      curAnswers = nextAnswers;
-      firstOnPage = false;
+    const B = budgetFor(nextAnswers);
+    const showHere = headerFor(q, topic, col);
+    const needHere = baseH + (showHere ? TOPIC_HEADER_HEIGHT_PX : 0);
+
+    if (pageEmpty() || colH[col] + needHere <= B) {
+      // Fits in the current column (or the page is empty: a single oversize
+      // block still gets placed alone and overflows gracefully).
+      place(q, needHere, topic, col, showHere);
+      continue;
     }
-    lastTopic = topic;
-    // If single question taller than pageCapacity, still keep alone (will overflow gracefully)
-    if (baseH > capacityH && current.length === 1) {
-      // already handled, will be pushed next iter
+
+    if (col === 0 && twoColumn) {
+      // Whole block moves to the right column — never split across columns.
+      const showRight = headerFor(q, topic, 1);
+      const needRight = baseH + (showRight ? TOPIC_HEADER_HEIGHT_PX : 0);
+      if (needRight <= B) {
+        debug.breaks.push({
+          page: pages.length + 1,
+          column: 0,
+          atQuestion: i,
+          usedH: pageUsed(),
+          capacityH: pageCapacityFor(curAnswers),
+          remainingH: B - colH[0],
+          nextH: needRight,
+          reason: `next block (${Math.round(needRight)}px) exceeds left-column remaining ${Math.round(B - colH[0])}px → whole block to right column`,
+        });
+        col = 1;
+        place(q, needRight, topic, 1, showRight);
+        continue;
+      }
+      // Doesn't fit in either column → whole block to a fresh page.
     }
+
+    debug.breaks.push({
+      page: pages.length + 1,
+      column: 1,
+      atQuestion: i,
+      usedH: pageUsed(),
+      capacityH: pageCapacityFor(curAnswers),
+      remainingH: pageCapacityFor(curAnswers) - pageUsed(),
+      nextH: needHere,
+      reason: `next block (${Math.round(needHere)}px) exceeds remaining ${Math.round(pageCapacityFor(curAnswers) - pageUsed())}px → whole block to new page`,
+    });
+    flushPage();
+    col = 0;
+    const showFresh = headerFor(q, topic, 0);
+    const freshNeed = baseH + (showFresh ? TOPIC_HEADER_HEIGHT_PX : 0);
+    place(q, freshNeed, topic, 0, showFresh);
   }
   if (current.length > 0) {
-    const start = pages.reduce((acc, p) => acc + p.questions.length, 0) + 1;
-    flushDebugPage(pages.length + 1, capacityFor(curAnswers));
-    pages.push({
-      pageNumber: pages.length + 1,
-      questions: current,
-      startQ: start,
-      endQ: start + current.length - 1,
-    });
+    flushPage();
   }
   return { pages, debug };
 }
@@ -334,7 +398,8 @@ export function logPaginateDebug(debug: PaginateDebugInfo): void {
   for (const p of debug.pages) {
     // eslint-disable-next-line no-console
     console.log(
-      `page ${p.page}: capacity ${Math.round(p.capacityH)}px, used ${Math.round(p.usedH)}px, ` +
+      `page ${p.page}: capacity ${Math.round(p.capacityH)}px (col ${Math.round(p.columnBudgetH)}px each), ` +
+        `used ${Math.round(p.usedH)}px [L ${Math.round(p.colUsedH[0])} / R ${Math.round(p.colUsedH[1])}], ` +
         `remaining ${Math.round(p.remainingH)}px, fill ${(p.fillRatio * 100).toFixed(1)}%`,
     );
   }

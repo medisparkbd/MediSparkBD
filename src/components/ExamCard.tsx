@@ -9,9 +9,12 @@ import {
  * Exam Card — reference-based premium card, three states driven ONLY by the
  * exam's time-based status (dynamic exam data, never hardcoded):
  *
- *   Upcoming → "Upcoming Exam" + "Coming Soon" (disabled, cannot start)
- *   Live     → "Exam is Live"  + "Start Exam"  (starts the live attempt)
- *   Practice → "Practice Exam" + "Start Exam"  (unranked practice attempt)
+ *   Upcoming → "Upcoming Exam" + "Coming Soon →" (disabled, cannot start)
+ *   Live     → "Exam is Live"  + "Start Exam →"  (starts the live attempt)
+ *   Practice → "Practice Exam" + "Start Now →"   (unranked practice attempt)
+ *
+ * Status color system (accents only — card background stays consistent):
+ *   Upcoming = YELLOW · Live = GREEN · Practice = BLUE.
  *
  * Layout (reference, unchanged across themes & screens):
  *   Row 1: exam title (left) + compact status pill (right, same row)
@@ -20,9 +23,9 @@ import {
  *   Row 4: one full-width bottom action button
  *
  * Theme-safe: every color goes through theme tokens (bg-dark-*, text-heading,
- * text-neutral-*, border-ink/*) so Dark + Light both stay readable. Red/amber/
- * emerald/violet accents are visible on both themes. No hardcoded white-on-dark
- * or black-on-light text.
+ * text-neutral-*, border-ink/*) so Dark + Light both stay readable. Yellow /
+ * green / blue status accents are visible on both themes. No hardcoded
+ * white-on-dark or black-on-light text.
  *
  * Responsive: same design on desktop / tablet / mobile — the card only shrinks
  * and wraps (title + pill stay on one row where space allows, never overflow).
@@ -57,7 +60,7 @@ function shouldShowTimeRow(exam: PublicExam): boolean {
   return Boolean(exam.scheduledAt) || Boolean(exam.endsAt);
 }
 
-function ExamWindow({ exam }: { exam: PublicExam }) {
+function ExamWindow({ exam, icon }: { exam: PublicExam; icon: string }) {
   if (!shouldShowTimeRow(exam)) return null;
   const pill =
     "min-w-0 flex-1 rounded-xl border border-ink/10 bg-dark-850 px-2 py-2 text-center sm:px-3";
@@ -79,7 +82,7 @@ function ExamWindow({ exam }: { exam: PublicExam }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center" aria-hidden="true">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary-500/40 bg-primary-600/15 text-xs font-extrabold text-primary-500 sm:h-7 sm:w-7 sm:text-sm">
+          <span className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-extrabold sm:h-7 sm:w-7 sm:text-sm ${icon}`}>
             &rarr;
           </span>
         </div>
@@ -118,32 +121,52 @@ const phaseMeta: Record<
     action: string;
     accentBar: string;
     ring: string;
+    /** Status-tinted chrome: marks/duration chips + participation arrow. */
+    icon: string;
+    /** Status-tinted divider gradient stop. */
+    divider: string;
+    /** Status-tinted top glow blob. */
+    glow: string;
+    /** Status-tinted CTA gradient (live + practice buttons). */
+    btn: string;
   }
 > = {
   upcoming: {
     badge: "Upcoming Exam",
     dotClass: "exam-dot exam-dot-upcoming",
-    label: "border-amber-400/50 bg-amber-500/10 exam-pill-upcoming",
+    label: "border-yellow-400/50 bg-yellow-500/10 exam-pill-upcoming",
     action: "Coming Soon",
-    accentBar: "from-amber-500/80 via-amber-500/20 to-transparent",
-    ring: "hover:border-amber-400/50",
+    accentBar: "from-yellow-500/80 via-yellow-500/20 to-transparent",
+    ring: "hover:border-yellow-400/50",
+    icon: "border-yellow-500/30 bg-yellow-600/10 text-yellow-500",
+    divider: "via-yellow-500/40",
+    glow: "bg-yellow-600/10 group-hover:bg-yellow-600/20",
+    btn: "bg-gradient-to-b from-yellow-500 to-yellow-600 text-white shadow-lg shadow-yellow-950/40 ring-1 ring-yellow-400/50 hover:from-yellow-400 hover:to-yellow-600",
   },
   live: {
     badge: "Exam is Live",
     dotClass: "exam-dot exam-dot-live",
     label:
-      "bg-red-600 text-white shadow-lg shadow-red-950/40 ring-1 ring-red-400/70",
+      "bg-green-600 text-white shadow-lg shadow-green-950/40 ring-1 ring-green-400/70",
     action: "Start Exam",
-    accentBar: "from-red-500 via-red-500/40 to-transparent",
-    ring: "hover:border-red-400/60",
+    accentBar: "from-green-500 via-green-500/40 to-transparent",
+    ring: "hover:border-green-400/60",
+    icon: "border-green-500/30 bg-green-600/10 text-green-500",
+    divider: "via-green-500/40",
+    glow: "bg-green-600/10 group-hover:bg-green-600/20",
+    btn: "bg-gradient-to-b from-green-500 to-green-700 text-white shadow-lg shadow-green-950/40 ring-1 ring-green-400/50 hover:from-green-400 hover:to-green-600",
   },
   practice: {
     badge: "Practice Exam",
     dotClass: "exam-dot exam-dot-practice",
-    label: "border-violet-400/50 bg-violet-600/15 exam-pill-practice",
-    action: "Start Exam",
-    accentBar: "from-violet-500/80 via-red-500/30 to-transparent",
-    ring: "hover:border-violet-400/60",
+    label: "border-blue-400/50 bg-blue-600/15 exam-pill-practice",
+    action: "Start Now",
+    accentBar: "from-blue-500/80 via-blue-500/30 to-transparent",
+    ring: "hover:border-blue-400/60",
+    icon: "border-blue-500/30 bg-blue-600/10 text-blue-500",
+    divider: "via-blue-500/40",
+    glow: "bg-blue-600/10 group-hover:bg-blue-600/20",
+    btn: "bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40 ring-1 ring-blue-400/50 hover:from-blue-400 hover:to-blue-600",
   },
   closed: {
     badge: "Exam is Closed",
@@ -152,6 +175,10 @@ const phaseMeta: Record<
     action: "Exam is Closed",
     accentBar: "from-red-900/60 via-red-900/10 to-transparent",
     ring: "",
+    icon: "border-red-500/30 bg-red-600/10 text-red-500",
+    divider: "via-red-500/40",
+    glow: "bg-red-600/10 group-hover:bg-red-600/20",
+    btn: "bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg shadow-red-950/40 ring-1 ring-red-400/50 hover:from-red-400 hover:to-red-600",
   },
   idle: {
     badge: "Not Available",
@@ -160,6 +187,10 @@ const phaseMeta: Record<
     action: "Not Available",
     accentBar: "from-neutral-700/40 via-neutral-700/10 to-transparent",
     ring: "",
+    icon: "border-ink/10 bg-dark-800 text-neutral-500",
+    divider: "via-neutral-500/40",
+    glow: "bg-primary-600/10 group-hover:bg-primary-600/20",
+    btn: "border border-ink/10 bg-dark-800 text-neutral-400",
   },
 };
 
@@ -239,7 +270,7 @@ export default function ExamCard({
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -top-20 left-1/2 h-44 w-72 max-w-full -translate-x-1/2 rounded-full bg-primary-600/10 blur-3xl transition duration-300 group-hover:bg-primary-600/20"
+        className={`pointer-events-none absolute -top-20 left-1/2 h-44 w-72 max-w-full -translate-x-1/2 rounded-full blur-3xl transition duration-300 ${meta.glow}`}
         aria-hidden="true"
       />
 
@@ -260,7 +291,7 @@ export default function ExamCard({
         {/* Marks + Duration — one horizontal container, center divider */}
         <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl border border-ink/10 bg-dark-850 p-3 sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary-500/30 bg-primary-600/10 text-primary-500">
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${meta.icon}`}>
               <MarksIcon />
             </span>
             <p className="truncate text-sm font-extrabold text-heading">
@@ -275,7 +306,7 @@ export default function ExamCard({
             aria-hidden="true"
           />
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary-500/30 bg-primary-600/10 text-primary-500">
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${meta.icon}`}>
               <ClockIcon />
             </span>
             <p className="truncate text-sm font-extrabold text-heading">
@@ -289,15 +320,15 @@ export default function ExamCard({
 
         {/* Divider */}
         <div
-          className="mx-1 mt-3 h-px bg-gradient-to-r from-transparent via-primary-500/40 to-transparent"
+          className={`mx-1 mt-3 h-px bg-gradient-to-r from-transparent to-transparent ${meta.divider}`}
           aria-hidden="true"
         />
 
         {/* Participation window: heading + Start → End compact pills */}
-        <ExamWindow exam={exam} />
+        <ExamWindow exam={exam} icon={meta.icon} />
 
         {isPostLivePractice && (
-          <p className="exam-practice-note mt-3 rounded-lg border border-violet-400/25 bg-violet-600/10 px-3 py-2 text-[11px] font-semibold leading-relaxed">
+          <p className="exam-practice-note mt-3 rounded-lg border border-blue-400/25 bg-blue-600/10 px-3 py-2 text-[11px] font-semibold leading-relaxed">
             Live window ended — practice attempts won&apos;t affect the
             leaderboard.
           </p>
@@ -324,7 +355,7 @@ export default function ExamCard({
           ) : canStart && !detailsHref ? (
             <StartExamButton
               exam={exam}
-              className={`${buttonBase} flex items-center justify-center gap-2 bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg shadow-red-950/40 ring-1 ring-red-400/50 hover:from-red-400 hover:to-red-600`}
+              className={`${buttonBase} flex items-center justify-center gap-2 ${meta.btn}`}
             >
               {meta.action}
               <span aria-hidden="true">&rarr;</span>
@@ -332,7 +363,7 @@ export default function ExamCard({
           ) : (
             <Link
               href={href}
-              className={`${buttonBase} flex items-center justify-center gap-2 bg-gradient-to-b from-red-500 to-red-700 text-white shadow-lg shadow-red-950/40 ring-1 ring-red-400/50 hover:from-red-400 hover:to-red-600`}
+              className={`${buttonBase} flex items-center justify-center gap-2 ${meta.btn}`}
             >
               {meta.action}
               <span aria-hidden="true">&rarr;</span>

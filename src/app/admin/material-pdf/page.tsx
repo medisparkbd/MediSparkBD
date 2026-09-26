@@ -1065,9 +1065,9 @@ D. 150 দিন
                       className="w-full max-w-[794px] rounded-xl border border-amber-400 bg-amber-50 px-4 py-2 text-[11px] leading-relaxed text-amber-900"
                     >
                       <span className="font-extrabold">Page {page.pageNumber} pagination</span>
-                      {` — available ${Math.round(info.capacityH)}px • used ${Math.round(info.usedH)}px • remaining ${Math.round(info.remainingH)}px • fill ${(info.fillRatio * 100).toFixed(1)}%`}
+                      {` — available ${Math.round(info.capacityH)}px (col ${Math.round(info.columnBudgetH)}px each) • used ${Math.round(info.usedH)}px [L ${Math.round(info.colUsedH[0])} / R ${Math.round(info.colUsedH[1])}] • remaining ${Math.round(info.remainingH)}px • fill ${(info.fillRatio * 100).toFixed(1)}%`}
                       <span className="mt-1 block font-mono">
-                        {info.items.map((it) => `${it.qNumber ?? "img"}:${Math.round(it.height)}${it.topicHeader ? "+T" : ""}`).join("  ")}
+                        {info.items.map((it) => `${it.column === 0 ? "L" : "R"}${it.qNumber ?? "img"}:${Math.round(it.height)}${it.topicHeader ? "+T" : ""}`).join("  ")}
                       </span>
                     </div>
                   );
@@ -1121,24 +1121,28 @@ D. 150 দিন
                   </div>
                 )}
 
-                {/* 7. Two-Column Page Layout with vertical center line */}
-                <div
-                  className="relative mt-3 flex-1"
-                  style={{
-                    columnCount: 2,
-                    columnGap: "18px",
-                    columnRule: "1px solid #1e293b",
-                    orphans: 1,
-                    widows: 1,
-                  } as React.CSSProperties}
-                >
+                {/* 7. Two-Column Page Layout with vertical center line.
+                    Explicit JS-assigned columns (page.columns) plus a real
+                    divider element — NOT CSS multicol: the PDF capture
+                    (html2canvas) does not render `column-rule` and cannot
+                    honor `break-inside: avoid` across CSS columns, which cut
+                    MCQs mid-text and dropped the divider from downloads.
+                    Each MCQ block lives wholly in one column by construction. */}
+                <div className="relative mt-3 flex flex-1 gap-[18px]">
+                  {page.columns.map((colBlocks, ci) => (
+                    <Fragment key={ci}>
+                      {ci === 1 && (
+                        <div aria-hidden="true" className="w-px shrink-0 self-stretch bg-[#1e293b]" />
+                      )}
+                      <div className="min-w-0 flex-1">
                   {/* Blocks: questions + standalone images interleaved already via pagination */}
-                  {page.questions.map((q, qi) => {
-                    // Topic-wise grouping: header whenever the topic changes within the page.
+                  {colBlocks.map((q, qi) => {
+                    // Topic-wise grouping: header whenever the topic changes within the column.
+                    const prevTopic = qi === 0 ? undefined : (colBlocks[qi - 1]!.isStandaloneImage ? "" : (colBlocks[qi - 1]!.topic ?? ""));
                     const showTopic =
                       !q.isStandaloneImage &&
                       !!q.topic?.trim() &&
-                      (qi === 0 || page.questions[qi - 1]?.topic !== q.topic);
+                      (qi === 0 || prevTopic !== q.topic);
                     return (
                       <Fragment key={q.id}>
                         {showTopic && (
@@ -1367,8 +1371,11 @@ D. 150 দিন
                       </Fragment>
                     );
                   })}
+                      </div>
+                    </Fragment>
+                  ))}
                   {page.questions.length === 0 && (
-                    <p className="py-10 text-center text-sm text-slate-400 col-span-2">No questions</p>
+                    <p className="py-10 text-center text-sm text-slate-400">No questions</p>
                   )}
                 </div>
 

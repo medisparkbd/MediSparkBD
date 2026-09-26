@@ -77,7 +77,15 @@ export async function addTypeChapter(
   );
 }
 
-export async function updateTypeChapter(id: string, name: string, sortOrder: number): Promise<boolean> {
+/**
+ * Rename a chapter. sortOrder is optional — when omitted only the name is
+ * updated so a rename NEVER disturbs the manually arranged display order.
+ */
+export async function updateTypeChapter(id: string, name: string, sortOrder?: number): Promise<boolean> {
+  if (sortOrder === undefined || !Number.isFinite(sortOrder)) {
+    const res = await exec("UPDATE course_chapters SET name = ? WHERE id = ?", [name, id]);
+    return res.affectedRows > 0;
+  }
   const res = await exec(
     "UPDATE course_chapters SET name = ?, sort_order = ? WHERE id = ?",
     [name, sortOrder, id],

@@ -903,7 +903,7 @@ export default function ExamManager({
         </p>
       ) : (
         <ul className="mt-5 space-y-3">
-          {filteredByMode!.map((exam) => {
+          {filteredByMode!.map((exam, fIdx) => {
             const phase = hasEnrolledExams ? flow4Phase(exam) : null;
             const phaseBadge = phase ? flow4PhaseBadge(phase) : null;
             const publicExam = examToPublic(exam);
@@ -914,6 +914,34 @@ export default function ExamManager({
                 <button type="button" disabled={busy} onClick={() => void toggleFeatured(exam)} className={`${exam.featured ? buttonPrimaryClass : buttonSecondaryClass} min-w-[88px] shrink-0 px-4 py-2 text-xs`} title={exam.featured ? "Featured — click to unfeature" : "Not featured — click to feature"}>{exam.featured ? "Featured" : "Feature"}</button>
                 <button type="button" disabled={busy} onClick={() => void toggleStatus(exam)} className={`${buttonSecondaryClass} min-w-[96px] shrink-0 px-4 py-2 text-xs`} title={exam.status === "published" ? "Unpublish exam" : "Publish exam"}>{exam.status === "published" ? "Unpublished" : "Publish"}</button>
                 <button type="button" onClick={() => void remove(exam.id, exam.title)} disabled={busy} aria-label={`Delete ${exam.title}`} className="min-w-[80px] shrink-0 rounded-xl border border-red-200 bg-[#fef2f2] px-4 py-2 text-xs font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 active:bg-red-100 disabled:opacity-50 admin-dark:border-red-900/30 admin-dark:bg-red-500/10 admin-dark:text-red-400 admin-dark:hover:border-red-800/50 admin-dark:hover:bg-red-500/20" title="Delete exam permanently">Delete</button>
+                <span className="flex shrink-0 gap-1" role="group" aria-label={`Reorder ${exam.title}`}>
+                  <button
+                    type="button"
+                    disabled={busy || fIdx === 0}
+                    onClick={() => {
+                      const real = exams!.findIndex((e) => e.id === exam.id);
+                      if (real !== -1) void move(real, -1);
+                    }}
+                    title="Move Up"
+                    aria-label={`Move ${exam.title} up`}
+                    className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-xs font-black text-[#0b1e3a] transition hover:border-[#93c5fd] disabled:cursor-not-allowed disabled:opacity-30 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:text-white"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || fIdx === filteredByMode!.length - 1}
+                    onClick={() => {
+                      const real = exams!.findIndex((e) => e.id === exam.id);
+                      if (real !== -1) void move(real, 1);
+                    }}
+                    title="Move Down"
+                    aria-label={`Move ${exam.title} down`}
+                    className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-xs font-black text-[#0b1e3a] transition hover:border-[#93c5fd] disabled:cursor-not-allowed disabled:opacity-30 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] admin-dark:text-white"
+                  >
+                    ↓
+                  </button>
+                </span>
               </div>
             );
             return (

@@ -15,7 +15,7 @@ const statusStyles: Record<ExamStatus, { label: string; badge: string }> = {
   },
   Upcoming: {
     label: "Upcoming Exam",
-    badge: "bg-primary-500/10 text-primary-300 border border-primary-500/30",
+    badge: "bg-yellow-500/10 border border-yellow-500/30 exam-pill-upcoming",
   },
   Completed: {
     label: "Exam is Closed",
@@ -27,11 +27,11 @@ const statusStyles: Record<ExamStatus, { label: string; badge: string }> = {
   },
   Practice: {
     label: "Practice Exam",
-    badge: "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
+    badge: "bg-blue-600 text-white shadow-md shadow-blue-600/50 ring-1 ring-blue-400/60",
   },
   Archived: {
     label: "Practice Exam",
-    badge: "bg-violet-600 text-white shadow-md shadow-violet-600/50 ring-1 ring-violet-400/60",
+    badge: "bg-blue-600 text-white shadow-md shadow-blue-600/50 ring-1 ring-blue-400/60",
   },
   Inactive: {
     label: "Inactive",

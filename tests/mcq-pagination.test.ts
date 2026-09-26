@@ -127,3 +127,81 @@ describe("paginateQuestions fills pages to capacity", () => {
     assert.ok(relaxed > compact, `relaxed (${relaxed}) should paginate more than compact (${compact})`);
   });
 });
+
+describe("explicit columns — MCQs never split, divider-safe", () => {
+  it("columns partition each page: no loss, no duplication, order kept", () => {
+    const qs = Array.from({ length: 60 }, (_, i) =>
+      mcq(i, 40 + ((i * 53) % 140), 8 + ((i * 7) % 30)),
+    );
+    const { pages } = paginateQuestionsDebug(qs, undefined, "normal", true, {});
+    for (const p of pages) {
+      const flat = [...p.columns[0], ...p.columns[1]].map((q) => q.id);
+      assert.deepEqual(flat, p.questions.map((q) => q.id));
+    }
+    const placed = pages.reduce((n, p) => n + p.questions.length, 0);
+    assert.equal(placed, 60);
+  });
+
+  it("no column overflows its budget (except lone oversize blocks)", () => {
+    const qs = Array.from({ length: 60 }, (_, i) =>
+      mcq(i, 40 + ((i * 53) % 140), 8 + ((i * 7) % 30)),
+    );
+    const { pages, debug } = paginateQuestionsDebug(qs, undefined, "normal", true, {});
+    for (let pi = 0; pi < pages.length; pi++) {
+      const info = debug.pages[pi];
+      for (let c = 0; c < 2; c++) {
+        const colBlocks = pages[pi].columns[c];
+        const singleOversize = colBlocks.length === 1 && info.items.find((it) => it.column === c)!.height > info.columnBudgetH;
+        if (!singleOversize) {
+          assert.ok(
+            info.colUsedH[c] <= info.columnBudgetH + 1,
+            `page ${pi + 1} col ${c}: used ${info.colUsedH[c]} > budget ${info.columnBudgetH}`,
+          );
+        }
+      }
+    }
+  });
+
+  it("MCQ that misses left-column space moves WHOLE to the right column", () => {
+    // Fill the left column near capacity with short blocks, then a long MCQ
+    // that cannot fit the remainder: it must land intact in column 1.
+    const filler = Array.from({ length: 7 }, (_, i) => mcq(i, 40, 10)); // ~108px each
+    const longOne = mcq(7, 300, 30); // ~250px+, exceeds the ~120px remainder
+    const rest = Array.from({ length: 6 }, (_, i) => mcq(8 + i, 40, 10));
+    const { pages, debug } = paginateQuestionsDebug([...filler, longOne, ...rest], undefined, "normal", true, {});
+    const p1 = pages[0];
+    const inRight = p1.columns[1].some((q) => q.id === longOne.id);
+    assert.ok(inRight, "long MCQ must be wholly in the right column");
+    assert.ok(!p1.columns[0].some((q) => q.id === longOne.id), "long MCQ must not be split across columns");
+    const colMove = debug.breaks.find((b) => b.column === 0);
+    assert.ok(colMove, "a column-0 break decision must be logged with remaining space");
+    assert.ok(colMove.remainingH >= 0 && colMove.nextH > 0);
+  });
+
+  it("standalone images stay atomic in a single column", () => {
+    const img: PdfMaterialQuestion = {
+      ...mcq(1, 40, 10),
+      isStandaloneImage: true,
+      question: "",
+      options: ["", "", "", ""],
+    };
+    const qs = [mcq(0, 40, 10), img, mcq(2, 40, 10), mcq(3, 300, 30)];
+    const { pages } = paginateQuestionsDebug(qs, undefined, "normal", true, {});
+    let occurrences = 0;
+    for (const p of pages) {
+      for (const col of p.columns) {
+        if (col.some((q) => q.id === img.id)) occurrences++;
+      }
+    }
+    assert.equal(occurrences, 1, "image block must appear in exactly one column");
+  });
+
+  it("single-column mode keeps everything in column 0", () => {
+    const qs = Array.from({ length: 12 }, (_, i) => mcq(i, 60, 12));
+    const { pages } = paginateQuestionsDebug(qs, undefined, "normal", false, {});
+    for (const p of pages) {
+      assert.equal(p.columns[1].length, 0);
+      assert.deepEqual(p.columns[0].map((q) => q.id), p.questions.map((q) => q.id));
+    }
+  });
+});

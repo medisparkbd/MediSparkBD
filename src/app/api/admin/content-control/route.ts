@@ -103,8 +103,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, id });
       }
       const id = typeof body.id === "string" ? body.id : "";
-      const sortOrder = Number(body.sortOrder) || 0;
-      const updated = await updateTypeChapter(id, name, sortOrder);
+      // sortOrder is optional — a plain rename must NOT touch sort_order,
+      // otherwise the manually arranged order would be silently destroyed.
+      const rawOrder = Number(body.sortOrder);
+      const updated = await updateTypeChapter(
+        id,
+        name,
+        Number.isFinite(rawOrder) ? rawOrder : undefined,
+      );
       return NextResponse.json({ ok: updated });
     }
 
