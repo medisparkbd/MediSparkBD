@@ -6,8 +6,10 @@ import { AccessLoading } from "@/components/auth/AccessGuard";
 import { parsePastedMcqs } from "@/lib/paste-mcq-parser";
 import type { PdfMaterialQuestion } from "@/lib/pdf-materials";
 import {
-  paginateQuestions,
+  paginateQuestionsDebug,
+  logPaginateDebug,
   type PaginatedPage,
+  type PaginateDebugInfo,
   type LineSpacing,
   lineSpacingFactor,
 } from "@/components/admin/MaterialPdf/pagination";
@@ -198,12 +200,21 @@ export default function MaterialPdfGeneratorPage() {
     prevPreviewKeyRef.current = key;
   }, [questions, materialName, lineSpacing, watermarkEnabled, watermarkOpacity, watermarkSize, watermarkPosition, watermarkLogo, pdfReady]);
 
-  // Usable column height depends on lineSpacing? Keep fixed, pagination estimates handle spacing
-  const usableColumnHeight = 740; // px per column after header + answer box reserved
+  // Pagination budget is derived from the real page geometry inside
+  // paginateQuestionsDebug (content height − header/title overhead − the
+  // page's own answer-box height) — no fixed over-reservation.
+  const { pages, debug }: { pages: PaginatedPage[]; debug: PaginateDebugInfo } = useMemo(() => {
+    return paginateQuestionsDebug(questions, undefined, lineSpacing, true, {
+      titleReserve: materialName.trim().length > 0,
+    });
+  }, [questions, lineSpacing, materialName]);
+  const [paginateDebugOn, setPaginateDebugOn] = useState(false);
 
-  const pages: PaginatedPage[] = useMemo(() => {
-    return paginateQuestions(questions, usableColumnHeight, lineSpacing, true);
-  }, [questions, lineSpacing]);
+  // Pagination decision log: available height, per-question heights,
+  // remaining space at every page break (devtools console).
+  useEffect(() => {
+    if (paginateDebugOn && questions.length > 0) logPaginateDebug(debug);
+  }, [paginateDebugOn, debug, questions.length]);
 
   const handleDetect = () => {
     if (!pasteText.trim()) {
@@ -997,6 +1008,13 @@ D. 150 দিন
                 >
                   Reset
                 </button>
+                <button
+                  onClick={() => setPaginateDebugOn((v) => !v)}
+                  title="Show pagination debug overlay + console log (available height, per-question heights, remaining space at each break)"
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold ${paginateDebugOn ? "bg-amber-500 text-white" : "border border-[#cbd5e1] bg-white text-slate-700 hover:bg-slate-50 admin-dark:border-[#1e3a65] admin-dark:bg-[#0f2547] admin-dark:text-white"}`}
+                >
+                  {paginateDebugOn ? "Debug: ON" : "Debug"}
+                </button>
               </div>
             </div>
 
@@ -1037,6 +1055,23 @@ D. 150 দিন
             style={{ background: "#525659" }}
           >
             {pages.map((page) => (
+              <Fragment key={page.pageNumber}>
+                {paginateDebugOn && (() => {
+                  const info = debug.pages.find((d) => d.page === page.pageNumber);
+                  if (!info) return null;
+                  return (
+                    <div
+                      data-html2canvas-ignore="true"
+                      className="w-full max-w-[794px] rounded-xl border border-amber-400 bg-amber-50 px-4 py-2 text-[11px] leading-relaxed text-amber-900"
+                    >
+                      <span className="font-extrabold">Page {page.pageNumber} pagination</span>
+                      {` — available ${Math.round(info.capacityH)}px • used ${Math.round(info.usedH)}px • remaining ${Math.round(info.remainingH)}px • fill ${(info.fillRatio * 100).toFixed(1)}%`}
+                      <span className="mt-1 block font-mono">
+                        {info.items.map((it) => `${it.qNumber ?? "img"}:${Math.round(it.height)}${it.topicHeader ? "+T" : ""}`).join("  ")}
+                      </span>
+                    </div>
+                  );
+                })()}
               <div
                 key={page.pageNumber}
                 className="a4-page relative flex w-full max-w-[794px] flex-col bg-white shadow-[0_8px_40px_rgba(0,0,0,.35)]"
@@ -1371,6 +1406,7 @@ D. 150 দিন
                   </div>
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         ) : (
