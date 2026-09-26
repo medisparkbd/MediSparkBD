@@ -22,8 +22,9 @@ import {
   estimateAnswerBoxHeight,
   columnBudgetFor,
 } from "../src/components/admin/MaterialPdf/pagination.ts";
+import type { PdfMaterialQuestion } from "../src/lib/pdf-materials.ts";
 
-function mcq(i, qLen = 60, optLen = 12, topic = "") {
+function mcq(i: number, qLen = 60, optLen = 12, topic = ""): PdfMaterialQuestion {
   return {
     id: `q-${i}`,
     qNumber: i + 1,
