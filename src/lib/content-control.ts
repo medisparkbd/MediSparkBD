@@ -85,6 +85,103 @@ export async function updateTypeChapter(id: string, name: string, sortOrder: num
   return res.affectedRows > 0;
 }
 
+/**
+ * Manual content reordering — moves one chapter Up/Down within its own
+ * content-type scope (course + subject + paper + content_type). The order is
+ * persisted via sort_order so it survives refresh/reload and is reflected on
+ * the main website (both admin and student queries ORDER BY sort_order).
+ * Swaps sort_order with the adjacent neighbour; no duplication, no deletion,
+ * content data untouched — only display position changes.
+ */
+export async function moveTypeChapter(
+  scope: CtypeScope,
+  contentType: string,
+  id: string,
+  direction: "up" | "down",
+): Promise<{ moved: boolean }> {
+  const rows = await query<{ id: string; sort_order: number }[]>(
+    `SELECT ch.id, ch.sort_order FROM course_chapters ch
+      WHERE COALESCE(ch.course_slug,'') = ?
+        AND COALESCE(ch.subject_id,'') = ?
+        AND COALESCE(ch.paper_id,'') = ?
+        AND ch.content_type = ?
+        AND ch.is_active = 1
+      ORDER BY ch.sort_order, ch.name`,
+    [scope.courseSlug, scope.subjectId ?? "", scope.paperId ?? "", contentType],
+  );
+  const idx = rows.findIndex((r) => r.id === id);
+  if (idx < 0) return { moved: false };
+  const neighbourIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (neighbourIdx < 0 || neighbourIdx >= rows.length) return { moved: false };
+  const current = rows[idx]!;
+  const neighbour = rows[neighbourIdx]!;
+  // Swap sort_order. If equal (legacy rows), force distinct ordering.
+  let orderA = Number(current.sort_order) || 0;
+  let orderB = Number(neighbour.sort_order) || 0;
+  if (orderA === orderB) {
+    orderA = idx + 1;
+    orderB = neighbourIdx + 1;
+  }
+  await exec("UPDATE course_chapters SET sort_order = ? WHERE id = ?", [orderB, current.id]);
+  await exec("UPDATE course_chapters SET sort_order = ? WHERE id = ?", [orderA, neighbour.id]);
+  return { moved: true };
+}
+
+/** Full-order persist: orderedIds[0] becomes sort_order 1, etc. Same scope. */
+export async function reorderTypeChapters(
+  scope: CtypeScope,
+  contentType: string,
+  orderedIds: string[],
+): Promise<void> {
+  let order = 1;
+  for (const id of orderedIds) {
+    await exec(
+      `UPDATE course_chapters SET sort_order = ?
+        WHERE id = ? AND COALESCE(course_slug,'') = ?
+          AND COALESCE(subject_id,'') = ? AND COALESCE(paper_id,'') = ?
+          AND content_type = ? AND is_active = 1`,
+      [order++, id, scope.courseSlug, scope.subjectId ?? "", scope.paperId ?? "", contentType],
+    );
+  }
+}
+
+/** Move a content-type card (Class / Exam / Materials / …) Up/Down. */
+export async function moveContentType(
+  scope: CtypeScope,
+  typeKey: string,
+  direction: "up" | "down",
+): Promise<{ moved: boolean }> {
+  const rows = await query<{ type_key: string; sort_order: number }[]>(
+    `SELECT type_key, sort_order FROM course_content_types
+      WHERE course_slug = ? AND subject_id <=> ? AND paper_id <=> ?
+      ORDER BY sort_order ASC`,
+    [scope.courseSlug, scope.subjectId ?? "", scope.paperId ?? ""],
+  );
+  const idx = rows.findIndex((r) => r.type_key === typeKey);
+  if (idx < 0) return { moved: false };
+  const neighbourIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (neighbourIdx < 0 || neighbourIdx >= rows.length) return { moved: false };
+  const current = rows[idx]!;
+  const neighbour = rows[neighbourIdx]!;
+  let orderA = Number(current.sort_order) || 0;
+  let orderB = Number(neighbour.sort_order) || 0;
+  if (orderA === orderB) {
+    orderA = idx + 1;
+    orderB = neighbourIdx + 1;
+  }
+  await exec(
+    `UPDATE course_content_types SET sort_order = ?
+      WHERE course_slug = ? AND subject_id <=> ? AND paper_id <=> ? AND type_key = ?`,
+    [orderB, scope.courseSlug, scope.subjectId ?? "", scope.paperId ?? "", current.type_key],
+  );
+  await exec(
+    `UPDATE course_content_types SET sort_order = ?
+      WHERE course_slug = ? AND subject_id <=> ? AND paper_id <=> ? AND type_key = ?`,
+    [orderA, scope.courseSlug, scope.subjectId ?? "", scope.paperId ?? "", neighbour.type_key],
+  );
+  return { moved: true };
+}
+
 export async function deleteTypeChapter(id: string): Promise<void> {
   await exec("UPDATE course_chapters SET is_active = 0 WHERE id = ?", [id]);
 }

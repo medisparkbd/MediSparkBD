@@ -5,6 +5,9 @@ import {
   deleteTypeChapter,
   ensureTypes,
   getTypeChapters,
+  moveContentType,
+  moveTypeChapter,
+  reorderTypeChapters,
   updateTypeChapter,
   type CtypeScope,
 } from "@/lib/content-control";
@@ -110,6 +113,43 @@ export async function POST(request: NextRequest) {
       if (!id) return NextResponse.json({ error: "Missing id." }, { status: 400 });
       await deleteTypeChapter(id);
       return NextResponse.json({ ok: true });
+    }
+
+    // Manual content reordering — Up / Down buttons persist sort_order.
+    if (action === "move-chapter") {
+      const scope = scopeFrom(body);
+      const id = typeof body.id === "string" ? body.id : "";
+      const direction = String(body.direction ?? "");
+      const ctype = typeof body.ctype === "string" ? body.ctype : "";
+      if (!scope || !id || !ctype || (direction !== "up" && direction !== "down")) {
+        return NextResponse.json({ error: "Course, content type, id and direction required." }, { status: 400 });
+      }
+      const { moved } = await moveTypeChapter(scope, ctype, id, direction);
+      return NextResponse.json({ ok: true, moved });
+    }
+
+    if (action === "reorder-chapters") {
+      const scope = scopeFrom(body);
+      const ctype = typeof body.ctype === "string" ? body.ctype : "";
+      const orderedIds = Array.isArray(body.orderedIds)
+        ? body.orderedIds.filter((v): v is string => typeof v === "string")
+        : [];
+      if (!scope || !ctype || orderedIds.length === 0) {
+        return NextResponse.json({ error: "Course, content type and orderedIds required." }, { status: 400 });
+      }
+      await reorderTypeChapters(scope, ctype, orderedIds);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "move-type") {
+      const scope = scopeFrom(body);
+      const typeKey = typeof body.typeKey === "string" ? body.typeKey : "";
+      const direction = String(body.direction ?? "");
+      if (!scope || !typeKey || (direction !== "up" && direction !== "down")) {
+        return NextResponse.json({ error: "Course, typeKey and direction required." }, { status: 400 });
+      }
+      const { moved } = await moveContentType(scope, typeKey, direction);
+      return NextResponse.json({ ok: true, moved });
     }
 
     if (action === "add-type") {

@@ -27,6 +27,7 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
   const [newTypeName, setNewTypeName] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [movingKey, setMovingKey] = useState<string | null>(null);
 
   async function headers() {
     return {
@@ -64,6 +65,26 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
     toast.showToast("success", success);
     await load();
     return true;
+  }
+
+  /** Manual content-type order — persisted so refresh + website keep it. */
+  async function moveType(typeKey: string, direction: "up" | "down") {
+    setMovingKey(typeKey);
+    try {
+      const res = await fetch("/api/admin/content-control", {
+        method: "POST",
+        headers: await headers(),
+        body: JSON.stringify({ courseSlug: slug, ...scope, action: "move-type", typeKey, direction }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.showToast("error", data.error ?? "Reorder failed.");
+        return;
+      }
+      await load();
+    } finally {
+      setMovingKey(null);
+    }
   }
 
   if (authLoading || !structure || !user) return <AccessLoading label="Loading course structure…" />;
@@ -142,7 +163,7 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
           )}
           {editingKey === "__list__" && (
             <ul className="mt-3 space-y-2">
-              {(structure.types ?? []).map((type) => (
+              {(structure.types ?? []).map((type, index, arr) => (
                 <li key={type.typeKey} className="flex flex-wrap items-center gap-2 rounded-xl border border-ink/10 bg-[#f1f5f9] admin-dark:bg-[#0a162e]/60 p-3">
                   {editingKey === type.typeKey ? (
                     <>
@@ -151,7 +172,21 @@ export default function LegacyCourseContent({ slug }: { slug: string }) {
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 break-words text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">{type.name}</span>
+                      <span className="flex-1 min-w-0 break-words text-sm font-semibold text-[#0b1e3a] admin-dark:text-white">{type.name}</span>
+                      <span className="inline-flex items-center gap-1" role="group" aria-label={`Reorder ${type.name}`}>
+                        <button type="button"
+                          disabled={index === 0 || movingKey !== null}
+                          onClick={() => void moveType(type.typeKey, "up")}
+                          title="Move Up"
+                          aria-label={`Move ${type.name} up`}
+                          className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-black text-[#0b1e3a] admin-dark:text-white disabled:cursor-not-allowed disabled:opacity-30">↑</button>
+                        <button type="button"
+                          disabled={index === arr.length - 1 || movingKey !== null}
+                          onClick={() => void moveType(type.typeKey, "down")}
+                          title="Move Down"
+                          aria-label={`Move ${type.name} down`}
+                          className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-black text-[#0b1e3a] admin-dark:text-white disabled:cursor-not-allowed disabled:opacity-30">↓</button>
+                      </span>
                       <button type="button" onClick={() => { setEditingKey(type.typeKey); setEditName(type.name); }} className="rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-bold text-[#0b1e3a] admin-dark:text-white">Rename</button>
                     </>
                   )}

@@ -64,6 +64,7 @@ export default function TypeChaptersPage({
   const [newName, setNewName] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   async function headers() {
     return {
@@ -115,6 +116,34 @@ export default function TypeChaptersPage({
     return true;
   }
 
+  /** Manual order control — persists sort_order so refresh + website keep it. */
+  async function move(id: string, direction: "up" | "down") {
+    setMovingId(id);
+    try {
+      const res = await fetch("/api/admin/content-control", {
+        method: "POST",
+        headers: await headers(),
+        body: JSON.stringify({
+          courseSlug: slug,
+          ctype,
+          ...(sp.subject ? { subjectId: sp.subject } : {}),
+          ...(sp.paper ? { paperId: sp.paper } : {}),
+          action: "move-chapter",
+          id,
+          direction,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.showToast("error", data.error ?? "Reorder failed.");
+        return;
+      }
+      await load();
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   if (authLoading || !user || chapters === null)
     return <AccessLoading label="Loading chapters…" />;
 
@@ -133,7 +162,7 @@ export default function TypeChaptersPage({
         </p>
       ) : (
         <ul className="mt-6 space-y-2">
-          {chapters.map((chapter) => (
+          {chapters.map((chapter, index) => (
             <li key={chapter.id} className="rounded-xl border border-[#dbeafe] bg-white shadow-sm shadow-[#0b1e3a]/5 admin-dark:border-[#1e3a65] admin-dark:bg-[#112544] p-4">
               {editId === chapter.id ? (
                 <div className="flex flex-wrap gap-2">
@@ -146,11 +175,26 @@ export default function TypeChaptersPage({
                     className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-bold text-white">Save</button>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="flex-1 break-words text-sm font-bold text-[#0b1e3a] admin-dark:text-white">{chapter.name}</span>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="flex-1 min-w-0 break-words text-sm font-bold text-[#0b1e3a] admin-dark:text-white">{chapter.name}</span>
                   {typeof chapter.classCount === "number" && (
                     <span className="text-[11px] text-slate-500 admin-dark:text-slate-400">{chapter.classCount} classes</span>
                   )}
+                  {/* Manual order — ↑ Up / ↓ Down, persisted to the database */}
+                  <span className="inline-flex items-center gap-1" role="group" aria-label={`Reorder ${chapter.name}`}>
+                    <button type="button"
+                      disabled={index === 0 || movingId !== null}
+                      onClick={() => void move(chapter.id, "up")}
+                      title="Move Up"
+                      aria-label={`Move ${chapter.name} up`}
+                      className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-black text-[#0b1e3a] admin-dark:text-white disabled:cursor-not-allowed disabled:opacity-30">↑</button>
+                    <button type="button"
+                      disabled={index === chapters.length - 1 || movingId !== null}
+                      onClick={() => void move(chapter.id, "down")}
+                      title="Move Down"
+                      aria-label={`Move ${chapter.name} down`}
+                      className="rounded-lg border border-ink/15 px-2 py-1.5 text-xs font-black text-[#0b1e3a] admin-dark:text-white disabled:cursor-not-allowed disabled:opacity-30">↓</button>
+                  </span>
                   {(() => {
                     const link = contentLink(ctype, chapter.id, slug, sp.subject, sp.paper);
                     return (

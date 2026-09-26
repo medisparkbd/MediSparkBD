@@ -275,6 +275,50 @@ html:not(:has([data-admin-theme]))[data-button-style="square"] button {
   }
 }
 
+/* ============ Exam Card status indicator — smooth premium pulse/glow ============ */
+/* Same size/position in every state; only the glow intensity changes. */
+.exam-dot {
+  height: 6px;
+  width: 6px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+}
+@keyframes exam-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+.exam-dot-upcoming {
+  background: #f59e0b;
+  box-shadow: 0 0 6px 1px rgb(245 158 11 / 0.7);
+  animation: exam-dot-pulse 1.8s ease-in-out infinite;
+}
+.exam-dot-live {
+  background: #ffffff;
+  box-shadow: 0 0 8px 2px rgb(255 255 255 / 0.9);
+  animation: exam-dot-pulse 1.2s ease-in-out infinite;
+}
+.exam-dot-practice {
+  background: #a78bfa;
+  box-shadow: 0 0 6px 1px rgb(167 139 250 / 0.6);
+  animation: exam-dot-pulse 2.4s ease-in-out infinite;
+}
+.exam-dot-closed {
+  background: currentColor;
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .exam-dot-upcoming, .exam-dot-live, .exam-dot-practice { animation: none; }
+}
+/* Theme-safe pill text — readable in both Dark and Light mode. */
+.exam-pill-upcoming { color: #b45309; }
+html[data-theme="dark"] .exam-pill-upcoming { color: #fcd34d; }
+.exam-pill-practice { color: #6d28d9; }
+html[data-theme="dark"] .exam-pill-practice { color: #ddd6fe; }
+.exam-practice-note { color: #6d28d9; }
+html[data-theme="dark"] .exam-practice-note { color: rgba(221, 214, 254, 0.9); }
+.exam-result-btn { color: #047857; }
+html[data-theme="dark"] .exam-result-btn { color: #a7f3d0; }
+
 @keyframes fade-in {
   from {
     opacity: 0;
